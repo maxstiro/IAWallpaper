@@ -1,15 +1,20 @@
 """CONTROL CENTER — Central de Controle estilo Wallpaper Engine para configurar cenário, clima, avatar, ComfyUI e sistema."""
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSlider,
     QTabWidget,
@@ -17,10 +22,55 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..comfy.workflows import SCENE_PRESETS
+from ..comfy.workflows import PACK_EXPRESSIONS, PACK_OUTFITS, PACK_SCENE_VARIANTS, SCENE_PRESETS
 from ..config import Settings
-from ..core.persona import BUILTIN_PERSONAS, list_personas
+from ..core.persona import BUILTIN_PERSONAS, create_custom_persona, list_personas, load_persona
 from .theme import DARK_STUDIO_QSS
+
+
+class CustomPersonaDialog(QDialog):
+    """Diálogo limpo para criar uma nova persona waifu personalizada com tags e temperamento."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Criar Nova Waifu Personalizada")
+        self.resize(460, 290)
+        self.setStyleSheet(DARK_STUDIO_QSS)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.ed_name = QLineEdit()
+        self.ed_name.setPlaceholderText("Ex: Luna, Aria, Yuki...")
+        self.ed_title = QLineEdit()
+        self.ed_title.setPlaceholderText("Ex: Guardiã da Lua / Companheira Estelar")
+        self.ed_tags = QLineEdit()
+        self.ed_tags.setPlaceholderText("Ex: long_silver_hair, violet_eyes, fox_ears, gentle_smile")
+
+        self.cb_temp = QComboBox()
+        self.cb_temp.addItem("Carinhosa & Aconchegante (Cozy)", "cozy")
+        self.cb_temp.addItem("Divertida & Brincalhona (Playful)", "playful")
+        self.cb_temp.addItem("Focada em Código & Criação (Focused)", "focused")
+        self.cb_temp.addItem("Notívaga & Cyberpunk (Night Owl)", "night_owl")
+
+        form.addRow("Nome:", self.ed_name)
+        form.addRow("Título:", self.ed_title)
+        form.addRow("Tags de Aparência:", self.ed_tags)
+        form.addRow("Temperamento Neural:", self.cb_temp)
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def build_persona(self):
+        return create_custom_persona(
+            name=self.ed_name.text().strip() or "Luna",
+            title=self.ed_title.text().strip() or "Companheira Personalizada",
+            character_tags=self.ed_tags.text().strip() or "long_silver_hair, violet_eyes, gentle_smile",
+            temperament_preset=self.cb_temp.currentData() or "cozy",
+        )
 
 
 class ControlCenterWindow(QWidget):
@@ -36,16 +86,19 @@ class ControlCenterWindow(QWidget):
     comfy_probe_requested = Signal()
     comfy_gen_avatar_requested = Signal(str)       # outfit_key
     comfy_gen_scene_requested = Signal(str, str)   # scene_id, variant
+    comfy_gen_pack_requested = Signal(str)         # scene_id
+    create_persona_requested = Signal(object)      # Persona
     reload_assets_requested = Signal()
     clear_generated_requested = Signal()
     clear_memory_requested = Signal()
 
-    def __init__(self, settings: Settings, parent=None):
+    def __init__(self, settings: Settings, personas_dir: Path | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("IAWallpaper — Central de Controle")
-        self.resize(700, 560)
+        self.resize(720, 600)
         self.setStyleSheet(DARK_STUDIO_QSS)
         self._settings = settings.sanitized()
+        self._personas_dir = personas_dir
         self._building = True
 
         root = QVBoxLayout(self)
@@ -167,12 +220,14 @@ class ControlCenterWindow(QWidget):
         g_char = QGroupBox("Personalidade & Aparência Dinâmica")
         f = QFormLayout(g_char)
 
+        persona_row = QHBoxLayout()
         self.cb_persona = QComboBox()
-        for pid in list_personas():
-            p = BUILTIN_PERSONAS.get(pid)
-            label = f"{p.name} — {p.title}" if p else pid.title()
-            self.cb_persona.addItem(label, pid)
+        self._populate_personas()
         self.cb_persona.currentIndexChanged.connect(self._emit_settings)
+        btn_new_persona = QPushButton("+ Nova Waifu")
+        btn_new_persona.clicked.connect(self._open_new_persona_dialog)
+        persona_row.addWidget(self.cb_persona, 1)
+        persona_row.addWidget(btn_new_persona)
 
         self.cb_outfit = QComboBox()
         for label, key in [
@@ -198,7 +253,7 @@ class ControlCenterWindow(QWidget):
         self.chk_whispers = QCheckBox("Permitir sussurros contextuais na área de trabalho")
         self.chk_whispers.stateChanged.connect(self._emit_settings)
 
-        f.addRow("Personagem:", self.cb_persona)
+        f.addRow("Personagem:", persona_row)
         f.addRow("Traje:", self.cb_outfit)
         f.addRow("Escala do Avatar:", self.sl_avatar_scale)
         f.addRow("Posição Horizontal:", self.sl_avatar_x)
@@ -252,12 +307,27 @@ class ControlCenterWindow(QWidget):
         info.setStyleSheet("color: #b8c9eb;")
         vg.addWidget(info)
 
+        btn_gen_pack = QPushButton("🚀 Gerar Pack Completo Consistente (6 Trajes + 5 Expressões + 4 Cenários)")
+        btn_gen_pack.setObjectName("primaryBtn")
+        btn_gen_pack.clicked.connect(lambda: self.comfy_gen_pack_requested.emit(self.cb_scene.currentData()))
+        vg.addWidget(btn_gen_pack)
+
+        self.pb_pack = QProgressBar()
+        self.pb_pack.setRange(0, 100)
+        self.pb_pack.setValue(0)
+        self.pb_pack.setVisible(False)
+        vg.addWidget(self.pb_pack)
+
+        self.lbl_asset_coverage = QLabel("Cobertura de Assets: verificando...")
+        self.lbl_asset_coverage.setStyleSheet("color: #9bb8e8; font-size: 12px;")
+        self.lbl_asset_coverage.setWordWrap(True)
+        vg.addWidget(self.lbl_asset_coverage)
+
         row1 = QHBoxLayout()
         self.cb_gen_outfit = QComboBox()
-        for key in ("casual", "focus", "rainy", "cozy", "nightwear", "starlight"):
+        for key in PACK_OUTFITS:
             self.cb_gen_outfit.addItem(f"Traje: {key}", key)
-        btn_gen_av = QPushButton("✨ Gerar Sprite da Waifu (RGBA)")
-        btn_gen_av.setObjectName("primaryBtn")
+        btn_gen_av = QPushButton("✨ Gerar Traje Individual (RGBA)")
         btn_gen_av.clicked.connect(lambda: self.comfy_gen_avatar_requested.emit(self.cb_gen_outfit.currentData()))
         row1.addWidget(self.cb_gen_outfit, 1)
         row1.addWidget(btn_gen_av, 2)
@@ -267,7 +337,7 @@ class ControlCenterWindow(QWidget):
         self.cb_gen_variant = QComboBox()
         for label, key in [("Dia", "day"), ("Pôr do Sol", "sunset"), ("Noite Estrelada", "night"), ("Chuva", "rain")]:
             self.cb_gen_variant.addItem(f"Cenário: {label}", key)
-        btn_gen_sc = QPushButton("🌄 Gerar Fundo do Cenário Atual")
+        btn_gen_sc = QPushButton("🌄 Gerar Horário Individual")
         btn_gen_sc.clicked.connect(
             lambda: self.comfy_gen_scene_requested.emit(self.cb_scene.currentData(), self.cb_gen_variant.currentData())
         )
@@ -409,6 +479,52 @@ class ControlCenterWindow(QWidget):
         ).sanitized()
         self._settings = s
         self.settings_changed.emit(s)
+
+    def _populate_personas(self) -> None:
+        curr = self.cb_persona.currentData() if self.cb_persona.count() else self._settings.persona_id
+        self.cb_persona.blockSignals(True)
+        self.cb_persona.clear()
+        for pid in list_personas(self._personas_dir):
+            p = load_persona(pid, self._personas_dir) if self._personas_dir else BUILTIN_PERSONAS.get(pid)
+            label = f"{p.name} — {p.title}" if p else pid.title()
+            self.cb_persona.addItem(label, pid)
+        self._set_combo(self.cb_persona, curr)
+        self.cb_persona.blockSignals(False)
+
+    def _open_new_persona_dialog(self) -> None:
+        dlg = CustomPersonaDialog(self)
+        if dlg.exec() == QDialog.Accepted:
+            persona = dlg.build_persona()
+            self.create_persona_requested.emit(persona)
+
+    def refresh_personas(self, select_id: str | None = None) -> None:
+        self._populate_personas()
+        if select_id:
+            self._building = True
+            self._set_combo(self.cb_persona, select_id)
+            self._building = False
+
+    def set_asset_coverage(self, avatar_keys: set[str], scene_keys: set[str]) -> None:
+        outfits_ok = [k for k in PACK_OUTFITS if k in avatar_keys]
+        exprs_ok = [k for k in PACK_EXPRESSIONS if f"casual_{k}" in avatar_keys or k in avatar_keys]
+        scenes_ok = [k for k in PACK_SCENE_VARIANTS if k in scene_keys]
+        self.lbl_asset_coverage.setText(
+            f"Trajes AI: {len(outfits_ok)}/{len(PACK_OUTFITS)} ({', '.join(outfits_ok) or 'procedural'}) · "
+            f"Expressões AI: {len(exprs_ok)}/{len(PACK_EXPRESSIONS)} · "
+            f"Cenários: {len(scenes_ok)}/{len(PACK_SCENE_VARIANTS)} ({', '.join(scenes_ok) or 'procedural'})"
+        )
+
+    def set_pack_progress(self, current: int, total: int, label: str) -> None:
+        self.lbl_gen_progress.setText(label)
+        if total > 0:
+            self.pb_pack.setVisible(True)
+            self.pb_pack.setValue(int((current / total) * 100))
+            if current >= total:
+                self.pb_pack.setFormat("100% — Concluído!")
+            else:
+                self.pb_pack.setFormat(f"{current}/{total}")
+        else:
+            self.pb_pack.setVisible(False)
 
     def set_status_text(self, text: str) -> None:
         self.status_lbl.setText(text)

@@ -16,7 +16,7 @@ from PySide6.QtGui import (
 
 from ..core.emotion import EmotionState
 from ..core.persona import Persona
-from ..mathutil import clamp, lerp
+from ..mathutil import clamp, lerp, smoothstep
 from .atmosphere import AtmospherePalette
 
 
@@ -51,10 +51,12 @@ class AvatarRig:
         self.head_rect = QRectF()
         self.body_rect = QRectF()
 
-        # Cache de sprites RGBA (ex: generated/comfyui ou assets/personas/<id>/)
+        # Cache de sprites RGBA (ex: generated/comfyui ou assets/personas/<id>/) + crossfade suave
         self._sprites: dict[str, QPixmap] = {}
-        self._tint_cache_key: tuple | None = None
-        self._tint_cache_pm: QPixmap | None = None
+        self._tint_cache: dict[tuple, QPixmap] = {}
+        self._current_sprite_key: str | None = None
+        self._prev_sprite: QPixmap | None = None
+        self._sprite_fade_t: float = 1.0
         self.reload_sprites()
 
     @staticmethod
@@ -68,11 +70,15 @@ class AvatarRig:
     def set_persona(self, persona: Persona, sprite_dirs: list[Path] | Path | None = None) -> None:
         self.persona = persona
         self.sprite_dirs = self._normalize_dirs(sprite_dirs)
+        self._current_sprite_key = None
+        self._prev_sprite = None
+        self._sprite_fade_t = 1.0
         self.reload_sprites()
 
     def reload_sprites(self) -> None:
         """Carrega sprites PNG transparentes (prioridade para o último diretório na lista, ex: generated)."""
         self._sprites.clear()
+        self._tint_cache.clear()
         for folder in self.sprite_dirs:
             if not folder.exists():
                 continue
@@ -81,13 +87,52 @@ class AvatarRig:
                 if not pm.isNull():
                     self._sprites[png.stem.lower()] = pm
 
-    def _active_sprite(self, mood: str) -> QPixmap | None:
-        for key in (f"{self.outfit}_{mood}", self.outfit, mood, "default", "base"):
-            if key in self._sprites:
-                return self._sprites[key]
+    def available_sprite_keys(self) -> set[str]:
+        return set(self._sprites.keys())
+
+    def _resolve_sprite_key(self, mood: str) -> str | None:
+        # Prioridade: traje+humor -> traje -> base+humor -> humor -> casual -> default -> qualquer um
+        mood_aliases = [mood]
+        if mood == "affectionate":
+            mood_aliases.append("happy")
+        elif mood == "cozy":
+            mood_aliases.append("calm")
+        for m in mood_aliases:
+            k = f"{self.outfit}_{m}"
+            if k in self._sprites:
+                return k
+        if self.outfit in self._sprites:
+            return self.outfit
+        for m in mood_aliases:
+            for base_k in (f"casual_{m}", m):
+                if base_k in self._sprites:
+                    return base_k
+        for fallback in ("casual", "default", "base"):
+            if fallback in self._sprites:
+                return fallback
         if self._sprites:
-            return next(iter(self._sprites.values()))
+            return next(iter(self._sprites.keys()))
         return None
+
+    def _get_tinted_sprite(self, sprite: QPixmap, atmosphere: AtmospherePalette) -> QPixmap:
+        tr, tg, tb = atmosphere.avatar_tint
+        tint_alpha = int(atmosphere.avatar_tint_alpha * 115)
+        cache_key = (id(sprite), tr // 8, tg // 8, tb // 8, tint_alpha // 6)
+        cached = self._tint_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        tinted = QPixmap(sprite.size())
+        tinted.fill(Qt.transparent)
+        tp = QPainter(tinted)
+        tp.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        tp.drawPixmap(0, 0, sprite)
+        tp.setCompositionMode(QPainter.CompositionMode_SourceAtop)
+        tp.fillRect(tinted.rect(), QColor(tr, tg, tb, tint_alpha))
+        tp.end()
+        if len(self._tint_cache) >= 12:
+            self._tint_cache.clear()
+        self._tint_cache[cache_key] = tinted
+        return tinted
 
     def impulse(self, vy: float = -180.0, tilt: float = 0.0) -> None:
         self.bounce_vy += vy
@@ -125,6 +170,12 @@ class AvatarRig:
         # Brilho afetivo durante carinho
         target_glow = 1.0 if caressing else 0.0
         self.caress_glow += (target_glow - self.caress_glow) * clamp(dt * 5.0, 0.0, 1.0)
+
+        # Crossfade suave entre expressões e trajes (0.55s)
+        if self._sprite_fade_t < 1.0:
+            self._sprite_fade_t = min(1.0, self._sprite_fade_t + dt / 0.55)
+            if self._sprite_fade_t >= 1.0:
+                self._prev_sprite = None
 
         # Ciclo natural de piscar
         if asleep:
@@ -164,8 +215,14 @@ class AvatarRig:
         anchor_x = canvas_w * x_ratio + parallax_x * 18.0
         anchor_y = canvas_h * 0.985 + self.bounce_y + parallax_y * 8.0
 
-        sprite = self._active_sprite(emotion.mood)
-        if sprite is not None:
+        sprite_key = self._resolve_sprite_key("sleepy" if asleep else emotion.mood)
+        if sprite_key is not None:
+            if sprite_key != self._current_sprite_key:
+                if self._current_sprite_key is not None and self._current_sprite_key in self._sprites:
+                    self._prev_sprite = self._sprites[self._current_sprite_key]
+                    self._sprite_fade_t = 0.0
+                self._current_sprite_key = sprite_key
+            sprite = self._sprites[sprite_key]
             self._paint_sprite_avatar(
                 painter, sprite, anchor_x, anchor_y, canvas_h, scale, breath, sway, emotion, atmosphere, asleep
             )
@@ -214,25 +271,23 @@ class AvatarRig:
         painter.scale(sx, sy)
 
         draw_rect = QRectF(-target_w * 0.5, -target_h, target_w, target_h)
-
-        # Harmonização sutil de cor estritamente sobre a silhueta opaca (com cache por paleta)
-        tr, tg, tb = atmosphere.avatar_tint
-        tint_alpha = int(atmosphere.avatar_tint_alpha * 115)
-        cache_key = (id(sprite), tr // 8, tg // 8, tb // 8, tint_alpha // 6)
-        if self._tint_cache_key != cache_key or self._tint_cache_pm is None:
-            tinted = QPixmap(sprite.size())
-            tinted.fill(Qt.transparent)
-            tp = QPainter(tinted)
-            tp.setRenderHint(QPainter.SmoothPixmapTransform, True)
-            tp.drawPixmap(0, 0, sprite)
-            tp.setCompositionMode(QPainter.CompositionMode_SourceAtop)
-            tp.fillRect(tinted.rect(), QColor(tr, tg, tb, tint_alpha))
-            tp.end()
-            self._tint_cache_key = cache_key
-            self._tint_cache_pm = tinted
-
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        painter.drawPixmap(draw_rect, self._tint_cache_pm, QRectF(self._tint_cache_pm.rect()))
+
+        # Harmonização sutil + crossfade suave quando troca expressão/traje
+        tinted_curr = self._get_tinted_sprite(sprite, atmosphere)
+        if self._prev_sprite is not None and self._sprite_fade_t < 1.0:
+            ease = smoothstep(0.0, 1.0, self._sprite_fade_t)
+            tinted_prev = self._get_tinted_sprite(self._prev_sprite, atmosphere)
+            prev_aspect = self._prev_sprite.width() / max(self._prev_sprite.height(), 1)
+            prev_w = target_h * prev_aspect
+            prev_rect = QRectF(-prev_w * 0.5, -target_h, prev_w, target_h)
+            painter.setOpacity(1.0 - ease)
+            painter.drawPixmap(prev_rect, tinted_prev, QRectF(tinted_prev.rect()))
+            painter.setOpacity(ease)
+            painter.drawPixmap(draw_rect, tinted_curr, QRectF(tinted_curr.rect()))
+            painter.setOpacity(1.0)
+        else:
+            painter.drawPixmap(draw_rect, tinted_curr, QRectF(tinted_curr.rect()))
         painter.restore()
 
         # Atualiza hitboxes para carinho na cabeça e clique no corpo

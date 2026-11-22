@@ -20,8 +20,8 @@
 ## Fase 5 — Interface Wallpaper Engine, App Principal & Entrega
 - [x] **Milestone 6**: Central de Controle Dark Studio (`ui/control_center.py`), Monitor Neural ao vivo (`ui/neural_monitor.py`), Bandeja do Sistema (`ui/tray.py`), composição `app.py` / `main.py` / `start_iawallpaper.ps1`, testes de arquitetura e integração (21/21 verdes), correções visuais e publicação no repositório `https://github.com/maxstiro/IAWallpaper.git`.
 
-## Fase 6 — Próximas Evoluções (Pós-MVP)
-- [ ] **Milestone 7**: Pacote multi-expressão e multi-traje automático via ComfyUI (geração em lote de `casual`, `focus`, `rainy`, `nightwear`, `day`, `rain` com mesma seed/consistência de personagem via IP-Adapter/LoRA).
+## Fase 6 — Evolução Contínua
+- [x] **Milestone 7**: Crossfade suave 2.5D (expressões, trajes e horários/clima), workflows img2img consistentes + gerador de pack em lote (`ComfyBridge` + `tools/generate_pack.py`), Criador de Waifu Personalizada na Central de Controle (`+ Nova Waifu`), validação visual com `tools/render_showcase.py`, pack completo da **Mira** (11 sprites RGBA) + **Observatório Celeste** (4 horários) e push via SSH no GitHub.
 - [ ] **Milestone 8**: Suporte multi-monitor independente (cenário dedicado por monitor ou modo panorâmico estendido) + validação em tempo real de ancoragem Win11 26300 com múltiplos DPIs.
 - [ ] **Milestone 9**: Áudio ambiente reativo opcional (chuva suave, vento, lareira) e visualizador/reatividade a áudio do sistema (WASAPI loopback) sincronizando ritmo da avatar com músicas no Spotify/YouTube.
 - [ ] **Milestone 10**: Diálogo interativo leve opcional (LLM local via Ollama/llama.cpp) condicionado ao humor da rede LIF, afinidade e memória episódica.

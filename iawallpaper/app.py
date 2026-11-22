@@ -14,7 +14,7 @@ from .core.emotion import EmotionDecoder
 from .core.episodic import EpisodicMemory
 from .core.homeostasis import Drives
 from .core.nervous_system import WaifuSpikingBrain
-from .core.persona import load_persona
+from .core.persona import load_persona, save_persona
 from .log import configure_log, log
 from .mind.director import BehaviorDirector
 from .paths import Paths
@@ -51,6 +51,8 @@ class _UiBridge(QObject):
     panic_triggered = Signal()
     comfy_avatar_done = Signal(str)
     comfy_scene_done = Signal(str)
+    comfy_pack_progress = Signal(int, int, str)
+    comfy_pack_asset = Signal(str, str)
     comfy_error = Signal(str)
 
 
@@ -85,6 +87,8 @@ class IAWallpaperApp:
         self.bridge.panic_triggered.connect(self.toggle_panic_hide)
         self.bridge.comfy_avatar_done.connect(self._on_comfy_avatar_done)
         self.bridge.comfy_scene_done.connect(self._on_comfy_scene_done)
+        self.bridge.comfy_pack_progress.connect(self._on_comfy_pack_progress)
+        self.bridge.comfy_pack_asset.connect(self._on_comfy_pack_asset)
         self.bridge.comfy_error.connect(self._on_comfy_error)
 
         # Estado de sessão
@@ -135,8 +139,9 @@ class IAWallpaperApp:
         self.canvas.cursor_approaching.connect(self._on_cursor_approaching)
 
         # Janelas de controle & monitor neural
-        self.control_center = ControlCenterWindow(self.settings)
+        self.control_center = ControlCenterWindow(self.settings, personas_dir=self.paths.personas_dir)
         self._connect_control_center()
+        self._update_asset_coverage()
         self.neural_monitor = NeuralMonitorWindow()
 
         # Ícone de bandeja
@@ -212,6 +217,8 @@ class IAWallpaperApp:
         cc.comfy_probe_requested.connect(self._probe_comfy_ui)
         cc.comfy_gen_avatar_requested.connect(self._generate_comfy_avatar)
         cc.comfy_gen_scene_requested.connect(self._generate_comfy_scene)
+        cc.comfy_gen_pack_requested.connect(self._generate_comfy_pack)
+        cc.create_persona_requested.connect(self._create_custom_persona)
         cc.reload_assets_requested.connect(self._reload_assets)
         cc.clear_generated_requested.connect(self._clear_generated_assets)
         cc.clear_memory_requested.connect(self._clear_memory)
@@ -301,6 +308,7 @@ class IAWallpaperApp:
             set_autostart(s.start_with_windows)
 
         self._apply_canvas_settings()
+        self._update_asset_coverage()
         self.settings.save(self.paths.settings_file)
 
     # ---------------- Ciclos principais ----------------
@@ -524,6 +532,41 @@ class IAWallpaperApp:
             on_error=lambda e: self.bridge.comfy_error.emit(e),
         )
 
+    def _generate_comfy_pack(self, scene_id: str) -> None:
+        p_dest = self.paths.persona_generated_assets(self.persona.id)
+        s_dest = self.paths.scene_generated_assets(scene_id)
+        self.control_center.set_pack_progress(0, 1, f"🚀 Iniciando pack completo de {self.persona.name}...")
+        self.comfy.generate_full_pack_async(
+            persona=self.persona,
+            scene_id=scene_id,
+            persona_dest_dir=p_dest,
+            scene_dest_dir=s_dest,
+            skip_existing=True,
+            on_progress=lambda cur, tot, lbl: self.bridge.comfy_pack_progress.emit(cur, tot, lbl),
+            on_asset=lambda kind, p: self.bridge.comfy_pack_asset.emit(kind, str(p)),
+            on_error=lambda e: self.bridge.comfy_error.emit(e),
+        )
+
+    def _on_comfy_pack_progress(self, cur: int, tot: int, label: str) -> None:
+        self.control_center.set_pack_progress(cur, tot, label)
+
+    def _on_comfy_pack_asset(self, _kind: str, _path_str: str) -> None:
+        self._reload_assets()
+
+    def _create_custom_persona(self, persona) -> None:
+        save_persona(persona, self.paths.personas_dir)
+        self.control_center.refresh_personas(select_id=persona.id)
+        new_s = Settings(**self.settings.__dict__)
+        new_s.persona_id = persona.id
+        self.apply_settings(new_s)
+        self.control_center.set_status_text(f"✨ Nova persona criada: {persona.name}!")
+
+    def _update_asset_coverage(self) -> None:
+        self.control_center.set_asset_coverage(
+            self.canvas.avatar.available_sprite_keys(),
+            self.canvas.scene.available_scene_keys(),
+        )
+
     def _on_comfy_avatar_done(self, path_str: str) -> None:
         self._reload_assets()
         self.control_center.set_gen_progress(f"✅ Sprite da avatar pronto e aplicado: {Path(path_str).name}")
@@ -539,6 +582,7 @@ class IAWallpaperApp:
     def _reload_assets(self) -> None:
         self.canvas.avatar.reload_sprites()
         self.canvas.scene.reload_scene_images()
+        self._update_asset_coverage()
         self.canvas.update()
 
     def _clear_generated_assets(self) -> None:

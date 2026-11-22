@@ -17,7 +17,7 @@ from PySide6.QtGui import (
 )
 
 from ..core.emotion import EmotionState
-from ..mathutil import clamp, lerp
+from ..mathutil import clamp, lerp, smoothstep
 from ..sense.circadian import CircadianState
 from ..sense.weather import WeatherState
 from .atmosphere import AtmospherePalette, compute_atmosphere
@@ -55,6 +55,9 @@ class SceneCompositor:
 
         # Imagens de cenário opcionais (geradas pelo ComfyUI): day.png, sunset.png, night.png, rain.png
         self._bg_images: dict[str, QPixmap] = {}
+        self._current_bg_key: str | None = None
+        self._prev_bg: QPixmap | None = None
+        self._bg_fade_t: float = 1.0
         self.reload_scene_images()
 
         # Bolha de sussurro contextual
@@ -73,6 +76,9 @@ class SceneCompositor:
     def reload_scene_images(self, scene_dirs: list[Path] | Path | None = None) -> None:
         if scene_dirs is not None:
             self.scene_dirs = self._normalize_dirs(scene_dirs)
+            self._current_bg_key = None
+            self._prev_bg = None
+            self._bg_fade_t = 1.0
         self._bg_images.clear()
         for folder in self.scene_dirs:
             if not folder.exists():
@@ -81,6 +87,9 @@ class SceneCompositor:
                 pm = QPixmap(str(png))
                 if not pm.isNull():
                     self._bg_images[png.stem.lower()] = pm
+
+    def available_scene_keys(self) -> set[str]:
+        return set(self._bg_images.keys())
 
     def set_parallax_target(self, nx: float, ny: float, strength: float = 1.0) -> None:
         self.target_px = clamp(nx, -1.0, 1.0) * clamp(strength, 0.0, 2.0)
@@ -103,19 +112,24 @@ class SceneCompositor:
             if cloud[0] > 1.25:
                 cloud[0] = -0.25
 
-    def _pick_bg_image(self, circadian: CircadianState, weather: WeatherState) -> QPixmap | None:
+        if self._bg_fade_t < 1.0:
+            self._bg_fade_t = min(1.0, self._bg_fade_t + dt / 1.5)
+            if self._bg_fade_t >= 1.0:
+                self._prev_bg = None
+
+    def _pick_bg_key(self, circadian: CircadianState, weather: WeatherState) -> str | None:
         if not self._bg_images:
             return None
         if weather.condition in ("rain", "storm") and "rain" in self._bg_images:
-            return self._bg_images["rain"]
+            return "rain"
         if circadian.period in ("golden_hour", "dawn", "twilight") and "sunset" in self._bg_images:
-            return self._bg_images["sunset"]
+            return "sunset"
         if circadian.night_factor >= 0.55 and "night" in self._bg_images:
-            return self._bg_images["night"]
+            return "night"
         for key in ("day", "default", "base"):
             if key in self._bg_images:
-                return self._bg_images[key]
-        return next(iter(self._bg_images.values()))
+                return key
+        return next(iter(self._bg_images.keys()))
 
     def paint(
         self,
@@ -138,8 +152,14 @@ class SceneCompositor:
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        bg = self._pick_bg_image(circadian, weather)
-        if bg is not None:
+        bg_key = self._pick_bg_key(circadian, weather)
+        if bg_key is not None:
+            if bg_key != self._current_bg_key:
+                if self._current_bg_key is not None and self._current_bg_key in self._bg_images:
+                    self._prev_bg = self._bg_images[self._current_bg_key]
+                    self._bg_fade_t = 0.0
+                self._current_bg_key = bg_key
+            bg = self._bg_images[bg_key]
             self._paint_ai_backdrop(painter, width, height, bg, atmo, circadian)
             particles.paint_sky_fx(painter)
         else:
@@ -194,7 +214,14 @@ class SceneCompositor:
         oy = -self.parallax_y * 10.0 - pad
         target = QRectF(ox, oy, w + pad * 2.0, h + pad * 2.0)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        painter.drawPixmap(target, bg, QRectF(bg.rect()))
+        if self._prev_bg is not None and self._bg_fade_t < 1.0:
+            ease = smoothstep(0.0, 1.0, self._bg_fade_t)
+            painter.drawPixmap(target, self._prev_bg, QRectF(self._prev_bg.rect()))
+            painter.setOpacity(ease)
+            painter.drawPixmap(target, bg, QRectF(bg.rect()))
+            painter.setOpacity(1.0)
+        else:
+            painter.drawPixmap(target, bg, QRectF(bg.rect()))
         # Gradação atmosférica suave para sincronizar dia/noite/tempestade
         grad = QLinearGradient(0, 0, 0, h)
         top = QColor(*atmo.sky_top)

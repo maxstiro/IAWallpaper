@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-22 (Milestone 6 — MVP Completo & Validado)
+> **Última atualização**: 2026-11-22 (Milestone 7 — Pack Consistente Completo & Push SSH Validado)
 
 ---
 
@@ -18,29 +18,33 @@
 | Render (`render/`) | `atmosphere.py`, `particles.py`, `avatar.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | 60 FPS, rim-light cacheado sem borda, corações/estrelas vetoriais, fallback procedural |
 | Mente (`mind/`) | `director.py` | 🟢 Validado | Trajes dinâmicos, sono + consolidação, sussurros por bandit, carinho/cutucada/mimo |
 | Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + Monitor Neural + Bandeja |
-| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tests/` | 🟢 21/21 Verdes | `pytest` completo (arquitetura + unitários + integração + offscreen render) |
+| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 23/23 Verdes | `pytest` completo + `generate_pack.py` + `render_showcase.py` |
 
 ---
 
 ## 2. Assets Gerados Localmente (ComfyUI Read-Only, fora do Git)
-- `assets/generated/personas/mira/casual.png` — Sprite RGBA transparente via `waiIllustriousSDXL_v170.safetensors` + PAG + `Image Rembg (isnet-anime)`.
-- `assets/generated/scenes/sky_sanctuary/sunset.png` — Cenário widescreen Pôr do Sol.
-- `assets/generated/scenes/sky_sanctuary/night.png` — Cenário widescreen Noite Estrelada.
-- **Fallback Procedural**: Qualquer persona/cenário sem PNG gerado opera 100% nativamente via render procedural.
+- **Mira (`assets/generated/personas/mira/` — 11 sprites RGBA consistentes via `isnet-anime`)**:
+  - Base + 5 expressões img2img (pose 100% travada, `denoise=0.44`): `casual.png`, `casual_happy.png`, `casual_affectionate.png`, `casual_shy.png`, `casual_sleepy.png`, `casual_pouty.png`.
+  - 5 trajes dinâmicos img2img: `focus.png` (óculos), `rainy.png` (capuz), `cozy.png` (suéter), `nightwear.png` (pijama/sonolenta), `starlight.png`.
+- **Observatório Celeste (`assets/generated/scenes/sky_sanctuary/` — 4 horários/climas)**:
+  - `day.png`, `sunset.png`, `night.png`, `rain.png`.
+- **Fallback Procedural**: Qualquer nova persona/cenário sem PNG gerado opera 100% nativamente via render procedural.
 
 ---
 
-## 3. Bugs Encontrados e Resolvidos na Validação Visual (Milestone 6)
+## 3. Bugs Encontrados e Resolvidos (Milestones 6–7)
 1. **Filtro de consolidação em `core/episodic.py`**: Episódios recém-decaídos (`n = 0.995`) eram filtrados por `n >= 1.0` em `preferences()`; ajustado para `n >= 0.2`.
 2. **Retângulo semitransparente em volta do sprite RGBA (`render/avatar.py`)**: `CompositionMode_SourceAtop` aplicado no painter principal tingia toda a bounding box (pois o fundo já tinha alpha 255). Corrigido renderizando o tint em buffer `QPixmap` transparente dedicado com cache por paleta (0 artefato de borda + alta performance em 60 FPS).
 3. **Glifos de coração/brilho virando caixas em ambientes sem fonte de símbolo (`render/particles.py`)**: Substituídos glifos de fonte por formas vetoriais puras (`QPainterPath`) para corações, estrelas 4-pontas e notas musicais.
 4. **Sobreposição visual da lanterna com o card HUD no modo procedural (`render/scene.py`)**: Reposicionada a lanterna para `w * 0.38` e alargado o card HUD para `360x78px`.
+5. **Erro `numpy._ArrayMemoryError` em `pymatting` durante `Image Rembg` em lote (`comfy/workflows.py`)**: `alpha_matting=True` acionava `pymatting.estimate_alpha_cf` alocando matriz esparsa pesada na RAM da CPU. Alterado para `alpha_matting=False` mantendo `model="isnet-anime"` e `post_processing=True` — recortes limpos em <1s sem picos de RAM.
+6. **Sincronia de crossfade no gerador de mosaico (`tools/render_showcase.py`)**: O primeiro `render_to_image()` dispara o crossfade; adicionada etapa prévia de disparo + 36 passos antes da captura final.
 
 ---
 
 ## 4. Como Executar
 - **Modo Wallpaper Dinâmico (atrás dos ícones)**: `.\start_iawallpaper.ps1` ou `.\venv\Scripts\python.exe main.py`
 - **Modo Preview + Central de Controle**: `.\start_iawallpaper.ps1 -Preview -Studio`
-- **Com Monitor Neural ao Vivo**: `.\start_iawallpaper.ps1 -Preview -Studio -Monitor -Test`
+- **Gerar Pack Completo via CLI**: `.\venv\Scripts\python.exe tools\generate_pack.py --persona nyx --scene cyber_loft`
 - **Suíte de Testes**: `$env:QT_QPA_PLATFORM="offscreen"; .\venv\Scripts\python.exe -m pytest -v`
-- **Git / GitHub**: Commit local `b2dff6e` pronto na branch `main` (`origin = https://github.com/maxstiro/IAWallpaper.git`). Execute `git push -u origin main` em terminal interativo para autenticar no GitHub e publicar.
+- **Git / GitHub**: Remote configurado via SSH (`git@github.com:maxstiro/IAWallpaper.git`, chave `ED25519` validada) com push automático na branch `main`.

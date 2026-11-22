@@ -1,9 +1,26 @@
 """PERSONA — Definição de personagens waifu (temperamento neural, paleta visual, trajes e sussurros)."""
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+import re
 
-from ..store import read_json
+from ..store import read_json, write_json
+
+
+TEMPERAMENT_PRESETS: dict[str, dict[str, float]] = {
+    "cozy": {
+        "CARESS": 1.25, "RAIN": 1.25, "NIGHT": 1.15, "MUSIC": 1.15, "WORK": 1.10, "DISMISS": 0.80,
+    },
+    "playful": {
+        "PLAY": 1.30, "POKE": 1.25, "CARESS": 1.20, "MUSIC": 1.20, "NOVELTY": 1.25,
+    },
+    "focused": {
+        "WORK": 1.35, "AI_CRAFT": 1.30, "TYPING": 1.20, "CARESS": 1.10, "DISMISS": 0.90,
+    },
+    "night_owl": {
+        "NIGHT": 1.35, "STORM": 1.20, "MUSIC": 1.25, "PLAY": 1.20, "AI_CRAFT": 1.25,
+    },
+}
 
 
 @dataclass
@@ -297,3 +314,53 @@ def load_persona(persona_id: str, personas_dir: Path | None = None) -> Persona:
                     whispers=dict(raw.get("whispers", base.whispers)),
                 )
     return BUILTIN_PERSONAS.get(pid, BUILTIN_PERSONAS["mira"])
+
+
+def slugify_persona_id(name: str) -> str:
+    """Normaliza um nome escolhido pelo usuário em um persona_id seguro."""
+    slug = re.sub(r"[^a-z0-9]+", "_", (name or "").strip().lower()).strip("_")
+    return slug[:28] or "custom_waifu"
+
+
+def create_custom_persona(
+    name: str,
+    title: str,
+    character_tags: str,
+    temperament_preset: str = "cozy",
+    hair_color: tuple[int, int, int] = (72, 68, 128),
+    eye_color: tuple[int, int, int] = (120, 205, 255),
+    accent_color: tuple[int, int, int] = (145, 190, 255),
+    seed: int | None = None,
+) -> Persona:
+    """Cria uma persona waifu personalizada completa com os 6 trajes dinâmicos e sussurros."""
+    base = BUILTIN_PERSONAS["mira"]
+    pid = slugify_persona_id(name)
+    actual_seed = int(seed if seed is not None else (abs(hash(pid)) % 900000 + 1000))
+    tags = (character_tags or "").strip()
+    if "1girl" not in tags.lower():
+        tags = f"1girl, solo, anime_style, masterpiece, best_quality, {tags}, upper_body, looking_at_viewer"
+    return Persona(
+        id=pid,
+        name=(name or "Nova Waifu").strip(),
+        title=(title or "Companheira Personalizada").strip(),
+        bio=f"Persona personalizada criada no IAWallpaper Studio ({temperament_preset}).",
+        seed=actual_seed,
+        hair_color=hair_color,
+        hair_highlight=tuple(min(255, c + 65) for c in hair_color),
+        eye_color=eye_color,
+        skin_color=base.skin_color,
+        accent_color=accent_color,
+        temperament=dict(TEMPERAMENT_PRESETS.get(temperament_preset, TEMPERAMENT_PRESETS["cozy"])),
+        comfy_character_tags=tags,
+        outfits=dict(base.outfits),
+        whispers=dict(base.whispers),
+    )
+
+
+def save_persona(persona: Persona, personas_dir: Path) -> Path:
+    """Persiste uma persona personalizada em assets/personas/<id>.json atomicamente."""
+    personas_dir.mkdir(parents=True, exist_ok=True)
+    out = personas_dir / f"{persona.id}.json"
+    data = asdict(persona)
+    write_json(out, data, indent=2)
+    return out

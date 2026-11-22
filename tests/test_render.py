@@ -57,3 +57,40 @@ def test_canvas_renders_non_empty_frames_and_hit_tests():
     assert not img_rain.isNull()
     # Garante que os dois frames são visualmente diferentes
     assert img_sunset.pixelColor(200, 120) != img_rain.pixelColor(200, 120)
+
+
+def test_avatar_crossfade_and_sprite_resolution(tmp_path):
+    _ensure_qapp()
+    from PySide6.QtGui import QColor, QImage
+
+    sdir = tmp_path / "sprites"
+    sdir.mkdir()
+    for name, color in (("casual.png", QColor(100, 150, 255, 255)), ("casual_shy.png", QColor(255, 120, 180, 255)), ("focus.png", QColor(80, 220, 180, 255))):
+        img = QImage(64, 96, QImage.Format_ARGB32)
+        img.fill(color)
+        img.save(str(sdir / name))
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, sprite_dirs=[sdir])
+    assert canvas.avatar.available_sprite_keys() == {"casual", "casual_shy", "focus"}
+
+    # Render inicial em calm -> escolhe casual
+    canvas.emotion = EmotionState(mood="calm", label="Serena")
+    canvas.render_to_image(320, 240)
+    assert canvas.avatar._current_sprite_key == "casual"
+
+    # Muda para shy -> inicia crossfade para casual_shy
+    canvas.emotion = EmotionState(mood="shy", label="Corada", blush=0.8)
+    canvas.render_to_image(320, 240)
+    assert canvas.avatar._current_sprite_key == "casual_shy"
+    assert canvas.avatar._sprite_fade_t < 1.0
+
+    # Avança animação -> conclui crossfade
+    for _ in range(25):
+        canvas.step_animation(0.04)
+    assert canvas.avatar._sprite_fade_t == 1.0
+
+    # Troca traje para focus -> escolhe focus
+    canvas.avatar.outfit = "focus"
+    canvas.render_to_image(320, 240)
+    assert canvas.avatar._current_sprite_key == "focus"
