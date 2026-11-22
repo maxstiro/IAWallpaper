@@ -14,6 +14,7 @@ from PIL import Image
 
 from ..core.persona import Persona
 from ..log import log
+from .presets import ComfyPreset, find_comfy_preset
 from .workflows import (
     PACK_EXPRESSIONS,
     PACK_OUTFITS,
@@ -22,6 +23,7 @@ from .workflows import (
     build_avatar_variant_img2img_workflow,
     build_avatar_workflow,
     build_diorama_scene_workflow,
+    build_qwen_relight_scene_workflow,
     build_scene_workflow,
     build_world_sprite_workflow,
 )
@@ -35,6 +37,7 @@ class ComfyStatus:
     checkpoint: str = ""
     has_rembg: bool = False
     has_pag: bool = False
+    has_qwen_relight: bool = False
 
 
 class ComfyBridge:
@@ -63,16 +66,7 @@ class ComfyBridge:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8", errors="replace"))
 
-    def upload_image_on_white(self, rgba_path: Path, upload_name: str) -> str:
-        """Compõe um sprite RGBA sobre fundo branco em memória e envia via POST /upload/image do ComfyUI."""
-        with Image.open(rgba_path) as im:
-            rgba = im.convert("RGBA")
-            white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
-            flat = Image.alpha_composite(white, rgba).convert("RGB")
-            buf = io.BytesIO()
-            flat.save(buf, format="PNG")
-            img_bytes = buf.getvalue()
-
+    def _upload_png_bytes(self, img_bytes: bytes, upload_name: str) -> str:
         boundary = f"----IAWallpaperBoundary{uuid.uuid4().hex}"
         body = bytearray()
         body.extend(f"--{boundary}\r\n".encode())
@@ -99,6 +93,21 @@ class ComfyBridge:
             res = json.loads(resp.read().decode("utf-8", errors="replace"))
         return str(res.get("name") or upload_name)
 
+    def upload_image_on_white(self, rgba_path: Path, upload_name: str) -> str:
+        """Compõe um sprite RGBA sobre fundo branco em memória e envia via POST /upload/image do ComfyUI."""
+        with Image.open(rgba_path) as im:
+            rgba = im.convert("RGBA")
+            white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+            flat = Image.alpha_composite(white, rgba).convert("RGB")
+            buf = io.BytesIO()
+            flat.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+        return self._upload_png_bytes(img_bytes, upload_name)
+
+    def upload_image_raw(self, image_path: Path, upload_name: str) -> str:
+        """Envia uma imagem PNG de cenário diretamente via POST /upload/image para reiluminação 1:1."""
+        return self._upload_png_bytes(Path(image_path).read_bytes(), upload_name)
+
     def probe(self) -> ComfyStatus:
         stats = self._get_json("/system_stats", timeout=2.0)
         if not isinstance(stats, dict):
@@ -112,6 +121,7 @@ class ComfyBridge:
         best = self.pick_anime_checkpoint(ckpts)
         has_rembg = self._get_json("/object_info/" + urllib.parse.quote("Image Rembg (Remove Background)"), timeout=2.0) is not None
         has_pag = self._get_json("/object_info/PerturbedAttentionGuidance", timeout=2.0) is not None
+        has_qwen = self._get_json("/object_info/TextEncodeQwenImage21", timeout=2.0) is not None
 
         return ComfyStatus(
             online=True,
@@ -120,6 +130,7 @@ class ComfyBridge:
             checkpoint=best,
             has_rembg=has_rembg,
             has_pag=has_pag,
+            has_qwen_relight=has_qwen,
         )
 
     def is_busy_fast(self) -> bool:
@@ -360,16 +371,26 @@ class ComfyBridge:
         scene_id: str,
         persona_dest_dir: Path,
         scene_dest_dir: Path,
+        preset: ComfyPreset | None = None,
+        preset_name: str = "",
         actions: tuple[str, ...] = tuple(WORLD_SPRITE_ACTIONS.keys()),
         scene_variants: tuple[str, ...] = PACK_SCENE_VARIANTS,
         skip_existing: bool = True,
         on_progress=None,
         on_asset=None,
     ) -> list[Path]:
-        """Gera pack 2.5D estilo RO/ToS/Pokémon: sprites full-body consistentes + dioramas nos 4 horários."""
+        """Gera pack 2.5D coerente:
+        1. Usa preset (TOP) do ComfyUI Studio (Checkpoint + LoRAs) para waifu madura/estilosa full-body.
+        2. Gera 1 cenário base (`diorama_day.png`) e reilumina O MESMO local para sunset/night/rain via Qwen Image 2.1!
+        """
         st = self.probe()
         if not st.online or not st.checkpoint:
             raise RuntimeError("ComfyUI offline ou sem checkpoint disponível.")
+
+        active_preset = preset or find_comfy_preset(preset_name)
+        sprite_ckpt = active_preset.checkpoint if active_preset else st.checkpoint
+        sprite_loras = active_preset.loras if active_preset else ()
+        log(f"[comfy] World pack usando preset={active_preset.name if active_preset else 'padrão'} (ckpt={sprite_ckpt}, {len(sprite_loras)} LoRAs)")
 
         persona_dest_dir.mkdir(parents=True, exist_ok=True)
         scene_dest_dir.mkdir(parents=True, exist_ok=True)
@@ -384,10 +405,17 @@ class ComfyBridge:
             p = persona_dest_dir / f"sprite_{act}.png"
             if not (skip_existing and p.exists()):
                 jobs.append(("sprite_action", act, p))
+
+        # Cenário base (day) primeiro, depois relight coerente do MESMO local para sunset/night/rain!
+        base_day = scene_dest_dir / "diorama_day.png"
+        if not (skip_existing and base_day.exists()):
+            jobs.append(("diorama_base", "day", base_day))
         for var in scene_variants:
+            if var == "day":
+                continue
             p = scene_dest_dir / f"diorama_{var}.png"
             if not (skip_existing and p.exists()):
-                jobs.append(("diorama", var, p))
+                jobs.append(("diorama_relight", var, p))
 
         total = len(jobs)
         if total == 0:
@@ -397,6 +425,7 @@ class ComfyBridge:
 
         created: list[Path] = []
         uploaded_idle: str | None = None
+        uploaded_day: str | None = None
 
         for idx, (kind, key, out_path) in enumerate(jobs, start=1):
             if on_progress:
@@ -404,11 +433,12 @@ class ComfyBridge:
 
             if kind == "sprite_base":
                 graph = build_world_sprite_workflow(
-                    checkpoint=st.checkpoint,
+                    checkpoint=sprite_ckpt,
                     persona=persona,
                     action_key="idle",
-                    seed=persona.seed + 505,
-                    steps=22,
+                    loras=sprite_loras,
+                    seed=persona.seed + 909,
+                    steps=24,
                     use_pag=st.has_pag,
                     use_rembg=st.has_rembg,
                 )
@@ -416,27 +446,49 @@ class ComfyBridge:
                 if uploaded_idle is None and base_idle.exists():
                     uploaded_idle = self.upload_image_on_white(base_idle, f"iawallpaper_sprite_idle_{persona.id}.png")
                 graph = build_world_sprite_workflow(
-                    checkpoint=st.checkpoint,
+                    checkpoint=sprite_ckpt,
                     persona=persona,
                     action_key=key,
+                    loras=sprite_loras,
                     base_uploaded_image=uploaded_idle,
-                    denoise=0.58 if key in ("walk1", "walk2") else 0.66,
-                    seed=persona.seed + 505 + idx * 19,
-                    steps=20,
+                    denoise=0.52 if key in ("walk1", "walk2", "happy") else 0.58,
+                    seed=persona.seed + 909 + idx * 23,
+                    steps=22,
                     use_pag=st.has_pag,
                     use_rembg=st.has_rembg,
                 )
-            else:
+            elif kind == "diorama_base":
                 graph = build_diorama_scene_workflow(
                     checkpoint=st.checkpoint,
                     scene_id=scene_id,
-                    variant=key,
-                    seed=202800 + idx * 29,
-                    steps=20,
+                    variant="day",
+                    seed=202901,
+                    steps=22,
                     use_pag=st.has_pag,
                 )
+            else:
+                # Reiluminação 1:1 da MESMA arquitetura via Qwen Image 2.1!
+                if uploaded_day is None and base_day.exists():
+                    uploaded_day = self.upload_image_raw(base_day, f"iawallpaper_diorama_day_{scene_id}.png")
+                if st.has_qwen_relight and uploaded_day is not None:
+                    graph = build_qwen_relight_scene_workflow(
+                        base_uploaded_scene=uploaded_day,
+                        variant=key,
+                        seed=202901 + idx * 17,
+                        steps=10,
+                        cfg=1.5,
+                    )
+                else:
+                    graph = build_diorama_scene_workflow(
+                        checkpoint=st.checkpoint,
+                        scene_id=scene_id,
+                        variant=key,
+                        seed=202901,
+                        steps=20,
+                        use_pag=st.has_pag,
+                    )
 
-            saved = self.run_workflow_and_save(graph, out_path, timeout=180.0)
+            saved = self.run_workflow_and_save(graph, out_path, timeout=240.0)
             created.append(saved)
             if on_asset:
                 on_asset(kind, saved)
@@ -451,6 +503,7 @@ class ComfyBridge:
         scene_id: str,
         persona_dest_dir: Path,
         scene_dest_dir: Path,
+        preset_name: str = "",
         skip_existing: bool = True,
         on_progress=None,
         on_asset=None,
@@ -463,6 +516,7 @@ class ComfyBridge:
                     scene_id=scene_id,
                     persona_dest_dir=persona_dest_dir,
                     scene_dest_dir=scene_dest_dir,
+                    preset_name=preset_name,
                     skip_existing=skip_existing,
                     on_progress=on_progress,
                     on_asset=on_asset,

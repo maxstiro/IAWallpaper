@@ -557,6 +557,7 @@ class IAWallpaperApp:
                 scene_id=scene_id,
                 persona_dest_dir=p_dest,
                 scene_dest_dir=s_dest,
+                preset_name=self.settings.comfyui_preset,
                 skip_existing=True,
                 on_progress=lambda cur, tot, lbl: self.bridge.comfy_pack_progress.emit(cur, tot, lbl),
                 on_asset=lambda kind, p: self.bridge.comfy_pack_asset.emit(kind, str(p)),

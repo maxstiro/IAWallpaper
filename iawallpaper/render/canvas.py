@@ -113,7 +113,8 @@ class WallpaperCanvas(QWidget):
             elif hit is not None:
                 self.avatar.impulse(vy=-210.0, tilt=(-5.0 if local_x < head_c.x() else 5.0))
                 self.avatar_poked.emit(hit)
-            elif self.avatar.render_style == "world_sprite" and (local_y / h) >= 0.60:
+            elif self.avatar.render_style == "world_sprite" and (local_y / h) >= 0.72:
+                self.scene.stage.spawn_cursor_ripple(local_x / w, local_y / h)
                 self.ground_clicked.emit(local_x / w, local_y / h)
         self._was_mouse_down = left_down
 

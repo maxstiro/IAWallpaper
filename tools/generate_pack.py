@@ -17,7 +17,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Gera pack completo consistente de persona + cenário via ComfyUI local.")
     parser.add_argument("--persona", default="mira", help="ID da persona (ex: mira, nyx ou personalizada).")
     parser.add_argument("--scene", default="sky_sanctuary", help="ID do cenário (sky_sanctuary, cyber_loft, sakura_hill).")
-    parser.add_argument("--style", choices=("world", "portrait"), default="world", help="world = sprites 2.5D RO/ToS + dioramas; portrait = bustos.")
+    parser.add_argument("--style", choices=("world", "portrait"), default="world", help="world = sprites 2.5D + dioramas coerentes; portrait = bustos.")
+    parser.add_argument("--preset", default="RawSexyGlowingGemPencil(TOP)", help="Nome do preset do ComfyUI Studio (read-only).")
     parser.add_argument("--url", default="http://127.0.0.1:8188", help="URL da API HTTP do ComfyUI.")
     parser.add_argument("--force", action="store_true", help="Regenera inclusive arquivos já existentes.")
     args = parser.parse_args()
@@ -31,6 +32,7 @@ def main() -> int:
             scene_id=args.scene,
             persona_dest_dir=paths.persona_generated_assets(persona.id),
             scene_dest_dir=paths.scene_generated_assets(args.scene),
+            preset_name=args.preset,
             skip_existing=not args.force,
             on_progress=lambda cur, tot, lbl: print(lbl, flush=True),
         )

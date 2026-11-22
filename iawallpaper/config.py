@@ -32,6 +32,7 @@ class Settings:
     time_override_hour: float | None = None
     outfit_override: str | None = None
     comfyui_url: str = "http://127.0.0.1:8188"
+    comfyui_preset: str = "RawSexyGlowingGemPencil(TOP)"
     comfyui_enabled: bool = True
     start_with_windows: bool = False
     test_mode: bool = False
@@ -76,6 +77,7 @@ class Settings:
             time_override_hour=time_override,
             outfit_override=outfit,
             comfyui_url=str(self.comfyui_url or "http://127.0.0.1:8188").strip().rstrip("/"),
+            comfyui_preset=str(self.comfyui_preset or "RawSexyGlowingGemPencil(TOP)").strip(),
             comfyui_enabled=bool(self.comfyui_enabled),
             start_with_windows=bool(self.start_with_windows),
             test_mode=bool(self.test_mode),

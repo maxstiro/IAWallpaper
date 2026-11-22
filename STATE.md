@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-22 (Milestone 8 — Mundo Vivo 2.5D RO/ToS/Pokémon NDS Validado)
+> **Última atualização**: 2026-11-22 (Milestone 9 — Ancoragem Aterrada, Preset TOP & Reiluminação 1:1 Qwen 2.1)
 
 ---
 
@@ -14,19 +14,19 @@
 | Núcleo Neural (`core/`) | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | 🟢 Validado | 438 neurônios LIF, aprendizado 3 fatores, Rescorla-Wagner, Bandit, Mira & Nyx |
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
 | Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
-| Ponte ComfyUI (`comfy/`) | `bridge.py`, `workflows.py` | 🟢 Validado E2E | Cliente read-only `127.0.0.1:8188`; gerou `mira/casual.png` + cenas `sunset.png`/`night.png` |
-| Render (`render/`) | `atmosphere.py`, `particles.py`, `world_stage.py`, `avatar.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Mundo Vivo 2.5D (RO/ToS/Pokémon), Y-sort, caminhada, guarda-chuva, balões RO, click-to-move |
+| Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py` | 🟢 Validado E2E | Leitor read-only de presets `(TOP)` (`RawSexyGlowingGemPencil(TOP)`) + Qwen 2.1 relighting 1:1 |
+| Render (`render/`) | `atmosphere.py`, `particles.py`, `world_stage.py`, `avatar.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Auto-trim nos pés, sombra dupla + reflexo molhado, animação 3-bandas Live2D, god rays, fauna diurna |
 | Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma por hotspots (`desk`, `cushion`, `music_spot`, `overlook`, `lantern`), emotes RO, sono e sussurros |
-| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + seletor Mundo 2.5D/Retrato + Criador de Waifu + Monitor Neural |
-| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 24/24 Verdes | `pytest` completo + `generate_pack.py --style world` + `render_showcase.py --mode world/sprites` |
+| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + seletor Preset ComfyUI + Mundo 2.5D/Retrato + Criador de Waifu + Monitor Neural |
+| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 25/25 Verdes | `pytest` completo + `generate_pack.py --preset ...` + `render_showcase.py` |
 
 ---
 
 ## 2. Assets Gerados Localmente (ComfyUI Read-Only, fora do Git)
-- **Mira — Modo Mundo Vivo 2.5D (`assets/generated/personas/mira/sprite_*.png` — 6 sprites full-body RGBA via `isnet-anime`)**:
-  - `sprite_idle.png`, `sprite_walk1.png`, `sprite_walk2.png`, `sprite_sit.png`, `sprite_happy.png`, `sprite_sleep.png` (proporção chibi RO/Tree of Savior 100% consistente).
-- **Observatório Celeste — Dioramas 2.5D (`assets/generated/scenes/sky_sanctuary/diorama_*.png` — 4 horários/climas)**:
-  - `diorama_day.png`, `diorama_sunset.png`, `diorama_night.png`, `diorama_rain.png`.
+- **Mira — Modo Mundo Vivo 2.5D Maduro (`assets/generated/personas/mira/sprite_*.png` — 6 sprites full-body RGBA)**:
+  - Gerados com o preset **`RawSexyGlowingGemPencil(TOP)`** (`arthemyComics_v80` + 5 LoRAs) + `isnet-anime`: `sprite_idle.png`, `sprite_walk1.png`, `sprite_walk2.png`, `sprite_sit.png`, `sprite_happy.png`, `sprite_sleep.png` (recorte automático exato na sola dos saltos via `trim_sprite_pixmap`).
+- **Observatório Celeste — Diorama Único Reiluminado 1:1 via Qwen Image 2.1 (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**:
+  - `diorama_day.png` (base) + `diorama_sunset.png`, `diorama_night.png`, `diorama_rain.png` (mesma arquitetura/cúpula/ponte/árvores pixel-a-pixel nos 4 climas/horários!).
 - **Mira — Modo Retrato Opcional (`casual*.png`, `focus.png`, `rainy.png`, `cozy.png`, `nightwear.png`, `starlight.png`)** + cenários `day/sunset/night/rain.png` também preservados caso o usuário alterne para o modo Retrato.
 - **Fallback Procedural**: Qualquer nova persona/cenário sem PNG gerado opera 100% nativamente via render procedural.
 

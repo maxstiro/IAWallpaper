@@ -3,10 +3,12 @@
 from pathlib import Path
 
 from iawallpaper.comfy.bridge import ComfyBridge
+from iawallpaper.comfy.presets import LoraSpec, find_comfy_preset, load_comfy_presets
 from iawallpaper.comfy.workflows import (
     build_avatar_variant_img2img_workflow,
     build_avatar_workflow,
     build_diorama_scene_workflow,
+    build_qwen_relight_scene_workflow,
     build_scene_workflow,
     build_world_sprite_workflow,
 )
@@ -53,10 +55,27 @@ def test_comfy_workflow_builders():
     assert "tree_of_savior_style" in dio["2"]["inputs"]["text"]
     assert "no_humans" in dio["2"]["inputs"]["text"]
 
-    ws = build_world_sprite_workflow("waiIllustriousSDXL_v170.safetensors", mira, action_key="walk1", seed=12)
+    ws = build_world_sprite_workflow(
+        "illustrious\\arthemyComics_v80.safetensors",
+        mira,
+        action_key="walk1",
+        loras=[LoraSpec("illustrious\\cutesexyrobutts.safetensors", 0.75, 0.75)],
+        seed=12,
+    )
     assert "full_body" in ws["2"]["inputs"]["text"]
-    assert "sprite_sheet" in ws["3"]["inputs"]["text"]
+    assert "mature_female" in ws["2"]["inputs"]["text"]
+    assert "chibi" in ws["3"]["inputs"]["text"]
+    assert "20" in ws and ws["20"]["class_type"] == "LoraLoader"
     assert ws["8"]["inputs"]["alpha_matting"] is False
+
+    qrel = build_qwen_relight_scene_workflow("iawallpaper_diorama_day.png", variant="night", seed=7)
+    assert qrel["4"]["class_type"] == "TextEncodeQwenImage21"
+    assert qrel["5"]["inputs"]["denoise"] == 1.0
+
+    top = find_comfy_preset("RawSexyGlowingGemPencil")
+    if top is not None:
+        assert top.is_top
+        assert len(top.loras) >= 3
 
 
 def test_custom_persona_creation_and_persistence(tmp_path: Path):

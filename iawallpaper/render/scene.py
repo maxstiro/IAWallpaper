@@ -104,7 +104,7 @@ class SceneCompositor:
     def update(self, dt: float, wind_speed: float = 6.0, condition: str = "clear") -> None:
         dt = clamp(dt, 0.0, 0.1)
         self.time += dt
-        self.stage.update(dt, condition=condition)
+        self.stage.update(dt, condition=condition, wind_speed=wind_speed)
         k = clamp(dt * 4.5, 0.0, 1.0)
         self.parallax_x += (self.target_px - self.parallax_x) * k
         self.parallax_y += (self.target_py - self.parallax_y) * k
@@ -193,7 +193,13 @@ class SceneCompositor:
             painter.fillRect(0, 0, width, height, fog_g)
 
         if is_world:
-            # Efeitos no piso (poeira de passos & ondas de chuva)
+            # Dinâmica viva própria do cenário (raios solares, água/caustics, névoa, lanternas pulsando, pássaros/borboletas)
+            self.stage.paint_location_dynamics(
+                painter, width, height, atmo,
+                daylight=circadian.daylight, warmth=circadian.warmth,
+                condition=weather.condition, parallax_x=self.parallax_x, parallax_y=self.parallax_y,
+            )
+            # Efeitos no piso (poeira de passos, ondas de chuva & clique)
             self.stage.paint_ground_fx(painter, width, height, atmo, self.parallax_x, self.parallax_y)
             working_now = activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING")
             music_now = activity == "MUSIC"
@@ -208,7 +214,7 @@ class SceneCompositor:
                 sx, sy = self.stage.screen_pos(avatar.pos_x, avatar.pos_y, width, height, self.parallax_x, self.parallax_y)
                 self.stage._draw_cushion_rug(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0), atmo)
 
-        # Avatar Waifu integrado com paralaxe, profundidade 2.5D e iluminação
+        # Avatar Waifu integrado com paralaxe, profundidade 2.5D, sombra aterrada e iluminação
         avatar.paint(
             painter=painter,
             canvas_w=width,
@@ -223,6 +229,7 @@ class SceneCompositor:
             asleep=asleep,
             raining=raining,
             stage=self.stage if is_world else None,
+            sun_x_norm=circadian.sun_x_norm,
         )
 
         if is_world:

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..comfy.presets import load_comfy_presets
 from ..comfy.workflows import PACK_EXPRESSIONS, PACK_OUTFITS, PACK_SCENE_VARIANTS, SCENE_PRESETS
 from ..config import Settings
 from ..core.persona import BUILTIN_PERSONAS, create_custom_persona, list_personas, load_persona
@@ -299,7 +300,16 @@ class ControlCenterWindow(QWidget):
 
         self.lbl_comfy_status = QLabel("Status: clique em Testar Conexão")
         self.lbl_comfy_status.setStyleSheet("color: #9ed0ff;")
+
+        self.cb_comfy_preset = QComboBox()
+        self.cb_comfy_preset.addItem("Automático (Primeiro Preset TOP)", "")
+        for pr in load_comfy_presets():
+            tag = "★ " if pr.is_top else ""
+            self.cb_comfy_preset.addItem(f"{tag}{pr.name} ({len(pr.loras)} LoRAs)", pr.name)
+        self.cb_comfy_preset.currentIndexChanged.connect(self._emit_settings)
+
         f.addRow("Endpoint HTTP:", url_row)
+        f.addRow("Preset (Read-Only):", self.cb_comfy_preset)
         f.addRow("Diagnóstico:", self.lbl_comfy_status)
         layout.addWidget(g_conn)
 
@@ -437,6 +447,7 @@ class ControlCenterWindow(QWidget):
         self.chk_whispers.setChecked(s.whispers_enabled)
 
         self.ed_comfy_url.setText(s.comfyui_url)
+        self._set_combo(self.cb_comfy_preset, s.comfyui_preset)
         self.chk_autostart.setChecked(s.start_with_windows)
         self.chk_test_mode.setChecked(s.test_mode)
 
@@ -481,6 +492,7 @@ class ControlCenterWindow(QWidget):
             time_override_hour=time_override,
             outfit_override=outfit_val,
             comfyui_url=self.ed_comfy_url.text().strip() or "http://127.0.0.1:8188",
+            comfyui_preset=self.cb_comfy_preset.currentData() or "RawSexyGlowingGemPencil(TOP)",
             comfyui_enabled=True,
             start_with_windows=self.chk_autostart.isChecked(),
             test_mode=self.chk_test_mode.isChecked(),

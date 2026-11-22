@@ -123,8 +123,24 @@ def test_world_sprite_locomotion_emotes_and_stage(tmp_path):
     assert canvas.avatar.action == "sit_work"
     assert abs(canvas.avatar.pos_x - hs.x) < 0.02
 
-    # Renderiza sob chuva (ativa guarda-chuva + ondas no piso sem erros)
+    # Renderiza sob chuva (ativa guarda-chuva + ondas no piso + reflexo molhado sem erros)
     canvas.weather = WeatherState(condition="rain", intensity=0.9)
     img = canvas.render_to_image(640, 360)
     assert not img.isNull()
     assert canvas.avatar._current_sprite_key == "sprite_sit"
+
+
+def test_trim_sprite_pixmap_removes_bottom_padding():
+    _ensure_qapp()
+    from PySide6.QtGui import QColor, QImage, QPixmap
+    from iawallpaper.render.avatar import trim_sprite_pixmap
+
+    img = QImage(100, 120, QImage.Format_RGBA8888)
+    img.fill(QColor(0, 0, 0, 0))
+    for y in range(20, 80):
+        for x in range(30, 70):
+            img.setPixelColor(x, y, QColor(200, 120, 240, 255))
+    trimmed = trim_sprite_pixmap(QPixmap.fromImage(img))
+    # Altura deve terminar exatamente em y=79 (sem os 40px transparentes abaixo dos pés!)
+    assert trimmed.height() <= 63
+    assert trimmed.width() <= 46
