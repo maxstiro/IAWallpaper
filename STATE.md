@@ -43,3 +43,4 @@
 - **Modo Preview + Central de Controle**: `.\start_iawallpaper.ps1 -Preview -Studio`
 - **Com Monitor Neural ao Vivo**: `.\start_iawallpaper.ps1 -Preview -Studio -Monitor -Test`
 - **Suíte de Testes**: `$env:QT_QPA_PLATFORM="offscreen"; .\venv\Scripts\python.exe -m pytest -v`
+- **Git / GitHub**: Commit local `b2dff6e` pronto na branch `main` (`origin = https://github.com/maxstiro/IAWallpaper.git`). Execute `git push -u origin main` em terminal interativo para autenticar no GitHub e publicar.
