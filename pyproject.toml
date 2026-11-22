@@ -1,0 +1,10 @@
+[project]
+name = "iawallpaper"
+version = "0.1.0"
+description = "Wallpaper dinâmico reativo estilo Wallpaper Engine com avatar waifu animado, rede neural pulsada (LIF), aprendizado contínuo e integração opcional com ComfyUI."
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

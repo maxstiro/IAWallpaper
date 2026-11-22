@@ -1,0 +1,37 @@
+# Ambientes virtuais e caches Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Segredos e variáveis locais (NUNCA versionar tokens)
+.env
+.env.*
+*.secret
+
+# Memória neural persistida e logs do usuário
+memory/
+logs/
+*.log
+*.corrompido
+*.tmp
+
+# Assets pesados gerados localmente pelo usuário via ComfyUI (mantemos os starter assets leves)
+assets/generated/
+
+# Builds e empacotamento
+build/
+dist/
+*.spec
+*.egg-info/
+
+# IDEs e SO
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

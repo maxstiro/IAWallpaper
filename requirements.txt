@@ -1,0 +1,6 @@
+# Dependências de runtime do IAWallpaper (Windows 10/11, Python 3.11+)
+PySide6-Essentials>=6.10.0
+numpy>=2.0.0
+psutil>=6.0.0
+pywin32>=305; sys_platform == "win32"
+Pillow>=10.0.0
