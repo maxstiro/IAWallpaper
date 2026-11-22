@@ -71,7 +71,7 @@ def test_avatar_crossfade_and_sprite_resolution(tmp_path):
         img.save(str(sdir / name))
 
     mira = load_persona("mira")
-    canvas = WallpaperCanvas(mira, sprite_dirs=[sdir])
+    canvas = WallpaperCanvas(mira, sprite_dirs=[sdir], render_style="portrait")
     assert canvas.avatar.available_sprite_keys() == {"casual", "casual_shy", "focus"}
 
     # Render inicial em calm -> escolhe casual
@@ -94,3 +94,37 @@ def test_avatar_crossfade_and_sprite_resolution(tmp_path):
     canvas.avatar.outfit = "focus"
     canvas.render_to_image(320, 240)
     assert canvas.avatar._current_sprite_key == "focus"
+
+
+def test_world_sprite_locomotion_emotes_and_stage(tmp_path):
+    _ensure_qapp()
+    from PySide6.QtGui import QColor, QImage
+
+    sdir = tmp_path / "world_sprites"
+    sdir.mkdir()
+    for name, color in (("sprite_idle.png", QColor(90, 140, 255, 255)), ("sprite_walk1.png", QColor(120, 200, 255, 255)), ("sprite_sit.png", QColor(200, 150, 255, 255))):
+        img = QImage(64, 96, QImage.Format_ARGB32)
+        img.fill(color)
+        img.save(str(sdir / name))
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, sprite_dirs=[sdir], render_style="world_sprite")
+    assert canvas.avatar.has_world_sprites()
+
+    # Chama para caminhar até a escrivaninha
+    hs = canvas.scene.stage.hotspots["desk"]
+    canvas.avatar.walk_to(hs.x, hs.y, arrive_action="sit_work")
+    canvas.avatar.show_emote("heart")
+    assert canvas.avatar.action == "walk"
+
+    # Simula caminhada até chegar
+    for _ in range(90):
+        canvas.step_animation(0.05)
+    assert canvas.avatar.action == "sit_work"
+    assert abs(canvas.avatar.pos_x - hs.x) < 0.02
+
+    # Renderiza sob chuva (ativa guarda-chuva + ondas no piso sem erros)
+    canvas.weather = WeatherState(condition="rain", intensity=0.9)
+    img = canvas.render_to_image(640, 360)
+    assert not img.isNull()
+    assert canvas.avatar._current_sprite_key == "sprite_sit"

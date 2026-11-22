@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-22 (Milestone 7 — Pack Consistente Completo & Push SSH Validado)
+> **Última atualização**: 2026-11-22 (Milestone 8 — Mundo Vivo 2.5D RO/ToS/Pokémon NDS Validado)
 
 ---
 
@@ -15,19 +15,19 @@
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
 | Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
 | Ponte ComfyUI (`comfy/`) | `bridge.py`, `workflows.py` | 🟢 Validado E2E | Cliente read-only `127.0.0.1:8188`; gerou `mira/casual.png` + cenas `sunset.png`/`night.png` |
-| Render (`render/`) | `atmosphere.py`, `particles.py`, `avatar.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | 60 FPS, rim-light cacheado sem borda, corações/estrelas vetoriais, fallback procedural |
-| Mente (`mind/`) | `director.py` | 🟢 Validado | Trajes dinâmicos, sono + consolidação, sussurros por bandit, carinho/cutucada/mimo |
-| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + Monitor Neural + Bandeja |
-| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 23/23 Verdes | `pytest` completo + `generate_pack.py` + `render_showcase.py` |
+| Render (`render/`) | `atmosphere.py`, `particles.py`, `world_stage.py`, `avatar.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Mundo Vivo 2.5D (RO/ToS/Pokémon), Y-sort, caminhada, guarda-chuva, balões RO, click-to-move |
+| Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma por hotspots (`desk`, `cushion`, `music_spot`, `overlook`, `lantern`), emotes RO, sono e sussurros |
+| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + seletor Mundo 2.5D/Retrato + Criador de Waifu + Monitor Neural |
+| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 24/24 Verdes | `pytest` completo + `generate_pack.py --style world` + `render_showcase.py --mode world/sprites` |
 
 ---
 
 ## 2. Assets Gerados Localmente (ComfyUI Read-Only, fora do Git)
-- **Mira (`assets/generated/personas/mira/` — 11 sprites RGBA consistentes via `isnet-anime`)**:
-  - Base + 5 expressões img2img (pose 100% travada, `denoise=0.44`): `casual.png`, `casual_happy.png`, `casual_affectionate.png`, `casual_shy.png`, `casual_sleepy.png`, `casual_pouty.png`.
-  - 5 trajes dinâmicos img2img: `focus.png` (óculos), `rainy.png` (capuz), `cozy.png` (suéter), `nightwear.png` (pijama/sonolenta), `starlight.png`.
-- **Observatório Celeste (`assets/generated/scenes/sky_sanctuary/` — 4 horários/climas)**:
-  - `day.png`, `sunset.png`, `night.png`, `rain.png`.
+- **Mira — Modo Mundo Vivo 2.5D (`assets/generated/personas/mira/sprite_*.png` — 6 sprites full-body RGBA via `isnet-anime`)**:
+  - `sprite_idle.png`, `sprite_walk1.png`, `sprite_walk2.png`, `sprite_sit.png`, `sprite_happy.png`, `sprite_sleep.png` (proporção chibi RO/Tree of Savior 100% consistente).
+- **Observatório Celeste — Dioramas 2.5D (`assets/generated/scenes/sky_sanctuary/diorama_*.png` — 4 horários/climas)**:
+  - `diorama_day.png`, `diorama_sunset.png`, `diorama_night.png`, `diorama_rain.png`.
+- **Mira — Modo Retrato Opcional (`casual*.png`, `focus.png`, `rainy.png`, `cozy.png`, `nightwear.png`, `starlight.png`)** + cenários `day/sunset/night/rain.png` também preservados caso o usuário alterne para o modo Retrato.
 - **Fallback Procedural**: Qualquer nova persona/cenário sem PNG gerado opera 100% nativamente via render procedural.
 
 ---

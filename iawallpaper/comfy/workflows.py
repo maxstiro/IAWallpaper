@@ -38,6 +38,34 @@ PACK_OUTFITS = ("casual", "focus", "rainy", "cozy", "nightwear", "starlight")
 PACK_EXPRESSIONS = ("happy", "affectionate", "shy", "sleepy", "pouty")
 PACK_SCENE_VARIANTS = ("day", "sunset", "night", "rain")
 
+WORLD_SPRITE_ACTIONS: dict[str, str] = {
+    "idle": "standing_cutely, gentle_smile, relaxed_pose, facing_slightly_right",
+    "walk1": "walking_pose, stepping_forward, cheerful_stride, gentle_arm_swing, facing_right",
+    "walk2": "walking_pose, lively_step, hair_flowing, upbeat_stride, facing_right",
+    "sit": "sitting_cutely, relaxed_smile, neat_sitting_pose, cute_chibi_sitting",
+    "happy": "happy_jump, arms_raised_cheerfully, sparkling_eyes, joyful_smile",
+    "sleep": "sleepy_sitting, closed_eyes, peaceful_nap, drowsy_cozy_pose",
+}
+
+DIORAMA_SCENE_PRESETS: dict[str, str] = {
+    "sky_sanctuary": (
+        "anime_scenery, tree_of_savior_style, ragnarok_online_style, hand_painted_storybook_2.5d_rpg_background, "
+        "wide_open_cobblestone_courtyard_and_meadow_foreground, low_stone_terrace_railing, wildflowers, "
+        "distant_floating_observatory_valley_and_lake, slight_high_angle_three_quarter_view, "
+        "masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
+    ),
+    "cyber_loft": (
+        "anime_scenery, 2.5d_rpg_isometric_cozy_terrace, hand_painted_anime_background, "
+        "wide_open_wooden_deck_foreground, neon_cyberpunk_cityscape_beyond_railing, potted_plants, "
+        "slight_high_angle_three_quarter_view, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
+    ),
+    "sakura_hill": (
+        "anime_scenery, tree_of_savior_style, ragnarok_online_style, hand_painted_storybook_2.5d_rpg_background, "
+        "wide_open_stone_shrine_plaza_foreground, blooming_cherry_blossom_trees, grassy_edges, coastal_town_below, "
+        "slight_high_angle_three_quarter_view, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
+    ),
+}
+
 DEFAULT_NEGATIVE = (
     "lowres, bad_anatomy, bad_hands, text, watermark, signature, logo, username, "
     "blurry, jpeg_artifacts, worst_quality, low_quality, nsfw, nude, explicit, "
@@ -254,6 +282,134 @@ def build_avatar_variant_img2img_workflow(
         graph,
         decoded_node="7",
         prefix=f"IAWallpaper_avatar_{persona.id}_{suffix}",
+        use_rembg=use_rembg,
+        rembg_model=rembg_model,
+    )
+    return graph
+
+
+def build_diorama_scene_workflow(
+    checkpoint: str,
+    scene_id: str = "sky_sanctuary",
+    variant: str = "day",
+    seed: int | None = None,
+    width: int = 1344,
+    height: int = 768,
+    steps: int = 20,
+    cfg: float = 5.5,
+    use_pag: bool = True,
+) -> dict:
+    """Constrói grafo 2.5D estilo Tree of Savior / Ragnarok Online com chão caminhável amplo."""
+    base = DIORAMA_SCENE_PRESETS.get(scene_id, DIORAMA_SCENE_PRESETS["sky_sanctuary"])
+    time_tags = TIME_VARIANT_PROMPTS.get(variant, TIME_VARIANT_PROMPTS["day"])
+    positive = f"{base}, {time_tags}"
+    negative = f"{DEFAULT_NEGATIVE}, 1girl, 1boy, person, character, crowd, ui, hud, minimap, health_bar"
+    actual_seed = int(seed if seed is not None else random.randint(1, 2**31 - 1))
+
+    model_src = ["1", 0]
+    graph: dict = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": checkpoint}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["1", 1]}},
+        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": int(width), "height": int(height), "batch_size": 1}},
+    }
+    if use_pag:
+        graph["5"] = {"class_type": "PerturbedAttentionGuidance", "inputs": {"model": ["1", 0], "scale": 2.5}}
+        model_src = ["5", 0]
+
+    graph["6"] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "model": model_src,
+            "seed": actual_seed,
+            "steps": int(steps),
+            "cfg": float(cfg),
+            "sampler_name": "dpmpp_2m",
+            "scheduler": "karras",
+            "positive": ["2", 0],
+            "negative": ["3", 0],
+            "latent_image": ["4", 0],
+            "denoise": 1.0,
+        },
+    }
+    graph["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
+    graph["8"] = {
+        "class_type": "SaveImage",
+        "inputs": {"images": ["7", 0], "filename_prefix": f"IAWallpaper_diorama_{scene_id}_{variant}"},
+    }
+    return graph
+
+
+def build_world_sprite_workflow(
+    checkpoint: str,
+    persona: Persona,
+    action_key: str = "idle",
+    outfit_key: str = "casual",
+    base_uploaded_image: str | None = None,
+    denoise: float | None = None,
+    seed: int | None = None,
+    width: int = 768,
+    height: int = 1024,
+    steps: int = 22,
+    cfg: float = 5.5,
+    use_pag: bool = True,
+    use_rembg: bool = True,
+    rembg_model: str = "isnet-anime",
+) -> dict:
+    """Gera sprite full-body chibi/2.5D RPG (estilo RO / Tree of Savior / Pokémon) com recorte RGBA limpo."""
+    outfit = persona.outfits.get(outfit_key) or persona.outfits["casual"]
+    outfit_tags = outfit.get("prompt", "cute_anime_outfit")
+    action_tags = WORLD_SPRITE_ACTIONS.get(action_key, WORLD_SPRITE_ACTIONS["idle"])
+    # Remove enquadramento upper_body das tags de busto para garantir corpo inteiro com sapatinhos
+    char_tags = persona.comfy_character_tags.replace("upper_body", "full_body")
+    positive = (
+        f"({action_tags}:1.2), (chibi:1.15), (full_body:1.3), complete_shoes_visible, "
+        f"tree_of_savior_style, ragnarok_online_style, 2.5d_rpg_character, cute_anime_sprite, "
+        f"{char_tags}, {outfit_tags}, clean_lineart, simple_background, solid_white_background"
+    )
+    negative = (
+        f"{DEFAULT_NEGATIVE}, upper_body, portrait, cowboy_shot, cropped_feet, cropped_legs, "
+        "out_of_frame, complex_background, scenery, floor_shadow, sprite_sheet, character_sheet, reference_sheet, 2girls, multiple_girls"
+    )
+    actual_seed = int(seed if seed is not None else persona.seed + 55)
+    eff_denoise = float(denoise if denoise is not None else (0.56 if base_uploaded_image else 1.0))
+
+    model_src = ["1", 0]
+    graph: dict = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": checkpoint}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["1", 1]}},
+    }
+    if base_uploaded_image:
+        graph["10"] = {"class_type": "LoadImage", "inputs": {"image": base_uploaded_image}}
+        graph["4"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["10", 0], "vae": ["1", 2]}}
+    else:
+        graph["4"] = {"class_type": "EmptyLatentImage", "inputs": {"width": int(width), "height": int(height), "batch_size": 1}}
+
+    if use_pag:
+        graph["5"] = {"class_type": "PerturbedAttentionGuidance", "inputs": {"model": ["1", 0], "scale": 2.7}}
+        model_src = ["5", 0]
+
+    graph["6"] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "model": model_src,
+            "seed": actual_seed,
+            "steps": int(steps),
+            "cfg": float(cfg),
+            "sampler_name": "dpmpp_2m",
+            "scheduler": "karras",
+            "positive": ["2", 0],
+            "negative": ["3", 0],
+            "latent_image": ["4", 0],
+            "denoise": eff_denoise,
+        },
+    }
+    graph["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
+    _attach_rembg_and_save(
+        graph,
+        decoded_node="7",
+        prefix=f"IAWallpaper_sprite_{persona.id}_{action_key}",
         use_rembg=use_rembg,
         rembg_model=rembg_model,
     )

@@ -5,6 +5,7 @@ from .avatar import AvatarRig
 from .canvas import WallpaperCanvas
 from .particles import ParticleEngine
 from .scene import SceneCompositor
+from .world_stage import WorldStage
 
 __all__ = [
     "AtmospherePalette",
@@ -13,4 +14,5 @@ __all__ = [
     "WallpaperCanvas",
     "ParticleEngine",
     "SceneCompositor",
+    "WorldStage",
 ]

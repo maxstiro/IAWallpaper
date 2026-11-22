@@ -108,14 +108,94 @@ def render_strip(persona_id: str, names: list[str], out_path: Path) -> Path:
     return out_path
 
 
+def render_world_showcase(persona_id: str, scene_id: str, out_path: Path) -> Path:
+    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (RO / Tree of Savior / Pokémon NDS)."""
+    app = QApplication.instance() or QApplication([])
+    for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
+        if Path(f).exists():
+            QFontDatabase.addApplicationFont(f)
+
+    paths = Paths(base_dir=ROOT)
+    persona = load_persona(persona_id, personas_dir=paths.personas_dir)
+    canvas = WallpaperCanvas(
+        persona,
+        sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
+        scene_dirs=[paths.scene_assets(scene_id), paths.scene_generated_assets(scene_id)],
+        render_style="world_sprite",
+    )
+
+    shots = [
+        (10.5, "clear", "desk", "sit_work", "focused", "Concentrada", "sparkle", "PROGRAMMING", "Trabalhando no notebook junto com voce!"),
+        (18.0, "clear", "overlook", "walk", "happy", "Radiante", "heart", "IDLE", "Passeando pelo mirante ao por do sol!"),
+        (16.0, "rain", "lantern", "walk", "cozy", "Aconchegada", "music", "MUSIC", "Guarda-chuva aberto e som de chuva!"),
+        (23.5, "clear", "cushion", "sleep", "sleepy", "Sonolenta", "zzz", "IDLE", "Cochilando sob as estrelas... Zzz"),
+    ]
+
+    tiles: list[Image.Image] = []
+    tmp_dir = out_path.parent
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    for idx, (hour, cond, spot, act, mood, label, emote, activity, whisper) in enumerate(shots):
+        canvas.circadian = compute_circadian(hour)
+        canvas.weather = WeatherState(condition=cond, intensity=0.9 if cond != "clear" else 0.0, temperature_c=20.0)
+        canvas.emotion = EmotionState(mood=mood, label=label, valence=0.8, arousal=0.5, blush=0.4)
+        canvas.asleep = act == "sleep"
+        canvas.affinity = 65.0
+        canvas.activity = activity
+
+        hs = canvas.scene.stage.hotspots[spot]
+        canvas.avatar.pos_x = hs.x
+        canvas.avatar.pos_y = hs.y
+        if act == "walk":
+            canvas.avatar.target_x = min(0.84, hs.x + 0.14)
+            canvas.avatar.target_y = hs.y + 0.03
+            canvas.avatar.action = "walk"
+            canvas.avatar.facing = 1
+            canvas.scene.stage.spawn_footstep(hs.x - 0.02, hs.y, raining=(cond == "rain"))
+        else:
+            canvas.avatar.target_x = hs.x
+            canvas.avatar.target_y = hs.y
+            canvas.avatar.action = act
+        canvas.avatar.show_emote(emote, duration=5.0)
+        canvas.scene.set_whisper(whisper, 1.0)
+
+        canvas.render_to_image(960, 540)
+        for _ in range(36):
+            canvas.step_animation(0.05)
+        if act == "walk":
+            canvas.avatar.pos_x = hs.x + 0.04
+            canvas.avatar.target_x = hs.x + 0.16
+            canvas.avatar.action = "walk"
+        canvas.avatar.emote_life = 0.7
+        img = canvas.render_to_image(960, 540)
+        tfile = tmp_dir / f"_wtile_{idx}.png"
+        img.save(str(tfile))
+        with Image.open(tfile) as im:
+            tiles.append(im.convert("RGB").copy())
+        tfile.unlink(missing_ok=True)
+
+    grid = Image.new("RGB", (1920, 1080), (10, 14, 24))
+    for tile, pos in zip(tiles, [(0, 0), (960, 0), (0, 540), (960, 540)]):
+        grid.paste(tile, pos)
+    draw = ImageDraw.Draw(grid)
+    draw.line([(960, 0), (960, 1080)], fill=(120, 175, 255), width=3)
+    draw.line([(0, 540), (1920, 540)], fill=(120, 175, 255), width=3)
+    grid.save(out_path, format="PNG")
+    return out_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--persona", default="mira")
     parser.add_argument("--scene", default="sky_sanctuary")
-    parser.add_argument("--mode", choices=("scenes", "expressions", "outfits"), default="scenes")
+    parser.add_argument("--mode", choices=("world", "scenes", "expressions", "outfits", "sprites"), default="world")
     parser.add_argument("--out", default="showcase.png")
     args = parser.parse_args()
-    if args.mode == "expressions":
+    if args.mode == "world":
+        out = render_world_showcase(args.persona, args.scene, Path(args.out))
+    elif args.mode == "sprites":
+        out = render_strip(args.persona, ["sprite_idle", "sprite_walk1", "sprite_walk2", "sprite_sit", "sprite_happy", "sprite_sleep"], Path(args.out))
+    elif args.mode == "expressions":
         out = render_strip(args.persona, ["casual", "casual_happy", "casual_affectionate", "casual_shy", "casual_sleepy", "casual_pouty"], Path(args.out))
     elif args.mode == "outfits":
         out = render_strip(args.persona, ["casual", "focus", "rainy", "cozy", "nightwear", "starlight"], Path(args.out))

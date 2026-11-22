@@ -18,9 +18,12 @@ from .workflows import (
     PACK_EXPRESSIONS,
     PACK_OUTFITS,
     PACK_SCENE_VARIANTS,
+    WORLD_SPRITE_ACTIONS,
     build_avatar_variant_img2img_workflow,
     build_avatar_workflow,
+    build_diorama_scene_workflow,
     build_scene_workflow,
+    build_world_sprite_workflow,
 )
 
 
@@ -350,6 +353,126 @@ class ComfyBridge:
         if on_progress:
             on_progress(total, total, f"✅ Pack completo concluído ({len(created)} assets gerados)!")
         return created
+
+    def generate_world_pack_sync(
+        self,
+        persona: Persona,
+        scene_id: str,
+        persona_dest_dir: Path,
+        scene_dest_dir: Path,
+        actions: tuple[str, ...] = tuple(WORLD_SPRITE_ACTIONS.keys()),
+        scene_variants: tuple[str, ...] = PACK_SCENE_VARIANTS,
+        skip_existing: bool = True,
+        on_progress=None,
+        on_asset=None,
+    ) -> list[Path]:
+        """Gera pack 2.5D estilo RO/ToS/Pokémon: sprites full-body consistentes + dioramas nos 4 horários."""
+        st = self.probe()
+        if not st.online or not st.checkpoint:
+            raise RuntimeError("ComfyUI offline ou sem checkpoint disponível.")
+
+        persona_dest_dir.mkdir(parents=True, exist_ok=True)
+        scene_dest_dir.mkdir(parents=True, exist_ok=True)
+
+        jobs: list[tuple[str, str, Path]] = []
+        base_idle = persona_dest_dir / "sprite_idle.png"
+        if not (skip_existing and base_idle.exists()):
+            jobs.append(("sprite_base", "idle", base_idle))
+        for act in actions:
+            if act == "idle":
+                continue
+            p = persona_dest_dir / f"sprite_{act}.png"
+            if not (skip_existing and p.exists()):
+                jobs.append(("sprite_action", act, p))
+        for var in scene_variants:
+            p = scene_dest_dir / f"diorama_{var}.png"
+            if not (skip_existing and p.exists()):
+                jobs.append(("diorama", var, p))
+
+        total = len(jobs)
+        if total == 0:
+            if on_progress:
+                on_progress(0, 0, "Pack Mundo Vivo 2.5D já existe no disco!")
+            return []
+
+        created: list[Path] = []
+        uploaded_idle: str | None = None
+
+        for idx, (kind, key, out_path) in enumerate(jobs, start=1):
+            if on_progress:
+                on_progress(idx, total, f"[{idx}/{total}] Gerando {kind}: {key}...")
+
+            if kind == "sprite_base":
+                graph = build_world_sprite_workflow(
+                    checkpoint=st.checkpoint,
+                    persona=persona,
+                    action_key="idle",
+                    seed=persona.seed + 505,
+                    steps=22,
+                    use_pag=st.has_pag,
+                    use_rembg=st.has_rembg,
+                )
+            elif kind == "sprite_action":
+                if uploaded_idle is None and base_idle.exists():
+                    uploaded_idle = self.upload_image_on_white(base_idle, f"iawallpaper_sprite_idle_{persona.id}.png")
+                graph = build_world_sprite_workflow(
+                    checkpoint=st.checkpoint,
+                    persona=persona,
+                    action_key=key,
+                    base_uploaded_image=uploaded_idle,
+                    denoise=0.58 if key in ("walk1", "walk2") else 0.66,
+                    seed=persona.seed + 505 + idx * 19,
+                    steps=20,
+                    use_pag=st.has_pag,
+                    use_rembg=st.has_rembg,
+                )
+            else:
+                graph = build_diorama_scene_workflow(
+                    checkpoint=st.checkpoint,
+                    scene_id=scene_id,
+                    variant=key,
+                    seed=202800 + idx * 29,
+                    steps=20,
+                    use_pag=st.has_pag,
+                )
+
+            saved = self.run_workflow_and_save(graph, out_path, timeout=180.0)
+            created.append(saved)
+            if on_asset:
+                on_asset(kind, saved)
+
+        if on_progress:
+            on_progress(total, total, f"✅ Pack Mundo Vivo 2.5D concluído ({len(created)} assets)!")
+        return created
+
+    def generate_world_pack_async(
+        self,
+        persona: Persona,
+        scene_id: str,
+        persona_dest_dir: Path,
+        scene_dest_dir: Path,
+        skip_existing: bool = True,
+        on_progress=None,
+        on_asset=None,
+        on_error=None,
+    ) -> None:
+        def worker():
+            try:
+                self.generate_world_pack_sync(
+                    persona=persona,
+                    scene_id=scene_id,
+                    persona_dest_dir=persona_dest_dir,
+                    scene_dest_dir=scene_dest_dir,
+                    skip_existing=skip_existing,
+                    on_progress=on_progress,
+                    on_asset=on_asset,
+                )
+            except Exception as err:
+                log(f"[comfy] falha no pack mundo 2.5D: {err}")
+                if on_error:
+                    on_error(str(err))
+
+        threading.Thread(target=worker, daemon=True, name="iawallpaper-comfy-world-pack").start()
 
     def generate_full_pack_async(
         self,

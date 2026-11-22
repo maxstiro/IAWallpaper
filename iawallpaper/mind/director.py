@@ -21,7 +21,9 @@ class DirectorOutputs:
     asleep: bool = False
     whisper_text: str = ""
     whisper_alpha: float = 0.0
-    burst_fx: str | None = None    # "heart" | "sparkle" | "note" | "zzz" | None
+    burst_fx: str | None = None        # "heart" | "sparkle" | "note" | "zzz" | None
+    target_hotspot: str | None = None  # "desk" | "cushion" | "music_spot" | "lantern" | "overlook" | "garden_l" | "garden_r"
+    emote: str | None = None           # balão RO/Pokémon: "heart" | "exclamation" | "music" | "question" | "zzz" | "sparkle" | "pout"
 
 
 class BehaviorDirector:
@@ -50,7 +52,10 @@ class BehaviorDirector:
         self._last_caress_fx: float = 0.0
         self._last_music_fx: float = 0.0
         self._last_zzz_fx: float = 0.0
+        self._last_wander_at: float = 0.0
+        self._current_hotspot: str = "overlook"
         self._pending_fx: str | None = None
+        self._pending_emote: str | None = None
         self._rng = random.Random(persona.seed + 303)
 
     def set_persona(self, persona: Persona) -> None:
@@ -86,6 +91,7 @@ class BehaviorDirector:
         self.brain.learn(+0.85)
         if t - self._last_caress_fx >= 0.65:
             self._pending_fx = "heart"
+            self._pending_emote = "heart"
             self._last_caress_fx = t
             if t > self._whisper_until:
                 self.show_whisper(self._pick_whisper("caress"), duration=5.5, now=t)
@@ -94,6 +100,7 @@ class BehaviorDirector:
         t = time.monotonic() if now is None else now
         if self.asleep:
             self.asleep = False
+            self._pending_emote = "exclamation"
             self.show_whisper("Hmm...? Já acordei! ✨", duration=4.5, now=t)
         else:
             self.drives.touched("poke", scale=0.8)
@@ -102,6 +109,7 @@ class BehaviorDirector:
             self.episodic.on_positive_feedback()
             self.brain.learn(+0.35)
             self._pending_fx = "sparkle"
+            self._pending_emote = "exclamation"
 
     def on_gift(self, label: str = "", now: float | None = None) -> None:
         t = time.monotonic() if now is None else now
@@ -111,6 +119,7 @@ class BehaviorDirector:
         self.episodic.on_positive_feedback()
         self.brain.learn(+1.0)
         self._pending_fx = "heart"
+        self._pending_emote = "heart"
         msg = f"Adorei {label}! Obrigada ♥" if label else "Obrigada pelo carinho! Fiquei super feliz ♥"
         self.show_whisper(msg, duration=6.5, now=t)
 
@@ -119,6 +128,7 @@ class BehaviorDirector:
         self.conditioning.set_cue("RETURN", True, t)
         self.show_whisper(self._pick_whisper("greet"), duration=7.0, now=t)
         self._pending_fx = "sparkle"
+        self._pending_emote = "heart"
 
     def choose_contextual_outfit(
         self,
@@ -188,16 +198,52 @@ class BehaviorDirector:
         # 2. Traje dinâmico contextual
         self.current_outfit = self.choose_contextual_outfit(activity, circadian, weather, outfit_override)
 
-        # 3. Efeitos periódicos de música e sono
+        # 3. Navegação autônoma pelo cenário 2.5D (estilo RO / Tree of Savior / Pokémon)
+        target_hotspot: str | None = None
+        emote = self._pending_emote
+        self._pending_emote = None
+
+        if self.asleep:
+            desired = "cushion"
+        elif activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING"):
+            desired = "desk"
+        elif activity == "MUSIC":
+            desired = "music_spot"
+        else:
+            wander_interval = 7.0 if test_mode else 18.0
+            if now - self._last_wander_at >= wander_interval:
+                self._last_wander_at = now
+                spots = ["overlook", "lantern", "garden_l", "garden_r", "cushion"]
+                choices = [s for s in spots if s != self._current_hotspot]
+                desired = self._rng.choice(choices)
+            else:
+                desired = self._current_hotspot
+
+        if desired != self._current_hotspot:
+            self._current_hotspot = desired
+            target_hotspot = desired
+            if emote is None:
+                if desired == "desk":
+                    emote = "sparkle"
+                elif desired == "music_spot":
+                    emote = "music"
+                elif desired == "cushion" and self.asleep:
+                    emote = "zzz"
+
+        # 4. Efeitos periódicos de música e sono
         burst = self._pending_fx
         self._pending_fx = None
         if burst is None:
             if self.asleep and now - self._last_zzz_fx >= 3.2:
                 burst = "zzz"
+                emote = emote or "zzz"
                 self._last_zzz_fx = now
             elif activity == "MUSIC" and not self.asleep and now - self._last_music_fx >= 4.2:
                 burst = "note"
+                emote = emote or "music"
                 self._last_music_fx = now
+            elif emotion.mood == "pouty" and not self.asleep and emote is None and now - self._last_action_at > 20.0:
+                emote = "question"
 
         # 4. Ações autônomas guiadas pelos motores de decisão + Bandit contextual
         cooldown = 12.0 if test_mode else 55.0
@@ -235,4 +281,6 @@ class BehaviorDirector:
             whisper_text=self.whisper_text if whispers_enabled else "",
             whisper_alpha=alpha if whispers_enabled else 0.0,
             burst_fx=burst,
+            target_hotspot=target_hotspot,
+            emote=emote,
         )

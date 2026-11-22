@@ -22,7 +22,8 @@
 
 ## Fase 6 — Evolução Contínua
 - [x] **Milestone 7**: Crossfade suave 2.5D (expressões, trajes e horários/clima), workflows img2img consistentes + gerador de pack em lote (`ComfyBridge` + `tools/generate_pack.py`), Criador de Waifu Personalizada na Central de Controle (`+ Nova Waifu`), validação visual com `tools/render_showcase.py`, pack completo da **Mira** (11 sprites RGBA) + **Observatório Celeste** (4 horários) e push via SSH no GitHub.
-- [ ] **Milestone 8**: Suporte multi-monitor independente (cenário dedicado por monitor ou modo panorâmico estendido) + validação em tempo real de ancoragem Win11 26300 com múltiplos DPIs.
+- [x] **Milestone 8**: **Mundo Vivo 2.5D estilo Ragnarok Online / Tree of Savior / Pokémon NDS** (`world_stage.py`, `avatar.py` full-body caminhável, guarda-chuva automático, balões de emote RO, *click-to-move* no chão, navegação autônoma pelo cérebro LIF, workflows `diorama_*` + `sprite_*` no ComfyUI e pack 2.5D da Mira validado visualmente com 24/24 testes).
+- [ ] **Milestone 9**: Suporte multi-monitor independente + validação de ancoragem ao vivo no Windows 11 Build 26300 com múltiplos DPIs.
 - [ ] **Milestone 9**: Áudio ambiente reativo opcional (chuva suave, vento, lareira) e visualizador/reatividade a áudio do sistema (WASAPI loopback) sincronizando ritmo da avatar com músicas no Spotify/YouTube.
 - [ ] **Milestone 10**: Diálogo interativo leve opcional (LLM local via Ollama/llama.cpp) condicionado ao humor da rede LIF, afinidade e memória episódica.
 - [ ] **Milestone 11**: Animação avançada de rosto/cabelo (malha deformável 2.5D / piscar dinâmico em sprites AI / loops curtos de vídeo WebM gerados por I2V).

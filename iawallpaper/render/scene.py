@@ -23,6 +23,7 @@ from ..sense.weather import WeatherState
 from .atmosphere import AtmospherePalette, compute_atmosphere
 from .avatar import AvatarRig
 from .particles import ParticleEngine
+from .world_stage import WorldStage
 
 
 class SceneCompositor:
@@ -30,6 +31,7 @@ class SceneCompositor:
 
     def __init__(self, scene_dirs: list[Path] | Path | None = None, seed: int = 2026):
         self.scene_dirs = self._normalize_dirs(scene_dirs)
+        self.stage = WorldStage(seed=seed)
         rng = random.Random(seed)
         self.time: float = 0.0
         self.parallax_x: float = 0.0
@@ -99,9 +101,10 @@ class SceneCompositor:
         self.whisper_text = text
         self.whisper_alpha = clamp(alpha, 0.0, 1.0)
 
-    def update(self, dt: float, wind_speed: float = 6.0) -> None:
+    def update(self, dt: float, wind_speed: float = 6.0, condition: str = "clear") -> None:
         dt = clamp(dt, 0.0, 0.1)
         self.time += dt
+        self.stage.update(dt, condition=condition)
         k = clamp(dt * 4.5, 0.0, 1.0)
         self.parallax_x += (self.target_px - self.parallax_x) * k
         self.parallax_y += (self.target_py - self.parallax_y) * k
@@ -117,18 +120,23 @@ class SceneCompositor:
             if self._bg_fade_t >= 1.0:
                 self._prev_bg = None
 
-    def _pick_bg_key(self, circadian: CircadianState, weather: WeatherState) -> str | None:
+    def _pick_bg_key(self, circadian: CircadianState, weather: WeatherState, prefer_diorama: bool = False) -> str | None:
         if not self._bg_images:
             return None
-        if weather.condition in ("rain", "storm") and "rain" in self._bg_images:
-            return "rain"
-        if circadian.period in ("golden_hour", "dawn", "twilight") and "sunset" in self._bg_images:
-            return "sunset"
-        if circadian.night_factor >= 0.55 and "night" in self._bg_images:
-            return "night"
-        for key in ("day", "default", "base"):
-            if key in self._bg_images:
-                return key
+        prefix = "diorama_" if prefer_diorama else ""
+        keys: list[str] = []
+        if weather.condition in ("rain", "storm"):
+            keys.extend([f"{prefix}rain", "rain"])
+        elif circadian.period in ("golden_hour", "dawn", "twilight"):
+            keys.extend([f"{prefix}sunset", "sunset"])
+        elif circadian.night_factor >= 0.55:
+            keys.extend([f"{prefix}night", "night"])
+        else:
+            keys.extend([f"{prefix}day", "day"])
+        keys.extend([f"{prefix}sunset", f"{prefix}day", "day", "default", "base"])
+        for k in keys:
+            if k in self._bg_images:
+                return k
         return next(iter(self._bg_images.keys()))
 
     def paint(
@@ -152,7 +160,9 @@ class SceneCompositor:
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        bg_key = self._pick_bg_key(circadian, weather)
+        is_world = avatar.render_style == "world_sprite"
+        raining = weather.condition in ("rain", "storm")
+        bg_key = self._pick_bg_key(circadian, weather, prefer_diorama=is_world)
         if bg_key is not None:
             if bg_key != self._current_bg_key:
                 if self._current_bg_key is not None and self._current_bg_key in self._bg_images:
@@ -167,7 +177,12 @@ class SceneCompositor:
             particles.paint_sky_fx(painter)
             self._paint_clouds(painter, width, height, atmo, weather)
             self._paint_mountains_and_city(painter, width, height, atmo)
-            self._paint_water_and_balcony(painter, width, height, atmo)
+            if is_world:
+                self.stage.paint_procedural_terrace(
+                    painter, width, height, atmo, self.parallax_x, self.parallax_y, wind_speed=weather.wind_speed
+                )
+            else:
+                self._paint_water_and_balcony(painter, width, height, atmo)
 
         # Neblina atmosférica sobre o fundo
         if atmo.fog_alpha > 0.01:
@@ -177,7 +192,23 @@ class SceneCompositor:
             fog_g.setColorAt(1.0, QColor(fog_c.red(), fog_c.green(), fog_c.blue(), int(atmo.fog_alpha * 150)))
             painter.fillRect(0, 0, width, height, fog_g)
 
-        # Avatar Waifu integrado com paralaxe e iluminação
+        if is_world:
+            # Efeitos no piso (poeira de passos & ondas de chuva)
+            self.stage.paint_ground_fx(painter, width, height, atmo, self.parallax_x, self.parallax_y)
+            working_now = activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING")
+            music_now = activity == "MUSIC"
+            # Em cenas procedurais desenha todos os props; em dioramas AI pintados à mão
+            # desenha apenas o tapete/mesa quando a avatar está usando (sem poluir a arte do cenário!)
+            if bg_key is None:
+                self.stage.paint_props_layer(
+                    painter, width, height, atmo, self.parallax_x, self.parallax_y,
+                    avatar_y=avatar.pos_y, behind_avatar=True, working_active=working_now, music_active=music_now,
+                )
+            elif avatar.action == "sleep":
+                sx, sy = self.stage.screen_pos(avatar.pos_x, avatar.pos_y, width, height, self.parallax_x, self.parallax_y)
+                self.stage._draw_cushion_rug(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0), atmo)
+
+        # Avatar Waifu integrado com paralaxe, profundidade 2.5D e iluminação
         avatar.paint(
             painter=painter,
             canvas_w=width,
@@ -190,7 +221,21 @@ class SceneCompositor:
             parallax_y=self.parallax_y,
             wind=weather.wind_speed,
             asleep=asleep,
+            raining=raining,
+            stage=self.stage if is_world else None,
         )
+
+        if is_world:
+            if bg_key is None:
+                self.stage.paint_props_layer(
+                    painter, width, height, atmo, self.parallax_x, self.parallax_y,
+                    avatar_y=avatar.pos_y, behind_avatar=False,
+                    working_active=activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING"),
+                    music_active=activity == "MUSIC",
+                )
+            elif avatar.action == "sit_work":
+                sx, sy = self.stage.screen_pos(avatar.pos_x, avatar.pos_y + 0.025, width, height, self.parallax_x, self.parallax_y)
+                self.stage._draw_study_desk(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0) * 0.88, atmo, True)
 
         # Partículas climáticas e reações afetivas em primeiro plano
         particles.paint_weather(painter)
@@ -382,8 +427,13 @@ class SceneCompositor:
         bw = text_rect.width() + pad_x * 2
         bh = text_rect.height() + pad_y * 2
 
-        bx = clamp(avatar.head_rect.left() - bw - 18, 28, w - bw - 28)
-        by = clamp(avatar.head_rect.top() + 26, 28, h - bh - 120)
+        # Posiciona à esquerda da cabeça ou à direita se a avatar estiver na metade esquerda (nunca cobre o rosto!)
+        prefer_left = avatar.head_rect.left() - bw - 20
+        if prefer_left >= 28:
+            bx = prefer_left
+        else:
+            bx = clamp(avatar.head_rect.right() + 20, 28, w - bw - 28)
+        by = clamp(avatar.head_rect.top() - 6, 28, h - bh - 120)
         self.whisper_rect = QRectF(bx, by, bw, bh)
 
         rim = QColor(*atmo.rim_light)

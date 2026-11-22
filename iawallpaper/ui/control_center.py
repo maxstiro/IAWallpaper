@@ -229,6 +229,11 @@ class ControlCenterWindow(QWidget):
         persona_row.addWidget(self.cb_persona, 1)
         persona_row.addWidget(btn_new_persona)
 
+        self.cb_render_style = QComboBox()
+        self.cb_render_style.addItem("Mundo Vivo 2.5D — Sprite Caminhando (RO / ToS / Pokémon)", "world_sprite")
+        self.cb_render_style.addItem("Retrato Visual Novel (Busto em Destaque)", "portrait")
+        self.cb_render_style.currentIndexChanged.connect(self._emit_settings)
+
         self.cb_outfit = QComboBox()
         for label, key in [
             ("Automático (Reage ao Clima, Hora e Atividade)", ""),
@@ -254,6 +259,7 @@ class ControlCenterWindow(QWidget):
         self.chk_whispers.stateChanged.connect(self._emit_settings)
 
         f.addRow("Personagem:", persona_row)
+        f.addRow("Estilo do Avatar:", self.cb_render_style)
         f.addRow("Traje:", self.cb_outfit)
         f.addRow("Escala do Avatar:", self.sl_avatar_scale)
         f.addRow("Posição Horizontal:", self.sl_avatar_x)
@@ -424,6 +430,7 @@ class ControlCenterWindow(QWidget):
         self.sl_particles.setValue(int(round(s.particle_density * 10)))
 
         self._set_combo(self.cb_persona, s.persona_id)
+        self._set_combo(self.cb_render_style, s.render_style)
         self._set_combo(self.cb_outfit, s.outfit_override or "")
         self.sl_avatar_scale.setValue(int(round(s.avatar_scale * 100)))
         self.sl_avatar_x.setValue(int(round(s.avatar_x_ratio * 100)))
@@ -461,6 +468,7 @@ class ControlCenterWindow(QWidget):
             persona_id=self.cb_persona.currentData() or "mira",
             scene_id=self.cb_scene.currentData() or "sky_sanctuary",
             mode=self.cb_mode.currentData() or "wallpaper",
+            render_style=self.cb_render_style.currentData() or "world_sprite",
             fps_cap=int(self.cb_fps.currentData() or 60),
             auto_pause_fullscreen=self.chk_autopause.isChecked(),
             parallax_strength=self.sl_parallax.value() / 10.0,

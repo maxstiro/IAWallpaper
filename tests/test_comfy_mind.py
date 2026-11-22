@@ -6,7 +6,9 @@ from iawallpaper.comfy.bridge import ComfyBridge
 from iawallpaper.comfy.workflows import (
     build_avatar_variant_img2img_workflow,
     build_avatar_workflow,
+    build_diorama_scene_workflow,
     build_scene_workflow,
+    build_world_sprite_workflow,
 )
 from iawallpaper.core.conditioning import Conditioning
 from iawallpaper.core.emotion import EmotionState
@@ -46,6 +48,15 @@ def test_comfy_workflow_builders():
     assert expr_wf["4"]["class_type"] == "VAEEncode"
     assert expr_wf["6"]["inputs"]["denoise"] == 0.44
     assert "blushing" in expr_wf["2"]["inputs"]["text"]
+
+    dio = build_diorama_scene_workflow("waiIllustriousSDXL_v170.safetensors", "sky_sanctuary", "day", seed=11)
+    assert "tree_of_savior_style" in dio["2"]["inputs"]["text"]
+    assert "no_humans" in dio["2"]["inputs"]["text"]
+
+    ws = build_world_sprite_workflow("waiIllustriousSDXL_v170.safetensors", mira, action_key="walk1", seed=12)
+    assert "full_body" in ws["2"]["inputs"]["text"]
+    assert "sprite_sheet" in ws["3"]["inputs"]["text"]
+    assert ws["8"]["inputs"]["alpha_matting"] is False
 
 
 def test_custom_persona_creation_and_persistence(tmp_path: Path):

@@ -21,15 +21,16 @@ class WallpaperCanvas(QWidget):
 
     caress_tick = Signal(float)        # intensidade 0..1 de carinho na cabeça
     avatar_poked = Signal(str)         # "head" | "body"
+    ground_clicked = Signal(float, float)  # clique no chão caminhável (x_norm, y_norm) -> click-to-move RO!
     whisper_dismissed = Signal()
     cursor_approaching = Signal(bool)  # True quando cursor se aproxima suavemente da avatar
 
-    def __init__(self, persona: Persona, sprite_dirs=None, scene_dirs=None, parent=None):
+    def __init__(self, persona: Persona, sprite_dirs=None, scene_dirs=None, render_style: str = "world_sprite", parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.setMouseTracking(True)
 
-        self.avatar = AvatarRig(persona, sprite_dirs=sprite_dirs)
+        self.avatar = AvatarRig(persona, sprite_dirs=sprite_dirs, render_style=render_style)
         self.scene = SceneCompositor(scene_dirs=scene_dirs, seed=persona.seed)
         self.particles = ParticleEngine(seed=persona.seed + 17)
 
@@ -110,8 +111,10 @@ class WallpaperCanvas(QWidget):
             if not self.scene.whisper_rect.isEmpty() and self.scene.whisper_rect.contains(local_x, local_y):
                 self.whisper_dismissed.emit()
             elif hit is not None:
-                self.avatar.impulse(vy=-160.0, tilt=(-4.0 if local_x < head_c.x() else 4.0))
+                self.avatar.impulse(vy=-210.0, tilt=(-5.0 if local_x < head_c.x() else 5.0))
                 self.avatar_poked.emit(hit)
+            elif self.avatar.render_style == "world_sprite" and (local_y / h) >= 0.60:
+                self.ground_clicked.emit(local_x / w, local_y / h)
         self._was_mouse_down = left_down
 
     def mouseMoveEvent(self, event):
@@ -132,7 +135,7 @@ class WallpaperCanvas(QWidget):
 
     def step_animation(self, dt: float) -> None:
         """Avança um quadro da simulação visual."""
-        self.scene.update(dt, wind_speed=self.weather.wind_speed)
+        self.scene.update(dt, wind_speed=self.weather.wind_speed, condition=self.weather.condition)
         self.particles.update(
             dt=dt,
             width=max(self.width(), 640),
@@ -143,6 +146,10 @@ class WallpaperCanvas(QWidget):
             wind_speed=self.weather.wind_speed,
         )
         self.avatar.update(dt=dt, emotion=self.emotion, caressing=self._caressing, asleep=self.asleep)
+        if self.avatar.pending_footstep is not None:
+            fx, fy = self.avatar.pending_footstep
+            self.scene.stage.spawn_footstep(fx, fy, raining=self.weather.condition in ("rain", "storm"))
+            self.avatar.pending_footstep = None
         self.update()
 
     def paintEvent(self, _event):

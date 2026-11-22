@@ -131,10 +131,12 @@ class IAWallpaperApp:
                 self.paths.scene_assets(self.settings.scene_id),
                 self.paths.scene_generated_assets(self.settings.scene_id),
             ],
+            render_style=self.settings.render_style,
         )
         self.canvas.setWindowTitle(f"IAWallpaper — {self.persona.name}")
         self.canvas.caress_tick.connect(self._on_canvas_caress)
         self.canvas.avatar_poked.connect(self._on_canvas_poke)
+        self.canvas.ground_clicked.connect(self._on_ground_clicked)
         self.canvas.whisper_dismissed.connect(self._on_whisper_dismissed)
         self.canvas.cursor_approaching.connect(self._on_cursor_approaching)
 
@@ -242,6 +244,7 @@ class IAWallpaperApp:
         self.canvas.particle_density = self.settings.particle_density
         self.canvas.avatar_scale = self.settings.avatar_scale
         self.canvas.avatar_x_ratio = self.settings.avatar_x_ratio
+        self.canvas.avatar.render_style = self.settings.render_style
         self.t_frame.setInterval(16 if self.settings.fps_cap >= 60 else 33)
 
     def _apply_window_mode(self, mode: str) -> None:
@@ -425,6 +428,12 @@ class IAWallpaperApp:
         self.canvas.avatar.outfit = out.outfit
         self.canvas.scene.set_whisper(out.whisper_text, out.whisper_alpha)
 
+        if out.target_hotspot and out.target_hotspot in self.canvas.scene.stage.hotspots:
+            hs = self.canvas.scene.stage.hotspots[out.target_hotspot]
+            self.canvas.avatar.walk_to(hs.x, hs.y, arrive_action=hs.arrive_action)
+        if out.emote:
+            self.canvas.avatar.show_emote(out.emote)
+
         if out.burst_fx:
             hc = self.canvas.avatar.head_rect.center()
             if not self.canvas.avatar.head_rect.isEmpty():
@@ -462,6 +471,12 @@ class IAWallpaperApp:
     def _on_canvas_poke(self, _zone: str) -> None:
         self.context_senses.kick("POKE", 0.85)
         self.director.on_poke()
+
+    def _on_ground_clicked(self, nx: float, ny: float) -> None:
+        """Click-to-move estilo Ragnarok Online: chama a avatar para caminhar até o ponto clicado."""
+        self.canvas.avatar.walk_to(nx, ny, arrive_action="idle")
+        self.canvas.avatar.show_emote("exclamation", duration=1.8)
+        self.drives.stimulate("novelty", scale=0.4)
 
     def _on_whisper_dismissed(self) -> None:
         self.context_senses.kick("DISMISS", 0.75)
@@ -535,6 +550,19 @@ class IAWallpaperApp:
     def _generate_comfy_pack(self, scene_id: str) -> None:
         p_dest = self.paths.persona_generated_assets(self.persona.id)
         s_dest = self.paths.scene_generated_assets(scene_id)
+        if self.settings.render_style == "world_sprite":
+            self.control_center.set_pack_progress(0, 1, f"🚀 Gerando Pack Mundo Vivo 2.5D de {self.persona.name}...")
+            self.comfy.generate_world_pack_async(
+                persona=self.persona,
+                scene_id=scene_id,
+                persona_dest_dir=p_dest,
+                scene_dest_dir=s_dest,
+                skip_existing=True,
+                on_progress=lambda cur, tot, lbl: self.bridge.comfy_pack_progress.emit(cur, tot, lbl),
+                on_asset=lambda kind, p: self.bridge.comfy_pack_asset.emit(kind, str(p)),
+                on_error=lambda e: self.bridge.comfy_error.emit(e),
+            )
+            return
         self.control_center.set_pack_progress(0, 1, f"🚀 Iniciando pack completo de {self.persona.name}...")
         self.comfy.generate_full_pack_async(
             persona=self.persona,
