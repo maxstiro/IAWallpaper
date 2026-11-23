@@ -7,6 +7,7 @@ from .particles import ParticleEngine
 from .rig_cutter import AutoRiggedCharacter, RigPart, build_rig_from_apose
 from .scene import SceneCompositor
 from .skeleton import BoneWorld, CharacterSkeleton, PoseTargets, RigProportions
+from .sprite_clip import SpriteClip, load_clips_from_dirs, load_sprite_clip
 from .world_stage import WorldStage
 
 __all__ = [
@@ -23,5 +24,8 @@ __all__ = [
     "CharacterSkeleton",
     "PoseTargets",
     "RigProportions",
+    "SpriteClip",
+    "load_clips_from_dirs",
+    "load_sprite_clip",
     "WorldStage",
 ]

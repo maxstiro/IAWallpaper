@@ -17,8 +17,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Gera pack completo consistente de persona + cenário via ComfyUI local.")
     parser.add_argument("--persona", default="mira", help="ID da persona (ex: mira, nyx ou personalizada).")
     parser.add_argument("--scene", default="sky_sanctuary", help="ID do cenário (sky_sanctuary, cyber_loft, sakura_hill).")
-    parser.add_argument("--style", choices=("world", "portrait"), default="world", help="world = sprites 2.5D + dioramas coerentes; portrait = bustos.")
+    parser.add_argument("--style", choices=("world", "clips", "portrait"), default="world", help="world = base + cenários 2.5D; clips = clipes animados Wan 2.2 RGBA; portrait = bustos.")
     parser.add_argument("--preset", default="RawSexyGlowingGemPencil(TOP)", help="Nome do preset do ComfyUI Studio (read-only).")
+    parser.add_argument("--actions", default="idle,walk,wave,dance", help="Lista de ações para --style clips (separadas por vírgula).")
     parser.add_argument("--url", default="http://127.0.0.1:8188", help="URL da API HTTP do ComfyUI.")
     parser.add_argument("--force", action="store_true", help="Regenera inclusive arquivos já existentes.")
     args = parser.parse_args()
@@ -26,7 +27,16 @@ def main() -> int:
     paths = Paths(base_dir=ROOT)
     persona = load_persona(args.persona, personas_dir=paths.personas_dir)
     bridge = ComfyBridge(args.url)
-    if args.style == "world":
+    if args.style == "clips":
+        acts = tuple(a.strip() for a in args.actions.split(",") if a.strip())
+        created = bridge.generate_wan_clips_sync(
+            persona=persona,
+            persona_dest_dir=paths.persona_generated_assets(persona.id),
+            actions=acts,
+            skip_existing=not args.force,
+            on_progress=lambda cur, tot, lbl: print(lbl, flush=True),
+        )
+    elif args.style == "world":
         created = bridge.generate_world_pack_sync(
             persona=persona,
             scene_id=args.scene,

@@ -32,19 +32,19 @@ class WorldHotspot:
     label_pt: str
 
 
-# Todos os hotspots ficam ancorados estritamente na passarela de pedra central do terraço eye-level (escala 1:1, longe do HUD)
+# Hotspots distribuídos pela praça de pedra aberta estilo Tree of Savior / Ragnarok Online (livres do HUD inferior esquerdo!)
 DEFAULT_HOTSPOTS: dict[str, WorldHotspot] = {
-    "desk":       WorldHotspot("desk",       0.47, 0.90, "sit_work",    "Cantinho de Estudo"),
-    "music_spot": WorldHotspot("music_spot", 0.49, 0.91, "music_sway",  "Cantinho Musical"),
-    "overlook":   WorldHotspot("overlook",   0.52, 0.88, "wave",        "Mirante do Terraço"),
-    "lantern":    WorldHotspot("lantern",    0.58, 0.90, "stretch",     "Luz da Lanterna"),
-    "cushion":    WorldHotspot("cushion",    0.63, 0.91, "sleep",       "Tapete & Almofada"),
-    "garden_l":   WorldHotspot("garden_l",   0.38, 0.92, "idle",        "Passarela Oeste"),
-    "garden_r":   WorldHotspot("garden_r",   0.65, 0.92, "idle",        "Passarela Leste"),
+    "desk":       WorldHotspot("desk",       0.46, 0.88, "sit_work",    "Praça de Estudo"),
+    "music_spot": WorldHotspot("music_spot", 0.48, 0.84, "dance",       "Praça da Música"),
+    "overlook":   WorldHotspot("overlook",   0.54, 0.71, "idle",        "Árvore Sagrada"),
+    "lantern":    WorldHotspot("lantern",    0.66, 0.78, "wave",        "Lanternas do Mirante"),
+    "cushion":    WorldHotspot("cushion",    0.74, 0.88, "sleep",       "Recanto das Flores"),
+    "garden_l":   WorldHotspot("garden_l",   0.44, 0.90, "walk",        "Pedras da Praça"),
+    "garden_r":   WorldHotspot("garden_r",   0.78, 0.88, "idle",        "Terraço Leste"),
 }
 
-WALK_MIN_X, WALK_MAX_X = 0.33, 0.69
-WALK_MIN_Y, WALK_MAX_Y = 0.84, 0.95
+WALK_MIN_X, WALK_MAX_X = 0.24, 0.84
+WALK_MIN_Y, WALK_MAX_Y = 0.69, 0.94
 
 
 @dataclass
@@ -112,9 +112,9 @@ class WorldStage:
 
     @staticmethod
     def depth_scale(y_norm: float) -> float:
-        """Perspectiva 2.5D real: menor ao fundo do terraço (0.81), maior próximo da câmera (0.95)."""
+        """Perspectiva 2.5D estilo Tree of Savior / Ragnarok Online: menor ao fundo da praça (0.64), maior à frente (0.91)."""
         t = clamp((y_norm - WALK_MIN_Y) / max(WALK_MAX_Y - WALK_MIN_Y, 0.01), 0.0, 1.0)
-        return lerp(0.86, 1.14, t)
+        return lerp(0.78, 1.08, t)
 
     def screen_pos(self, x_norm: float, y_norm: float, w: int, h: int, parallax_x: float = 0.0, parallax_y: float = 0.0) -> tuple[float, float]:
         depth = self.depth_scale(y_norm)

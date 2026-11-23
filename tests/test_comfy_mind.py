@@ -10,6 +10,7 @@ from iawallpaper.comfy.workflows import (
     build_diorama_scene_workflow,
     build_qwen_relight_scene_workflow,
     build_scene_workflow,
+    build_wan_sprite_clip_workflow,
     build_world_sprite_workflow,
 )
 from iawallpaper.core.conditioning import Conditioning
@@ -71,6 +72,13 @@ def test_comfy_workflow_builders():
     qrel = build_qwen_relight_scene_workflow("iawallpaper_diorama_day.png", variant="night", seed=7)
     assert qrel["4"]["class_type"] == "TextEncodeQwenImage21"
     assert qrel["5"]["inputs"]["denoise"] == 1.0
+
+    wan = build_wan_sprite_clip_workflow("iawallpaper_wan_base_mira.png", action_key="dance", seed=9)
+    assert wan["10"]["class_type"] == "WanFirstLastFrameToVideo"
+    assert wan["10"]["inputs"]["start_image"] == wan["10"]["inputs"]["end_image"]
+    assert wan["14"]["class_type"] == "Image Rembg (Remove Background)"
+    assert wan["14"]["inputs"]["alpha_matting"] is False
+    assert wan["15"]["class_type"] == "SaveAnimatedWEBP"
 
     top = find_comfy_preset("RawSexyGlowingGemPencil")
     if top is not None:

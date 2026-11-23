@@ -127,10 +127,10 @@ def render_world_showcase(persona_id: str, scene_id: str, out_path: Path) -> Pat
     )
 
     shots = [
-        (10.5, "clear", "desk", "sit_work", "focused", "Concentrada", "sparkle", "PROGRAMMING", "Trabalhando no notebook junto com voce!"),
-        (18.0, "clear", "overlook", "wave", "happy", "Radiante", "heart", "IDLE", "Oi! O por do sol no terraco esta lindo!"),
-        (16.0, "rain", "lantern", "walk", "cozy", "Aconchegada", "music", "MUSIC", "Guarda-chuva na mao e passos na chuva!"),
-        (23.5, "clear", "cushion", "stretch", "happy", "Relaxando", "sparkle", "IDLE", "Espreguicando sob a lua cheia..."),
+        (10.5, "clear", "overlook", "idle", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada na praca do observatorio!"),
+        (18.0, "clear", "lantern", "wave", "affectionate", "Carinhosa", "heart", "IDLE", "Oi! O por do sol na praca esta magico!"),
+        (16.0, "rain", "garden_l", "walk", "cozy", "Aconchegada", "music", "MUSIC", "Caminhando com guarda-chuva na chuva suave!"),
+        (23.5, "clear", "music_spot", "dance", "happy", "Animada", "sparkle", "IDLE", "Dancando sob a lua e os vaga-lumes!"),
     ]
 
     tiles: list[Image.Image] = []
@@ -165,22 +165,25 @@ def render_world_showcase(persona_id: str, scene_id: str, out_path: Path) -> Pat
         for _ in range(36):
             canvas.step_animation(0.05)
         if act == "walk":
-            canvas.avatar.pos_x = hs.x + 0.04
-            canvas.avatar.target_x = hs.x + 0.16
+            canvas.avatar.pos_x = hs.x + 0.06
+            canvas.avatar.target_x = hs.x + 0.22
             canvas.avatar.action = "walk"
             canvas.avatar.walk_phase = 1.15
             canvas.avatar.update(0.05, canvas.emotion, raining=(cond == "rain"))
-        elif act == "stretch":
-            canvas.avatar.action = "stretch"
-            canvas.avatar.action_timer = 2.0
-            for _ in range(18):
+        elif act in ("stretch", "dance"):
+            canvas.avatar.action = act
+            canvas.avatar.action_timer = 1.0
+            for _ in range(12):
                 canvas.avatar.update(0.05, canvas.emotion, raining=False)
         elif act == "wave":
             canvas.avatar.action = "wave"
-            canvas.avatar.action_timer = 0.8
-            for _ in range(18):
+            canvas.avatar.action_timer = 0.85
+            for _ in range(12):
                 canvas.avatar.update(0.05, canvas.emotion, raining=False)
         canvas.avatar.emote_life = 0.7
+        # Posiciona no pico da pose animada do clipe para o frame estatico do mosaico
+        if canvas.avatar.has_animated_clips():
+            canvas.avatar._clip_time = 0.95 if act in ("wave", "dance") else 0.55
         img = canvas.render_to_image(960, 540)
         tfile = tmp_dir / f"_wtile_{idx}.png"
         img.save(str(tfile))
@@ -275,39 +278,40 @@ def render_animated_gif(persona_id: str, scene_id: str, out_path: Path, width: i
     canvas.affinity = 74.0
     canvas.activity = "IDLE"
 
-    # Inicia caminhando da esquerda para o centro da passarela de pedra
-    canvas.avatar.pos_x = 0.37
-    canvas.avatar.pos_y = 0.91
-    canvas.avatar.walk_to(0.56, 0.90, arrive_action="wave")
-    canvas.scene.set_whisper("Caminhando pelo terraco ao por do sol...", 1.0)
+    # Inicia caminhando pelas pedras da praça aberta estilo Tree of Savior / Ragnarok Online
+    canvas.avatar.pos_x = 0.42
+    canvas.avatar.pos_y = 0.90
+    canvas.avatar.walk_to(0.64, 0.84, arrive_action="wave")
+    canvas.scene.set_whisper("Passeando pela praca ao por do sol...", 1.0)
     canvas.render_to_image(width, height)
     for _ in range(20):
         canvas.step_animation(0.05)
     # Reposiciona início limpo após crossfade do fundo
-    canvas.avatar.pos_x = 0.37
-    canvas.avatar.pos_y = 0.91
-    canvas.avatar.walk_to(0.56, 0.90, arrive_action="wave")
+    canvas.avatar.pos_x = 0.42
+    canvas.avatar.pos_y = 0.90
+    canvas.avatar.walk_to(0.64, 0.84, arrive_action="wave")
+    canvas.avatar._clip_time = 0.0
 
     frames: list[Image.Image] = []
     dt = 1.0 / fps
-    total_frames = int(fps * 5.0)  # 60 frames = 5 segundos suaves
+    total_frames = int(fps * 6.0)  # 72 frames = 6 segundos fluidos (walk -> wave -> dance!)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_frame = out_path.parent / "_gif_frame.png"
 
     for i in range(total_frames):
-        t_sec = i * dt
         if i == int(fps * 2.0):
-            canvas.avatar.pos_x = 0.54
-            canvas.avatar.target_x = 0.54
-            canvas.avatar.target_y = 0.89
+            canvas.avatar.pos_x = 0.64
+            canvas.avatar.pos_y = 0.84
+            canvas.avatar.target_x = 0.64
+            canvas.avatar.target_y = 0.84
             canvas.avatar.trigger_action("wave")
             canvas.avatar.show_emote("heart", duration=2.2)
-            canvas.scene.set_whisper("Oi! Agora com esqueleto real de 18 ossos!", 1.0)
-        elif i == int(fps * 3.5):
-            canvas.avatar.trigger_action("stretch")
-            canvas.avatar.show_emote("sparkle", duration=2.0)
-            canvas.scene.set_whisper("Espreguicando na brisa do mirante...", 1.0)
+            canvas.scene.set_whisper("Oi! Agora com animacao fluida quadro-a-quadro!", 1.0)
+        elif i == int(fps * 4.0):
+            canvas.avatar.trigger_action("dance")
+            canvas.avatar.show_emote("sparkle", duration=2.2)
+            canvas.scene.set_whisper("Dancando na brisa estilo Tree of Savior!", 1.0)
 
         # Sub-steps de 25ms para física de mola ultra suave
         sub = 3

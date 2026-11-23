@@ -50,43 +50,74 @@ WORLD_SPRITE_ACTIONS: dict[str, str] = {
 
 DIORAMA_SCENE_PRESETS: dict[str, str] = {
     "sky_sanctuary": (
-        "anime_scenery, tree_of_savior_style, hand_painted_anime_background, "
-        "(eye_level_camera:1.35), (straight-on_horizontal_view:1.30), human_scale_architecture, "
-        "wide_flat_horizontal_stone_terrace_floor_across_bottom_30_percent, "
-        "waist_high_ornate_stone_balcony_railing_spanning_horizontally_midground, "
-        "warm_terrace_lantern_posts_on_far_edges, lush_blossoming_trees_framing_left_and_right_edges, "
-        "expansive_serene_sky_distant_mountains_and_shimmering_lake_vista_behind_railing, "
+        "anime_scenery, (tree_of_savior_style:1.30), (ragnarok_online_style:1.25), hand_painted_anime_background, full_bleed, borderless, "
+        "(slight_high_angle_3/4_view:1.25), wide_open_sunlit_cobblestone_plaza_and_lush_green_meadow_filling_bottom_55_percent, "
+        "scattered_wildflowers_and_mossy_garden_stones, cozy_carved_stone_lanterns_on_edges, "
+        "blooming_trees_framing_left_and_right_borders, low_ornate_stone_balustrade_in_background, "
+        "bright_open_scenic_sky_and_serene_mountain_valley_horizon, luminous_warm_painterly_art, "
         "masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
     ),
     "cyber_loft": (
-        "anime_scenery, hand_painted_anime_background, (eye_level_camera:1.35), (straight-on_horizontal_view:1.30), "
-        "wide_flat_horizontal_wooden_rooftop_terrace_floor_across_bottom_30_percent, "
-        "waist_high_glass_balcony_railing_midground, neon_cyberpunk_cityscape_horizon_behind_railing, "
-        "cozy_potted_plants_and_warm_lights_on_edges, human_scale_architecture, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
+        "anime_scenery, hand_painted_2.5d_rpg_background, full_bleed, borderless, (slight_high_angle_3/4_view:1.25), "
+        "wide_open_wooden_rooftop_lounge_terrace_filling_bottom_55_percent, warm_potted_plants_and_lanterns_on_edges, "
+        "glass_balcony_railing_midground, glowing_cyberpunk_cityscape_horizon_behind_railing, "
+        "masterpiece, best_quality, no_humans, wide_angle, wallpaper"
     ),
     "sakura_hill": (
-        "anime_scenery, tree_of_savior_style, hand_painted_anime_background, "
-        "(eye_level_camera:1.35), (straight-on_horizontal_view:1.30), human_scale_architecture, "
-        "wide_flat_horizontal_stone_shrine_terrace_floor_across_bottom_30_percent, "
-        "waist_high_low_stone_railing_midground, blooming_cherry_blossom_trees_framing_left_and_right_edges, "
-        "coastal_town_and_ocean_horizon_behind_railing, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
+        "anime_scenery, (tree_of_savior_style:1.30), (ragnarok_online_style:1.25), hand_painted_2.5d_rpg_background, full_bleed, borderless, "
+        "(slight_high_angle_3/4_view:1.25), wide_open_stone_shrine_courtyard_and_grass_meadow_filling_bottom_55_percent, "
+        "blooming_cherry_blossom_trees_framing_sides, scattered_sakura_petals_on_ground, low_stone_railing, "
+        "serene_coastal_town_and_sky_horizon, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
     ),
 }
 
 QWEN_RELIGHT_INSTRUCTIONS: dict[str, str] = {
+    "day": (
+        "Keep the exact same open cobblestone plaza, sacred tree, flowers, stone lanterns, stone balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the sky, lighting, and atmosphere into a bright cheerful sunny late morning with crisp azure blue sky, fluffy sunlit white cumulus clouds, vibrant green leaves, and clean daylight illuminating the cobblestone plaza."
+    ),
     "sunset": (
-        "Keep the exact same stone balcony railing, flat horizontal stone terrace floor, trees, lantern posts, and eye-level camera angle from <image1> completely unchanged. "
-        "Transform only the sky, lighting, and atmosphere into a breathtaking warm golden-hour sunset with rich amber and violet clouds, warm golden sunlight casting soft shadows across the terrace floor, and glowing sunset reflections."
+        "Keep the exact same open cobblestone plaza, green meadow, flowers, trees, stone lanterns, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the sky, lighting, and atmosphere into a breathtaking warm golden-hour sunset with rich amber and violet clouds, warm golden sunlight casting soft shadows across the plaza stones and grass, and glowing sunset warmth."
     ),
     "night": (
-        "Keep the exact same stone balcony railing, flat horizontal stone terrace floor, trees, lantern posts, and eye-level camera angle from <image1> completely unchanged. "
-        "Transform only the sky, lighting, and atmosphere into a serene deep starry night with a glowing crescent moon, warm amber lanterns glowing softly along the balcony railing, cool moonlight illuminating the terrace floor, and twinkling distant lights."
+        "Keep the exact same open cobblestone plaza, green meadow, flowers, trees, stone lanterns, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the sky, lighting, and atmosphere into a serene starry night with a glowing crescent moon, warm amber light glowing softly inside the stone lanterns, cool silvery moonlight illuminating the plaza and meadow, and soft fireflies."
     ),
     "rain": (
-        "Keep the exact same stone balcony railing, flat horizontal stone terrace floor, trees, lantern posts, and eye-level camera angle from <image1> completely unchanged. "
-        "Transform only the weather and lighting into a cozy overcast rainy afternoon with wet glossy reflective stone terrace floor, shallow rain puddles reflecting soft warm lantern light, gentle falling rain mist, and atmospheric cool blue-grey sky."
+        "Keep the exact same open cobblestone plaza, sacred tree, flowers, stone lanterns, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the weather and lighting into a cozy overcast rainy afternoon with wet glossy reflective cobblestone plaza, shallow rain puddles reflecting warm stone lantern light, gentle falling rain mist, and soft cool blue-grey sky."
     ),
 }
+
+WAN_CLIP_PROMPTS: dict[str, str] = {
+    "idle": (
+        "2D anime game character sprite animation on a pure solid white background, static locked camera, "
+        "the stylish mature anime woman stands gracefully breathing gently, shifting her weight softly from hip to hip, "
+        "blinking naturally with a warm alluring smile, her glowing hair and pleated mini-dress swaying softly in a gentle breeze, "
+        "smooth 2D RPG game idle animation loop, clean solid white background."
+    ),
+    "walk": (
+        "2D anime game character sprite animation on a pure solid white background, static locked camera, "
+        "the stylish mature anime woman walks gracefully in a smooth rhythmic stepping cycle, alternating legs stepping naturally "
+        "with gentle hip sway, arms swinging smoothly, glowing hair and pleated mini-dress flowing naturally with each step, "
+        "smooth 2D RPG walking loop animation, clean solid white background."
+    ),
+    "wave": (
+        "2D anime game character sprite animation on a pure solid white background, static locked camera, "
+        "the stylish mature anime woman cheerfully raises her hand and waves warmly at the viewer, shifting her weight gracefully, "
+        "her glowing hair and pleated mini-dress swaying gently, blinking with a radiant happy smile, "
+        "then smoothly returning to her standing pose, smooth 2D RPG emote animation, clean solid white background."
+    ),
+    "dance": (
+        "2D anime game character sprite animation on a pure solid white background, static locked camera, "
+        "the stylish mature anime woman performs a playful graceful Tree of Savior style rhythmic sway and gentle twirl, "
+        "pleated mini-dress flaring and glowing hair flowing dynamically, arms opening gracefully with a joyful radiant smile, "
+        "then returning smoothly to her standing pose, smooth 2D RPG emote animation, clean solid white background."
+    ),
+}
+
+WAN_DEFAULT_CLIPS = ("idle", "walk", "wave", "dance")
 
 DEFAULT_NEGATIVE = (
     "lowres, bad_anatomy, bad_hands, text, watermark, signature, logo, username, "
@@ -356,8 +387,9 @@ def build_diorama_scene_workflow(
     time_tags = TIME_VARIANT_PROMPTS.get(variant, TIME_VARIANT_PROMPTS["day"])
     positive = f"{base}, {time_tags}"
     negative = (
-        f"{DEFAULT_NEGATIVE}, (bird's-eye_view:1.5), (top-down:1.5), (high_angle:1.4), (aerial_view:1.5), "
-        "(isometric:1.4), miniature, diorama_toy, stairs, bridge, cliff_edge_without_floor, "
+        f"{DEFAULT_NEGATIVE}, white_border, paper_border, frame, vignette_border, "
+        "dark_tunnel, narrow_corridor, roof_blocking_sky, dark_pillars_in_center, "
+        "bridge, stairs, cliff_edge_without_floor, top-down_90_degrees, "
         "1girl, 1boy, person, people, character, crowd, traveler, adventurer, "
         "cloaked_figure, hooded_figure, npc, silhouette, statue_person, ui, hud, minimap, health_bar"
     )
@@ -621,3 +653,122 @@ def build_apose_rig_workflow(
         rembg_model=rembg_model,
     )
     return graph
+
+
+def build_wan_sprite_clip_workflow(
+    base_uploaded_image: str,
+    action_key: str = "idle",
+    persona_id: str = "mira",
+    width: int = 416,
+    height: int = 640,
+    length: int = 25,
+    fps: float = 12.0,
+    seed: int | None = None,
+    steps: int = 6,
+    high_unet: str = "Wan2.2_Remix_NSFW_i2v_14b_high_lighting_fp8_e4m3fn_v3.0.safetensors",
+    low_unet: str = "Wan2.2_Remix_NSFW_i2v_14b_low_lighting_fp8_e4m3fn_v3.0.safetensors",
+    clip_name: str = "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    vae_name: str = "wan_2.1_vae.safetensors",
+    rembg_model: str = "isnet-anime",
+) -> dict:
+    """Gera clipe RGBA animado em loop infinito perfeito via Wan 2.2 FirstLastFrameToVideo + isnet-anime RemBG.
+
+    Trava `start_image == end_image` para retorno matemático perfeito ao frame inicial (loop sem corte!),
+    eliminando totalmente o aspecto rígido de marionete 2D e entregando fluidez estilo Tree of Savior / RO.
+    """
+    pos_text = WAN_CLIP_PROMPTS.get(action_key, WAN_CLIP_PROMPTS["idle"])
+    neg_text = (
+        "camera movement, zoom, pan, background scenery, floor shadows, blurry, distorted limbs, "
+        "extra arms, morphing clothes, low quality, photorealistic, text, watermark"
+    )
+    actual_seed = int(seed if seed is not None else random.randint(1, 2**31 - 1))
+    half_steps = max(2, int(steps) // 2)
+
+    return {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": high_unet, "weight_dtype": "fp8_e4m3fn"}},
+        "2": {"class_type": "UNETLoader", "inputs": {"unet_name": low_unet, "weight_dtype": "fp8_e4m3fn"}},
+        "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": clip_name, "type": "wan", "device": "default"}},
+        "4": {"class_type": "VAELoader", "inputs": {"vae_name": vae_name}},
+        "5": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 5.0}},
+        "6": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["2", 0], "shift": 5.0}},
+        "7": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["3", 0], "text": pos_text}},
+        "8": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["3", 0], "text": neg_text}},
+        "9": {"class_type": "LoadImage", "inputs": {"image": base_uploaded_image}},
+        "10": {
+            "class_type": "WanFirstLastFrameToVideo",
+            "inputs": {
+                "positive": ["7", 0],
+                "negative": ["8", 0],
+                "vae": ["4", 0],
+                "width": int(width),
+                "height": int(height),
+                "length": int(length),
+                "batch_size": 1,
+                "start_image": ["9", 0],
+                "end_image": ["9", 0],
+            },
+        },
+        "11": {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                "model": ["5", 0],
+                "add_noise": "enable",
+                "noise_seed": actual_seed,
+                "steps": int(steps),
+                "cfg": 1.0,
+                "sampler_name": "euler",
+                "scheduler": "simple",
+                "positive": ["10", 0],
+                "negative": ["10", 1],
+                "latent_image": ["10", 2],
+                "start_at_step": 0,
+                "end_at_step": half_steps,
+                "return_with_leftover_noise": "enable",
+            },
+        },
+        "12": {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                "model": ["6", 0],
+                "add_noise": "disable",
+                "noise_seed": actual_seed,
+                "steps": int(steps),
+                "cfg": 1.0,
+                "sampler_name": "euler",
+                "scheduler": "simple",
+                "positive": ["10", 0],
+                "negative": ["10", 1],
+                "latent_image": ["11", 0],
+                "start_at_step": half_steps,
+                "end_at_step": int(steps),
+                "return_with_leftover_noise": "disable",
+            },
+        },
+        "13": {"class_type": "VAEDecode", "inputs": {"samples": ["12", 0], "vae": ["4", 0]}},
+        "14": {
+            "class_type": "Image Rembg (Remove Background)",
+            "inputs": {
+                "images": ["13", 0],
+                "transparency": True,
+                "model": rembg_model,
+                "post_processing": True,
+                "only_mask": False,
+                "alpha_matting": False,
+                "alpha_matting_foreground_threshold": 240,
+                "alpha_matting_background_threshold": 10,
+                "alpha_matting_erode_size": 6,
+                "background_color": "none",
+            },
+        },
+        "15": {
+            "class_type": "SaveAnimatedWEBP",
+            "inputs": {
+                "images": ["14", 0],
+                "filename_prefix": f"IAWallpaper_clip_{persona_id}_{action_key}",
+                "fps": float(fps),
+                "lossless": False,
+                "quality": 92,
+                "method": "default",
+            },
+        },
+    }

@@ -35,6 +35,7 @@ from ..mathutil import clamp, lerp, smoothstep
 from .atmosphere import AtmospherePalette
 from .rig_cutter import AutoRiggedCharacter, RigPart, build_rig_from_apose
 from .skeleton import BoneWorld, CharacterSkeleton
+from .sprite_clip import SpriteClip, load_clips_from_dirs
 from .world_stage import WorldStage
 
 
@@ -83,15 +84,20 @@ class AvatarRig:
         self.outfit: str = "casual"
         self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | admire_view | music_sway | sleep
 
-        # Esqueleto real de 18 ossos + rig recortado de A-pose
+        # Esqueleto real de 18 ossos + rig recortado + banco de clipes RGBA animados quadro-a-quadro (Wan 2.2)
         self.skeleton = CharacterSkeleton()
         self._rig: AutoRiggedCharacter | None = None
+        self._clips: dict[str, SpriteClip] = {}
+        self._clip_time: float = 0.0
+        self._current_clip_key: str | None = None
+        self._prev_clip_frame: QPixmap | None = None
+        self._clip_fade_t: float = 1.0
 
-        # Posição e navegação no chão 2.5D (ancorada no plano caminhável do terraço eye-level)
-        self.pos_x: float = 0.54
-        self.pos_y: float = 0.90
-        self.target_x: float = 0.54
-        self.target_y: float = 0.90
+        # Posição e navegação no chão 2.5D (ancorada no plano aberto estilo Tree of Savior / Ragnarok Online)
+        self.pos_x: float = 0.52
+        self.pos_y: float = 0.78
+        self.target_x: float = 0.52
+        self.target_y: float = 0.78
         self._arrive_action: str = "idle"
         self.facing: int = 1                   # -1 esquerda, +1 direita
         self.walk_speed: float = 0.14
@@ -156,10 +162,14 @@ class AvatarRig:
         self.reload_sprites()
 
     def reload_sprites(self) -> None:
-        """Carrega sprites RGBA, recorta a base nos pés e constrói o AutoRig de 10 peças a partir de rig_base.png."""
+        """Carrega clipes animados RGBA (`clip_*.webp`), sprites PNG e constrói fallback esquelético."""
         self._sprites.clear()
         self._tint_cache.clear()
         self._rig = None
+        self._clips = load_clips_from_dirs(self.sprite_dirs)
+        self._current_clip_key = None
+        self._prev_clip_frame = None
+        self._clip_fade_t = 1.0
 
         for folder in self.sprite_dirs:
             if not folder.exists():
@@ -173,7 +183,6 @@ class AvatarRig:
                     else:
                         self._sprites[key] = pm
 
-        # Prioriza A-pose limpa (`rig_base.png` / `sprite_apose.png`) para esqueleto articulado real de 18 ossos!
         for rig_key in ("rig_base", "sprite_apose", "sprite_rig"):
             if rig_key in self._sprites:
                 rig = build_rig_from_apose(self._sprites[rig_key])
@@ -188,8 +197,14 @@ class AvatarRig:
     def available_sprite_keys(self) -> set[str]:
         return set(self._sprites.keys())
 
+    def available_clip_keys(self) -> set[str]:
+        return set(self._clips.keys())
+
+    def has_animated_clips(self) -> bool:
+        return bool(self._clips)
+
     def has_world_sprites(self) -> bool:
-        return self._rig is not None or any(k.startswith("sprite_") for k in self._sprites)
+        return bool(self._clips) or self._rig is not None or any(k.startswith("sprite_") for k in self._sprites)
 
     def has_skeletal_rig(self) -> bool:
         return self._rig is not None
@@ -360,6 +375,12 @@ class AvatarRig:
             if self._sprite_fade_t >= 1.0:
                 self._prev_sprite = None
 
+        self._clip_time += dt
+        if self._clip_fade_t < 1.0:
+            self._clip_fade_t = min(1.0, self._clip_fade_t + dt / 0.22)
+            if self._clip_fade_t >= 1.0:
+                self._prev_clip_frame = None
+
         if self.emote_kind:
             self.emote_life += dt
             if self.emote_life >= self.emote_max:
@@ -432,8 +453,23 @@ class AvatarRig:
         is_walking = self.action == "walk"
         breath = math.sin(self.time * (1.35 if asleep else 2.25))
 
-        # No modo esquelético real, o próprio CharacterSkeleton já executa elevação de pelve e auto-aterramento!
-        if self._rig is not None:
+        # Prioridade 1: Clipes RGBA animados quadro-a-quadro (Wan 2.2 FirstLastFrameToVideo — estilo Tree of Savior / RO!)
+        clip_key = self._resolve_clip_key("sleepy" if asleep else emotion.mood, asleep)
+        if clip_key is not None:
+            if clip_key != self._current_clip_key:
+                if self._current_clip_key is not None and self._current_clip_key in self._clips:
+                    self._prev_clip_frame = self._clips[self._current_clip_key].frame_at(self._clip_time)
+                    self._clip_fade_t = 0.0
+                self._current_clip_key = clip_key
+                self._clip_time = 0.0
+            lift = max(0.0, -self.bounce_y)
+            self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+            self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
+            draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
+            self._paint_animated_clip(
+                painter, self._clips[clip_key], foot_x, foot_y, draw_y, u, atmosphere, raining
+            )
+        elif self._rig is not None:
             lift = max(0.0, -self.bounce_y)
             self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
             draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
@@ -464,6 +500,137 @@ class AvatarRig:
 
         if self.emote_kind:
             self._paint_ro_emote_balloon(painter, self.head_rect.center().x(), self.head_rect.top() - 8 * u, u)
+
+    def _resolve_clip_key(self, mood: str, asleep: bool) -> str | None:
+        if not self._clips:
+            return None
+        candidates: list[str] = []
+        if asleep or self.action == "sleep":
+            candidates.extend(["clip_sleep", "clip_sit", "clip_idle", "clip_wave"])
+        elif self.action == "walk":
+            candidates.extend(["clip_walk", "clip_idle", "clip_wave"])
+        elif self.action in ("dance", "music_sway", "stretch"):
+            candidates.extend(["clip_dance", "clip_wave", "clip_idle"])
+        elif self.action == "wave":
+            candidates.extend(["clip_wave", "clip_dance", "clip_idle"])
+        elif self.action in ("sit_work", "sit_relax"):
+            candidates.extend(["clip_sit", "clip_idle", "clip_wave"])
+        else:
+            candidates.extend(["clip_idle", "clip_wave", "clip_dance"])
+        for k in candidates:
+            if k in self._clips:
+                return k
+        return next(iter(self._clips.keys()))
+
+    def _paint_rpg_ground_aura(self, painter: QPainter, foot_x: float, foot_y: float, u: float, atmo: AtmospherePalette) -> None:
+        """Anel mágico sutil no piso estilo Ragnarok Online / Tree of Savior durante interações, dança ou aceno."""
+        active = self.action in ("wave", "dance", "music_sway", "stretch") or self.caress_glow > 0.1 or bool(self.emote_kind)
+        if not active:
+            return
+        strength = 0.85 if self.action in ("dance", "music_sway") else (0.75 if self.caress_glow > 0.1 else 0.55)
+        pulse = 0.85 + 0.15 * math.sin(self.time * 4.2)
+        rim = QColor(*atmo.rim_light)
+        acc = QColor(*self.persona.accent_color)
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.translate(foot_x, foot_y + 2 * u)
+
+        # Anel externo suave com brilho no plano 2.5D
+        rx, ry = 66 * u * pulse, 20 * u * pulse
+        glow = QRadialGradient(QPointF(0, 0), rx)
+        glow.setColorAt(0.0, QColor(acc.red(), acc.green(), acc.blue(), int(42 * strength)))
+        glow.setColorAt(0.7, QColor(rim.red(), rim.green(), rim.blue(), int(78 * strength)))
+        glow.setColorAt(1.0, QColor(rim.red(), rim.green(), rim.blue(), 0))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(glow)
+        painter.drawEllipse(QPointF(0, 0), rx, ry)
+
+        # Círculo mágico estilizado girando lentamente sob os pés
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor(225, 245, 255, int(135 * strength)), 1.6 * u))
+        painter.drawEllipse(QPointF(0, 0), 54 * u, 16 * u)
+        painter.setPen(QPen(QColor(acc.red(), acc.green(), acc.blue(), int(115 * strength)), 1.2 * u))
+        painter.drawEllipse(QPointF(0, 0), 42 * u, 12.5 * u)
+
+        # 6 pontos orbitais luminosos sobre o anel
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(255, 250, 225, int(190 * strength)))
+        for i in range(6):
+            ang = self.time * 1.4 + i * (math.tau / 6.0)
+            px = math.cos(ang) * 54 * u
+            py = math.sin(ang) * 16 * u
+            painter.drawEllipse(QPointF(px, py), 2.6 * u, 2.6 * u)
+        painter.restore()
+
+    def _paint_animated_clip(
+        self,
+        painter: QPainter,
+        clip: SpriteClip,
+        foot_x: float,
+        foot_y: float,
+        draw_y: float,
+        u: float,
+        atmosphere: AtmospherePalette,
+        raining: bool,
+    ) -> None:
+        """Renderiza o frame atual do clipe RGBA animado (Wan 2.2) ancorado nos pés, com crossfade e reflexo."""
+        frame = clip.frame_at(self._clip_time)
+        if frame.isNull():
+            return
+
+        # Proporção natural estilo Tree of Savior / Ragnarok Online no cenário aberto
+        target_h = 345.0 * u
+        aspect = frame.width() / max(frame.height(), 1)
+        target_w = target_h * aspect
+        sx = -1.0 if self.facing < 0 else 1.0
+
+        # 1. Reflexo animado no piso molhado quando está chovendo!
+        if raining:
+            painter.save()
+            painter.translate(foot_x, foot_y + 2 * u)
+            painter.scale(sx, -0.32)
+            painter.setOpacity(0.18)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            painter.drawPixmap(QRectF(-target_w * 0.5, -target_h, target_w, target_h), frame, QRectF(frame.rect()))
+            painter.restore()
+
+        # 2. Aura sutil de carinho
+        painter.save()
+        if self.caress_glow > 0.05:
+            rim_r, rim_g, rim_b = atmosphere.rim_light
+            aura = QRadialGradient(QPointF(foot_x, draw_y - target_h * 0.52), target_h * 0.52)
+            aura.setColorAt(0.0, QColor(rim_r, rim_g, rim_b, int(92 * self.caress_glow)))
+            aura.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(aura)
+            painter.drawEllipse(QPointF(foot_x, draw_y - target_h * 0.52), target_h * 0.40, target_h * 0.52)
+
+        painter.translate(foot_x, draw_y)
+        painter.rotate(self.tilt_deg)
+        painter.scale(sx, 1.0)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        tinted_curr = self._get_tinted_sprite(frame, atmosphere)
+        dst = QRectF(-target_w * 0.5, -target_h, target_w, target_h)
+        if self._prev_clip_frame is not None and self._clip_fade_t < 1.0:
+            ease = smoothstep(0.0, 1.0, self._clip_fade_t)
+            prev_t = self._get_tinted_sprite(self._prev_clip_frame, atmosphere)
+            prev_w = target_h * (prev_t.width() / max(prev_t.height(), 1))
+            painter.setOpacity(1.0 - ease)
+            painter.drawPixmap(QRectF(-prev_w * 0.5, -target_h, prev_w, target_h), prev_t, QRectF(prev_t.rect()))
+            painter.setOpacity(ease)
+            painter.drawPixmap(dst, tinted_curr, QRectF(tinted_curr.rect()))
+            painter.setOpacity(1.0)
+        else:
+            painter.drawPixmap(dst, tinted_curr, QRectF(tinted_curr.rect()))
+        painter.restore()
+
+        if raining and self.action not in ("sleep", "sit_work"):
+            self._paint_umbrella(painter, foot_x + self.facing * 18 * u, draw_y - target_h * 1.02, u, atmosphere)
+
+        self.body_rect = QRectF(foot_x - target_w * 0.36, draw_y - target_h * 0.96, target_w * 0.72, target_h * 0.96)
+        self.head_rect = QRectF(foot_x - target_w * 0.28, draw_y - target_h * 0.98, target_w * 0.56, target_h * 0.28)
 
     def _draw_rig_parts(
         self,

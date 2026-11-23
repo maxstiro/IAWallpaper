@@ -19,6 +19,7 @@ from .workflows import (
     PACK_EXPRESSIONS,
     PACK_OUTFITS,
     PACK_SCENE_VARIANTS,
+    WAN_DEFAULT_CLIPS,
     WORLD_SPRITE_ACTIONS,
     build_apose_rig_workflow,
     build_avatar_variant_img2img_workflow,
@@ -26,6 +27,7 @@ from .workflows import (
     build_diorama_scene_workflow,
     build_qwen_relight_scene_workflow,
     build_scene_workflow,
+    build_wan_sprite_clip_workflow,
     build_world_sprite_workflow,
 )
 
@@ -39,6 +41,7 @@ class ComfyStatus:
     has_rembg: bool = False
     has_pag: bool = False
     has_qwen_relight: bool = False
+    has_wan_i2v: bool = False
 
 
 class ComfyBridge:
@@ -109,6 +112,22 @@ class ComfyBridge:
         """Envia uma imagem PNG de cenário diretamente via POST /upload/image para reiluminação 1:1."""
         return self._upload_png_bytes(Path(image_path).read_bytes(), upload_name)
 
+    def upload_image_fitted_on_white(self, rgba_path: Path, upload_name: str, tw: int = 416, th: int = 640) -> str:
+        """Centraliza sprite RGBA em fundo branco puro com margem confortável para animação Wan 2.2 I2V."""
+        with Image.open(rgba_path) as im:
+            rgba = im.convert("RGBA")
+            scale = min((tw * 0.88) / max(rgba.width, 1), (th * 0.90) / max(rgba.height, 1))
+            nw, nh = max(1, int(rgba.width * scale)), max(1, int(rgba.height * scale))
+            resized = rgba.resize((nw, nh), Image.Resampling.LANCZOS)
+            canvas = Image.new("RGBA", (tw, th), (255, 255, 255, 255))
+            ox = (tw - nw) // 2
+            oy = th - nh - int(th * 0.03)
+            canvas.alpha_composite(resized, (ox, oy))
+            buf = io.BytesIO()
+            canvas.convert("RGB").save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+        return self._upload_png_bytes(img_bytes, upload_name)
+
     def probe(self) -> ComfyStatus:
         stats = self._get_json("/system_stats", timeout=2.0)
         if not isinstance(stats, dict):
@@ -123,6 +142,7 @@ class ComfyBridge:
         has_rembg = self._get_json("/object_info/" + urllib.parse.quote("Image Rembg (Remove Background)"), timeout=2.0) is not None
         has_pag = self._get_json("/object_info/PerturbedAttentionGuidance", timeout=2.0) is not None
         has_qwen = self._get_json("/object_info/TextEncodeQwenImage21", timeout=2.0) is not None
+        has_wan = self._get_json("/object_info/WanFirstLastFrameToVideo", timeout=2.0) is not None
 
         return ComfyStatus(
             online=True,
@@ -132,6 +152,7 @@ class ComfyBridge:
             has_rembg=has_rembg,
             has_pag=has_pag,
             has_qwen_relight=has_qwen,
+            has_wan_i2v=has_wan,
         )
 
     def is_busy_fast(self) -> bool:
@@ -442,19 +463,19 @@ class ComfyBridge:
                     checkpoint=st.checkpoint,
                     scene_id=scene_id,
                     variant="day",
-                    seed=203011,
+                    seed=203511,
                     steps=24,
                     use_pag=st.has_pag,
                 )
             else:
-                # Reiluminação 1:1 da MESMA arquitetura eye-level via Qwen Image 2.1!
+                # Reiluminação 1:1 da MESMA praça 2.5D via Qwen Image 2.1!
                 if uploaded_day is None and base_day.exists():
                     uploaded_day = self.upload_image_raw(base_day, f"iawallpaper_diorama_day_{scene_id}.png")
                 if st.has_qwen_relight and uploaded_day is not None:
                     graph = build_qwen_relight_scene_workflow(
                         base_uploaded_scene=uploaded_day,
                         variant=key,
-                        seed=203011 + idx * 17,
+                        seed=203511 + idx * 17,
                         steps=10,
                         cfg=1.5,
                     )
@@ -463,7 +484,7 @@ class ComfyBridge:
                         checkpoint=st.checkpoint,
                         scene_id=scene_id,
                         variant=key,
-                        seed=203011,
+                        seed=203511,
                         steps=22,
                         use_pag=st.has_pag,
                     )
@@ -475,6 +496,68 @@ class ComfyBridge:
 
         if on_progress:
             on_progress(total, total, f"✅ Pack Mundo Vivo 2.5D concluído ({len(created)} assets)!")
+        return created
+
+    def generate_wan_clips_sync(
+        self,
+        persona: Persona,
+        persona_dest_dir: Path,
+        actions: tuple[str, ...] = WAN_DEFAULT_CLIPS,
+        width: int = 416,
+        height: int = 640,
+        length: int = 25,
+        fps: float = 12.0,
+        skip_existing: bool = True,
+        on_progress=None,
+        on_asset=None,
+    ) -> list[Path]:
+        """Gera clipes RGBA animados em loop infinito (`clip_*.webp`) via Wan 2.2 FirstLastFrameToVideo + isnet-anime."""
+        st = self.probe()
+        if not st.online or not st.has_wan_i2v:
+            raise RuntimeError("ComfyUI offline ou Wan 2.2 FirstLastFrameToVideo indisponível.")
+
+        persona_dest_dir.mkdir(parents=True, exist_ok=True)
+        base_src = persona_dest_dir / "rig_base.png"
+        if not base_src.exists():
+            base_src = persona_dest_dir / "sprite_idle.png"
+        if not base_src.exists():
+            raise FileNotFoundError(f"Sprite base não encontrado em {persona_dest_dir} (gere o pack world primeiro).")
+
+        jobs: list[tuple[str, Path]] = []
+        for act in actions:
+            out_p = persona_dest_dir / f"clip_{act}.webp"
+            if not (skip_existing and out_p.exists()):
+                jobs.append((act, out_p))
+
+        total = len(jobs)
+        if total == 0:
+            if on_progress:
+                on_progress(0, 0, "Todos os clipes animados RGBA já existem no disco!")
+            return []
+
+        uploaded = self.upload_image_fitted_on_white(base_src, f"iawallpaper_wan_base_{persona.id}.png", tw=width, th=height)
+        created: list[Path] = []
+        for idx, (act, out_p) in enumerate(jobs, start=1):
+            if on_progress:
+                on_progress(idx, total, f"[{idx}/{total}] Animando clipe RGBA Wan 2.2: {act}...")
+            graph = build_wan_sprite_clip_workflow(
+                base_uploaded_image=uploaded,
+                action_key=act,
+                persona_id=persona.id,
+                width=width,
+                height=height,
+                length=length,
+                fps=fps,
+                seed=persona.seed + 500 + idx * 37,
+                steps=6,
+            )
+            saved = self.run_workflow_and_save(graph, out_p, timeout=600.0)
+            created.append(saved)
+            if on_asset:
+                on_asset("wan_clip", saved)
+
+        if on_progress:
+            on_progress(total, total, f"✅ {len(created)} clipes animados RGBA concluídos!")
         return created
 
     def generate_world_pack_async(

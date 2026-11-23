@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-22 (Milestone 10 — Esqueleto Real 2D de 18 Ossos, AutoRigger Spine2D & Terraço Eye-Level 1:1)
+> **Última atualização**: 2026-11-22 (Milestone 11 — Animação Fluida Quadro-a-Quadro Wan 2.2 + Praça Aberta Tree of Savior / Ragnarok Online)
 
 ---
 
@@ -43,7 +43,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 | **Plataforma** | `iawallpaper/plataforma/` | `desktop_host.py`, `windows.py` | não | sim |
 | **Sense** | `iawallpaper/sense/` | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | não | não |
 | **Comfy** | `iawallpaper/comfy/` | `presets.py`, `bridge.py`, `workflows.py` | não | não |
-| **Render** | `iawallpaper/render/` | `skeleton.py`, `rig_cutter.py`, `world_stage.py`, `atmosphere.py`, `particles.py`, `avatar.py`, `scene.py`, `canvas.py` | sim | não |
+| **Render** | `iawallpaper/render/` | `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
 | **Mind** | `iawallpaper/mind/` | `director.py` | não | não |
 | **UI** | `iawallpaper/ui/` | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | sim | não |
 | **App** | `iawallpaper/app.py`, `main.py` | Orquestração principal, trava de instância única, ciclos 16ms/100ms/500ms/15m/30s, launcher `start_iawallpaper.ps1` | sim | sim |
@@ -67,3 +67,6 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
   - **Motor Esquelético FK (`render/skeleton.py`)**: Hierarquia anatômica real de 18 ossos com convenção articular humana (joelhos dobrando apenas para trás na caminhada, coxas/canelas dobrando à frente ao sentar, braços erguidos no aceno e alongamento, guarda-chuva ancorado na mão direita `forearm_r.end`), física de mola para cabelo/saia e auto-aterramento matemático (`max(foot_y) == 0.0`).
   - **AutoRigger Guiado por Silhueta (`render/rig_cutter.py`)**: Recorta automaticamente um sprite frontal A-pose (`rig_base.png`) em 10 peças RGBA (`head`, `torso`, `upper_arm_l/r`, `forearm_l/r`, `thigh_l/r`, `shin_l/r`) usando detecção exata de axilas (*armpit gap detection*), juntas circulares sobrepostas e calibração 1:1 de `RigProportions`.
   - **Workflows A-Pose & Terraço Eye-Level 1:1 (`comfy/workflows.py`, `bridge.py`, `world_stage.py`, `director.py`)**: Novo `build_apose_rig_workflow` com preset `(TOP)` + cenário *eye-level* em escala humana (passarela de pedra com corrimãos laterais reiluminada 1:1 via Qwen Image 2.1 para dia/pôr do sol/chuva/noite) + novos modos diagnósticos `--mode rig_parts` e `--mode gif` em `tools/render_showcase.py`. Validado com **27/27 testes verdes**, inspeção visual das 10 peças + showcase + GIF animado no Telegram.
+- **Milestone 11** (2026-11-22): **Animação Fluida Quadro-a-Quadro via Wan 2.2 `WanFirstLastFrameToVideo` + Praça Aberta Estilo Tree of Savior / Ragnarok Online**:
+  - **Motor de Clipes RGBA (`render/sprite_clip.py`, `render/avatar.py`)**: Elimina definitivamente o aspecto de marionete 2D ao reproduzir clipes `.webp`/`.gif` RGBA transparentes quadro-a-quadro em loop infinito perfeito (`clip_idle`, `clip_walk`, `clip_wave`, `clip_dance`), com recorte de linha de pés unificada entre frames (zero flutuação/jitter), crossfade suave (0.22s) entre ações, anel mágico giratório no chão estilo Ragnarok Online / Tree of Savior, reflexo animado no piso molhado e 0% de uso de GPU durante a reprodução no desktop.
+  - **Pipeline ComfyUI Wan 2.2 + Qwen 2.1 (`comfy/workflows.py`, `bridge.py`, `tools/generate_pack.py`)**: Adicionado `build_wan_sprite_clip_workflow` (`Wan2.2_Remix_NSFW_i2v_14b_high/low_lighting_fp8` + `WanFirstLastFrameToVideo` travando `start_image == end_image` + `isnet-anime` RemBG + `SaveAnimatedWEBP`) e nova praça aberta 3/4 com árvore sagrada, lanternas e piso de pedras reiluminada 1:1 sem bordas para Manhã, Pôr do Sol, Chuva e Noite. Validado visualmente (folha dos 4 clipes + mosaico 4 horários + GIF animado de 6s enviado no Telegram) com **28/28 testes verdes**.

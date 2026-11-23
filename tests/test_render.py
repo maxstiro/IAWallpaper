@@ -221,3 +221,49 @@ def test_auto_rigger_cuts_synthetic_apose_and_renders(tmp_path):
         frame = canvas.render_to_image(640, 360)
         assert not frame.isNull()
         assert not canvas.avatar.head_rect.isEmpty()
+
+
+def test_animated_sprite_clip_webp_playback_and_crossfade(tmp_path):
+    _ensure_qapp()
+    from PIL import Image, ImageDraw
+    from iawallpaper.render.sprite_clip import load_sprite_clip
+
+    # Gera um clipe RGBA animado sintético em WEBP (6 frames com movimento visível)
+    cdir = tmp_path / "clips_persona"
+    cdir.mkdir()
+    for clip_name, base_rgb in (("clip_idle.webp", (110, 170, 255)), ("clip_wave.webp", (255, 130, 195))):
+        frames = []
+        for i in range(6):
+            im = Image.new("RGBA", (120, 180), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            # Corpo + pés constantes em y=160 e braço subindo nos frames
+            d.ellipse([42, 24, 78, 60], fill=(*base_rgb, 255))
+            d.rectangle([40, 62, 80, 160], fill=(*base_rgb, 255))
+            d.line([(80, 75), (105, 75 - i * 8)], fill=(255, 220, 230, 255), width=8)
+            frames.append(im)
+        frames[0].save(cdir / clip_name, save_all=True, append_images=frames[1:], duration=83, loop=0)
+
+    clip = load_sprite_clip(cdir / "clip_wave.webp")
+    assert clip is not None
+    assert len(clip.frames) == 6
+    assert clip.height <= 145  # recortado na sola dos pés (remove os 20px transparentes inferiores!)
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, sprite_dirs=[cdir], render_style="world_sprite")
+    assert canvas.avatar.has_animated_clips()
+    assert {"clip_idle", "clip_wave"}.issubset(canvas.avatar.available_clip_keys())
+
+    canvas.avatar.trigger_action("idle")
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar._current_clip_key == "clip_idle"
+
+    # Alterna para wave -> ativa crossfade e aura mágica no piso
+    canvas.avatar.trigger_action("wave")
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar._current_clip_key == "clip_wave"
+    assert canvas.avatar._clip_fade_t < 1.0
+    for _ in range(15):
+        canvas.step_animation(0.04)
+    assert canvas.avatar._clip_fade_t == 1.0
+    out = canvas.render_to_image(480, 270)
+    assert not out.isNull()
