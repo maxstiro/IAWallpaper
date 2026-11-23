@@ -348,18 +348,21 @@ class VrmAnimator:
                 e["rightLowerArm"] = (0.0, 42.0 - ds_breath * 4.0, -16.0)
                 e["rightHand"] = (0.0, 0.0, -14.0)
             else:
-                # Postura feminina natural e confiante (braços relaxados graciosos ao longo do corpo, leve contrapposto!)
-                e["leftUpperLeg"] = (-4.0, 4.0, 5.5 + sway * 1.2)
-                e["leftLowerLeg"] = (6.0, 0.0, 0.0)
-                e["rightUpperLeg"] = (2.5, -4.0, -5.5 + sway * 1.2)
-                e["rightLowerLeg"] = (3.5, 0.0, 0.0)
+                # Postura estilizada confiante (Dungeon Squad × Rapscallion): base levemente aberta exibindo curvas,
+                # contrapposto natural e braços soltos com graça!
+                e["leftUpperLeg"] = (-4.0, 7.0, 11.5 + sway * 1.2)
+                e["leftLowerLeg"] = (7.0, 0.0, -3.0)
+                e["leftFoot"] = (-3.0, 0.0, -7.0)
+                e["rightUpperLeg"] = (3.0, -7.0, -11.5 + sway * 1.2)
+                e["rightLowerLeg"] = (5.0, 0.0, 3.0)
+                e["rightFoot"] = (-2.0, 0.0, 7.0)
                 e["leftShoulder"] = (0.0, 0.0, -3.0)
-                e["leftUpperArm"] = (5.0, -8.0 - sway * 3.0, -64.0)
-                e["leftLowerArm"] = (0.0, -14.0 + breath * 2.5, -8.0)
+                e["leftUpperArm"] = (6.0, -10.0 - sway * 3.0, -60.0)
+                e["leftLowerArm"] = (0.0, -18.0 + breath * 2.5, -6.0)
                 e["leftHand"] = (0.0, 0.0, 10.0)
                 e["rightShoulder"] = (0.0, 0.0, 3.0)
-                e["rightUpperArm"] = (5.0, 8.0 + sway * 3.0, 64.0)
-                e["rightLowerArm"] = (0.0, 14.0 - breath * 2.5, 8.0)
+                e["rightUpperArm"] = (6.0, 10.0 + sway * 3.0, 60.0)
+                e["rightLowerArm"] = (0.0, 18.0 - breath * 2.5, 6.0)
                 e["rightHand"] = (0.0, 0.0, -10.0)
 
         # Sobrepõe braço direito segurando guarda-chuva na chuva (em pé/caminhada)
@@ -419,12 +422,13 @@ class VrmAnimator:
             self._cur_euler[b] += (dst - self._cur_euler[b]) * k
         self.hips_offset += (np.array(target_hips, dtype=np.float32) - self.hips_offset) * k
 
-        # 3. Expressões faciais VRM (piscar + humor da rede LIF + carinho!)
+        # 3. Expressões faciais VRM (olhar confiante levemente semicerrado estilo Rapscallion + piscar + humor LIF!)
         mood = "sleepy" if asleep else emotion.mood
+        sultry_base = 0.12 if (not asleep and mood not in ("pouty", "shy")) else 0.0
         want_expr: dict[str, float] = {
-            "blink": clamp(1.0 if asleep else (0.85 if caressing else blink_amount), 0.0, 1.0),
-            "happy": 0.78 if (mood in ("happy", "affectionate") or action in ("wave", "dance") or caressing) else 0.18,
-            "relaxed": 0.65 if mood in ("cozy", "calm", "sleepy") else 0.0,
+            "blink": clamp(1.0 if asleep else (0.85 if caressing else max(sultry_base, blink_amount)), 0.0, 1.0),
+            "happy": 0.45 if (mood in ("happy", "affectionate") or action in ("wave", "dance") or caressing) else 0.22,
+            "relaxed": 0.48 if mood in ("cozy", "calm", "sleepy") else 0.0,
             "angry": 0.55 if mood == "pouty" else 0.0,
             "sad": 0.35 if mood == "shy" else 0.0,
             "surprised": 0.0,

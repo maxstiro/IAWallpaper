@@ -44,111 +44,126 @@ class GirlArchetype:
     elf_ears: bool = False
     freckles: bool = False
     use_long_hair_graft: bool = True
-    # Escultura anatômica suave (proporções Tree of Savior × curvas maduras)
-    head_scale: float = 1.14
-    bust_boost: float = 1.15
-    waist_pinch: float = 0.85
-    hip_boost: float = 1.24
-    thigh_boost: float = 1.22
-    leg_compact: float = 0.90
+    # Escultura anatômica estilizada (Rapscallion × Dungeon Squad — adeus proporções Barbie!)
+    head_scale: float = 1.24
+    bust_boost: float = 1.72
+    waist_pinch: float = 0.84
+    hip_boost: float = 1.38
+    thigh_boost: float = 1.44
+    calf_boost: float = 1.24
+    arm_boost: float = 1.14
+    leg_compact: float = 0.77
+    torso_compact: float = 0.93
 
 
 GIRL_ARCHETYPES: dict[str, GirlArchetype] = {
     "elfa_loira": GirlArchetype(
         id="elfa_loira",
         label="Lyra — Elfa Loira",
-        skin_rgb=(234, 174, 136),
-        skin_shade=(0.76, 0.48, 0.40),
-        blush_rgb=(228, 84, 72),
-        blush_strength=0.62,
-        lip_rgb=(218, 108, 98),
-        hair_rgb=(248, 222, 148),
-        hair_shade=(0.76, 0.58, 0.36),
-        eye_rgb=(42, 204, 96),
-        brow_rgb=(164, 118, 66),
-        underwear_rgb=(248, 242, 236),
-        underwear_trim_rgb=(208, 178, 152),
+        skin_rgb=(232, 166, 126),
+        skin_shade=(0.74, 0.44, 0.36),
+        blush_rgb=(228, 76, 66),
+        blush_strength=0.72,
+        lip_rgb=(218, 98, 88),
+        hair_rgb=(248, 220, 142),
+        hair_shade=(0.72, 0.52, 0.30),
+        eye_rgb=(36, 206, 92),
+        brow_rgb=(142, 92, 46),
+        underwear_rgb=(250, 244, 236),
+        underwear_trim_rgb=(126, 76, 56),
         elf_ears=True,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.12,
-        bust_boost=1.34,
-        waist_pinch=0.86,
-        hip_boost=1.20,
-        thigh_boost=1.18,
-        leg_compact=0.90,
+        head_scale=1.24,
+        bust_boost=1.78,
+        waist_pinch=0.84,
+        hip_boost=1.38,
+        thigh_boost=1.46,
+        calf_boost=1.24,
+        arm_boost=1.14,
+        leg_compact=0.77,
+        torso_compact=0.92,
     ),
     "humana_ruiva": GirlArchetype(
         id="humana_ruiva",
         label="Freya — Humana Ruiva",
-        skin_rgb=(248, 214, 196),
-        skin_shade=(0.82, 0.58, 0.54),
-        blush_rgb=(236, 96, 94),
-        blush_strength=0.60,
-        lip_rgb=(224, 112, 110),
-        hair_rgb=(214, 96, 46),
-        hair_shade=(0.64, 0.30, 0.22),
-        eye_rgb=(118, 172, 68),
-        brow_rgb=(148, 64, 34),
+        skin_rgb=(248, 212, 192),
+        skin_shade=(0.80, 0.54, 0.50),
+        blush_rgb=(236, 88, 86),
+        blush_strength=0.68,
+        lip_rgb=(224, 102, 100),
+        hair_rgb=(214, 92, 42),
+        hair_shade=(0.60, 0.26, 0.18),
+        eye_rgb=(112, 174, 62),
+        brow_rgb=(132, 52, 26),
         underwear_rgb=(36, 30, 42),
-        underwear_trim_rgb=(232, 188, 96),
+        underwear_trim_rgb=(234, 186, 88),
         elf_ears=False,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.12,
-        bust_boost=1.18,
-        waist_pinch=0.85,
-        hip_boost=1.24,
-        thigh_boost=1.22,
-        leg_compact=0.91,
+        head_scale=1.24,
+        bust_boost=1.70,
+        waist_pinch=0.84,
+        hip_boost=1.36,
+        thigh_boost=1.42,
+        calf_boost=1.22,
+        arm_boost=1.12,
+        leg_compact=0.78,
+        torso_compact=0.93,
     ),
     "androide_rosa": GirlArchetype(
         id="androide_rosa",
         label="Airi — Androide Rosa",
-        skin_rgb=(252, 226, 218),
-        skin_shade=(0.86, 0.66, 0.70),
-        blush_rgb=(244, 118, 156),
-        blush_strength=0.54,
-        lip_rgb=(242, 126, 148),
-        hair_rgb=(252, 168, 198),
-        hair_shade=(0.78, 0.48, 0.64),
-        eye_rgb=(72, 162, 250),
-        brow_rgb=(212, 112, 144),
-        underwear_rgb=(252, 206, 224),
-        underwear_trim_rgb=(255, 244, 250),
+        skin_rgb=(252, 224, 214),
+        skin_shade=(0.84, 0.62, 0.66),
+        blush_rgb=(244, 110, 148),
+        blush_strength=0.62,
+        lip_rgb=(242, 118, 142),
+        hair_rgb=(252, 162, 196),
+        hair_shade=(0.74, 0.42, 0.60),
+        eye_rgb=(64, 162, 252),
+        brow_rgb=(196, 92, 128),
+        underwear_rgb=(252, 204, 224),
+        underwear_trim_rgb=(198, 96, 142),
         elf_ears=False,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.12,
-        bust_boost=1.20,
-        waist_pinch=0.84,
-        hip_boost=1.22,
-        thigh_boost=1.20,
-        leg_compact=0.91,
+        head_scale=1.24,
+        bust_boost=1.74,
+        waist_pinch=0.83,
+        hip_boost=1.34,
+        thigh_boost=1.40,
+        calf_boost=1.20,
+        arm_boost=1.10,
+        leg_compact=0.78,
+        torso_compact=0.93,
     ),
     "vampira_negra": GirlArchetype(
         id="vampira_negra",
         label="Lilith — Vampira",
-        skin_rgb=(244, 214, 200),
-        skin_shade=(0.80, 0.58, 0.60),
-        blush_rgb=(224, 100, 96),
-        blush_strength=0.48,
-        lip_rgb=(210, 104, 106),
-        hair_rgb=(42, 50, 48),
-        hair_shade=(0.24, 0.28, 0.34),
-        eye_rgb=(74, 162, 134),
-        brow_rgb=(46, 42, 42),
+        skin_rgb=(244, 212, 198),
+        skin_shade=(0.78, 0.54, 0.56),
+        blush_rgb=(224, 92, 88),
+        blush_strength=0.56,
+        lip_rgb=(208, 94, 98),
+        hair_rgb=(36, 46, 44),
+        hair_shade=(0.20, 0.24, 0.30),
+        eye_rgb=(68, 164, 132),
+        brow_rgb=(36, 32, 34),
         underwear_rgb=(30, 28, 36),
-        underwear_trim_rgb=(188, 56, 86),
+        underwear_trim_rgb=(196, 52, 86),
         elf_ears=False,
         freckles=True,
-        use_long_hair_graft=False,  # Usa o rabo lateral charmoso da Victoria!
-        head_scale=1.12,
-        bust_boost=1.18,
-        waist_pinch=0.85,
-        hip_boost=1.24,
-        thigh_boost=1.22,
-        leg_compact=0.91,
+        use_long_hair_graft=False,
+        head_scale=1.24,
+        bust_boost=1.72,
+        waist_pinch=0.84,
+        hip_boost=1.40,
+        thigh_boost=1.46,
+        calf_boost=1.24,
+        arm_boost=1.12,
+        leg_compact=0.77,
+        torso_compact=0.92,
     ),
 }
 
@@ -273,10 +288,21 @@ def _paint_victoria_body_base_texture(orig: np.ndarray, arch: GirlArchetype) -> 
         base[is_panties, 1] = np.clip(ug * p_sh[is_panties], 0, 255).astype(np.uint8)
         base[is_panties, 2] = np.clip(ub * p_sh[is_panties], 0, 255).astype(np.uint8)
 
-    # Pinta sutiã tomara-que-caia / bandeau delicado e limpo no busto (zero costura de alça nos ombros!)
+    # Pinta traço nanquim sutil de HQ nas clavículas, sulco do busto e umbigo (assinatura Rapscallion!)
     img = Image.fromarray(base, mode="RGBA")
     d = ImageDraw.Draw(img)
     cx = w // 2
+    ink = (42, 18, 22, 255)
+    soft_ink = (max(0, arch.skin_rgb[0] - 88), max(0, arch.skin_rgb[1] - 92), max(0, arch.skin_rgb[2] - 82), 210)
+    # Clavículas estilizadas em HQ
+    d.line([(cx - int(w * 0.088), int(h * 0.125)), (cx - int(w * 0.016), int(h * 0.136))], fill=soft_ink, width=4)
+    d.line([(cx + int(w * 0.088), int(h * 0.125)), (cx + int(w * 0.016), int(h * 0.136))], fill=soft_ink, width=4)
+    # Sulco central expressivo do decote (cleavage line estilo Rapscallion!)
+    d.line([(cx, int(h * 0.215)), (cx, int(h * 0.282))], fill=ink, width=5)
+    # Umbigo desenhado com traço delicado de HQ
+    d.arc([cx - 8, int(h * 0.398), cx + 8, int(h * 0.418)], start=20, end=160, fill=soft_ink, width=4)
+
+    # Sutiã tomara-que-caia simples com contorno nanquim nítido de ilustração 2D!
     band_y0 = int(h * 0.268)
     band_y1 = int(h * 0.308)
     d.rectangle([int(w * 0.238), band_y0, int(w * 0.762), band_y1], fill=(ur, ug, ub, 255))
@@ -284,10 +310,30 @@ def _paint_victoria_body_base_texture(orig: np.ndarray, arch: GirlArchetype) -> 
         bx = cx + sign * int(w * 0.068)
         by = int(h * 0.255)
         d.ellipse([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], fill=(ur, ug, ub, 255))
-        d.arc([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], start=190, end=350, fill=(tr, tg, tb, 255), width=5)
-    d.line([(int(w * 0.238), band_y1), (int(w * 0.762), band_y1)], fill=(tr, tg, tb, 255), width=5)
+        d.arc([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], start=185, end=355, fill=(tr, tg, tb, 255), width=7)
+        d.arc([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], start=192, end=348, fill=ink, width=3)
+        # Linha inferior de sombra/nanquim sob cada seio
+        d.arc([bx - int(w * 0.066), by - int(h * 0.036), bx + int(w * 0.066), by + int(h * 0.058)], start=25, end=155, fill=ink, width=4)
+    d.line([(int(w * 0.238), band_y1), (int(w * 0.762), band_y1)], fill=ink, width=4)
+    # Contorno nanquim sutil no cós da calcinha
+    d.line([(int(w * 0.24), int(h * 0.482)), (int(w * 0.76), int(h * 0.482))], fill=ink, width=4)
 
     return np.array(img, dtype=np.uint8)
+
+
+def _bold_comic_strokes(orig: np.ndarray, target_rgb: tuple[int, int, int], thicken: int = 5) -> np.ndarray:
+    """Engrossa e escurece delineado, cílios e sobrancelhas no estilo nanquim expressivo Rapscallion!"""
+    img = Image.fromarray(orig, mode="RGBA")
+    r, g, b, a = img.split()
+    a_bold = a.filter(ImageFilter.MaxFilter(size=thicken))
+    a_np = np.array(a_bold, dtype=np.float32)
+    a_np = np.clip(a_np * 1.35, 0, 255).astype(np.uint8)
+    out = np.zeros_like(orig, dtype=np.uint8)
+    out[:, :, 0] = target_rgb[0]
+    out[:, :, 1] = target_rgb[1]
+    out[:, :, 2] = target_rgb[2]
+    out[:, :, 3] = a_np
+    return out
 
 
 def _recolor_iris_texture(orig: np.ndarray, eye_rgb: tuple[int, int, int]) -> np.ndarray:
@@ -457,21 +503,21 @@ def _graft_long_hair(dst_model: VrmModel, hair_vrm_path: Path, arch: GirlArchety
     if dst_skin_idx < 0:
         return
 
-    # Remove o cabelo nativo da malha destino para substituir pelo cabelo longo sem sobreposição
+    # Remove apenas as mechas de cabelo externas da malha destino, preservando a calota limpa `HairBack` da própria Victoria!
     dst_model.primitives = [
         p for p in dst_model.primitives
-        if dst_model.materials[p.material_index].role != "hair"
+        if not (dst_model.materials[p.material_index].role == "hair" and "hairback" not in dst_model.materials[p.material_index].name.lower())
     ]
 
     flip_y180 = (dst_model.is_vrm1 != src.is_vrm1)
-    # Alinhamento fino: `vroid_sample` tem cabeça levemente menor que `Victoria_Rubin` -> escala 1.04x + offset Y suave
-    hair_scale = np.array([1.05, 1.04, 1.05], dtype=np.float32)
+    # Alinhamento fino: `vroid_sample` cobre perfeitamente o crânio e as orelhas humanas da Victoria sem vazamento!
+    hair_scale = np.array([1.08, 1.05, 1.08], dtype=np.float32)
     next_mesh_idx = max((p.mesh_index for p in dst_model.primitives), default=0) + 1
 
     mat_remap: dict[int, int] = {}
     for p in src.primitives:
         smat = src.materials[p.material_index]
-        if smat.role != "hair":
+        if smat.role != "hair" or "hairback" in smat.name.lower():
             continue
         if p.material_index not in mat_remap:
             new_mi = len(dst_model.materials)
@@ -542,43 +588,71 @@ def _sculpt_body_vertices(model: VrmModel, arch: GirlArchetype) -> None:
         x, y, z = p[:, 0], p[:, 1], p[:, 2]
         zf = z * z_fwd  # positivo = frente do corpo!
 
-        # 1. Busto mais farto, arredondado e natural (atua SOMENTE na frente do peito, longe dos braços!)
+        # 1. Busto bem mais cheio, arredondado e pesado (assinatura Rapscallion × Dungeon Squad!)
         if arch.bust_boost > 0.01:
-            amp = 0.042 * arch.bust_boost
-            front_mask = np.clip((zf - 0.008) / 0.048, 0.0, 1.0)
-            arm_mask = np.clip((0.155 - np.abs(x)) / 0.035, 0.0, 1.0)
+            amp = 0.044 * arch.bust_boost
+            front_mask = np.clip((zf - 0.005) / 0.045, 0.0, 1.0)
+            arm_mask = np.clip((0.158 - np.abs(x)) / 0.036, 0.0, 1.0)
             for sign in (-1.0, 1.0):
-                dx = (x - sign * 0.064) / 0.070
-                dy = (y - y_chest) / 0.072
+                dx = (x - sign * 0.062) / 0.074
+                dy = (y - y_chest) / 0.078
                 g = np.exp(-(dx * dx + dy * dy)) * front_mask * arm_mask
                 p[:, 2] += g * (amp * z_fwd)
-                p[:, 0] += g * (sign * amp * 0.30)
-                p[:, 1] -= g * (amp * 0.22)
+                p[:, 0] += g * (sign * amp * 0.28)
+                p[:, 1] -= g * (amp * 0.26)
 
-        # 2. Cintura ampulheta feminina suave (transição orgânica em S sem degrau!)
-        waist_w = np.exp(-((y - y_waist) / 0.078) ** 2) * np.clip((0.155 - np.abs(x)) / 0.038, 0.0, 1.0)
+        # 2. Cintura ampulheta feminina suave
+        waist_w = np.exp(-((y - y_waist) / 0.080) ** 2) * np.clip((0.155 - np.abs(x)) / 0.038, 0.0, 1.0)
         p[:, 0] *= (1.0 - (1.0 - arch.waist_pinch) * waist_w)
         p[:, 2] *= (1.0 - (1.0 - arch.waist_pinch) * 0.55 * waist_w)
 
-        # 3. Quadris largos, glúteos arredondados e coxas grossas com transição contínua
-        hip_w = np.exp(-((y - y_hips) / 0.135) ** 2)
-        thigh_w = np.exp(-((y - y_thigh) / 0.165) ** 2)
-        p[:, 0] *= (1.0 + (arch.hip_boost - 1.0) * hip_w + (arch.thigh_boost - 1.0) * 0.65 * thigh_w)
-        p[:, 2] *= (1.0 + (arch.hip_boost - 1.0) * 0.78 * hip_w + (arch.thigh_boost - 1.0) * 0.58 * thigh_w)
-        back_mask = np.clip((-zf - 0.015) / 0.055, 0.0, 1.0)
-        p[:, 2] -= hip_w * back_mask * (0.028 * z_fwd) * (arch.hip_boost - 1.0) / 0.20
+        # 3. Quadris redondos suaves, glúteos cheios, coxas grossas e panturrilhas macias (curva contínua sem quina!)
+        y_calf = h_ref * 0.24
+        hip_w = np.exp(-((y - y_hips) / 0.165) ** 2)
+        thigh_w = np.exp(-((y - (y_thigh - 0.04)) / 0.190) ** 2)
+        calf_w = np.exp(-((y - y_calf) / 0.135) ** 2) * np.clip((y - 0.09) / 0.09, 0.0, 1.0)
+
+        # Curva única contínua sem descontinuidade no encontro quadril -> coxa!
+        hip_x_gain = (arch.hip_boost - 1.0) * 0.72 * hip_w
+        thigh_x_gain = (arch.thigh_boost - 1.0) * 0.56 * thigh_w
+        calf_x_gain = (arch.calf_boost - 1.0) * 0.65 * calf_w
+
+        # Expansão suave em torno da linha central da perna para coxas/panturrilhas manterem vão natural
+        below_crotch = np.clip((y_hips - 0.02 - y) / 0.18, 0.0, 1.0)
+        leg_cx = np.sign(x) * 0.088
+        # Parte superior (quadril): expande em torno de x=0; parte inferior (coxa/panturrilha): expande em torno de leg_cx
+        x_hip = x * (1.0 + hip_x_gain)
+        x_leg = leg_cx + (x_hip - leg_cx) * (1.0 + thigh_x_gain * below_crotch + calf_x_gain * below_crotch)
+        p[:, 0] = x_leg
+
+        # Profundidade Z suave (quadris, coxas arredondadas, panturrilhas e glúteos cheios!)
+        p[:, 2] *= (1.0 + (arch.hip_boost - 1.0) * 0.74 * hip_w + (arch.thigh_boost - 1.0) * 0.58 * thigh_w + (arch.calf_boost - 1.0) * 0.65 * calf_w)
+        back_mask = np.clip((-zf - 0.010) / 0.050, 0.0, 1.0)
+        p[:, 2] -= hip_w * back_mask * (0.042 * z_fwd) * (arch.hip_boost - 1.0) / 0.36
+
+        # 4. Braços levemente mais macios/encorpados para harmonizar com o busto e quadris (|x| > 0.16)
+        in_arms = np.clip((np.abs(x) - 0.16) / 0.06, 0.0, 1.0) * np.clip((y - (y_waist + 0.05)) / 0.12, 0.0, 1.0)
+        arm_y_c = h_ref * 0.918
+        p[:, 1] = arm_y_c + (p[:, 1] - arm_y_c) * (1.0 + (arch.arm_boost - 1.0) * in_arms)
+        p[:, 2] *= (1.0 + (arch.arm_boost - 1.0) * in_arms)
 
         prim.positions = p.astype(np.float32)
         prim.normals = _recompute_smooth_normals(prim.positions, prim.indices)
 
 
 def _apply_tos_proportions(model: VrmModel, arch: GirlArchetype) -> None:
-    """Ajusta proporções estilizadas Tree of Savior (~5.2 cabeças para rosto super nítido e corpo curvilíneo)."""
+    """Ajusta proporções estilizadas Rapscallion × Dungeon Squad (~4.5 cabeças, pernas compactas e rosto expressivo)."""
     hb = model.humanoid_bones
     head_i = hb.get("head")
     if head_i is not None:
         s = float(arch.head_scale)
         model.nodes[head_i].scale = model.nodes[head_i].scale * np.array([s, s, s], dtype=np.float32)
+
+    # Compacta suavemente o tronco para silhueta menos alongada
+    spine_i = hb.get("spine")
+    if spine_i is not None:
+        tc = float(arch.torso_compact)
+        model.nodes[spine_i].scale = model.nodes[spine_i].scale * np.array([1.0, tc, 1.0], dtype=np.float32)
 
     for bname in ("leftUpperLeg", "rightUpperLeg"):
         bi = hb.get(bname)
@@ -589,7 +663,7 @@ def _apply_tos_proportions(model: VrmModel, arch: GirlArchetype) -> None:
     if hips_i is not None:
         drop = (1.0 - float(arch.leg_compact)) * 0.96
         model.nodes[hips_i].translation = model.nodes[hips_i].translation - np.array([0.0, drop, 0.0], dtype=np.float32)
-        model.height = max(1.30, model.height - drop + 0.04)
+        model.height = max(1.18, model.height - drop + 0.04)
 
 
 def build_sculpted_vrm_girl(
@@ -629,8 +703,10 @@ def build_sculpted_vrm_girl(
             mat.shade_color = arch.skin_shade
         elif "eyeiris" in nlow:
             mat.texture_rgba = _recolor_iris_texture(mat.texture_rgba, arch.eye_rgb)
+        elif "faceeyeline" in nlow or "faceeyelash" in nlow:
+            mat.texture_rgba = _bold_comic_strokes(mat.texture_rgba, (24, 10, 14), thicken=7)
         elif "facebrow" in nlow:
-            mat.texture_rgba = _recolor_hair_texture(mat.texture_rgba, arch.brow_rgb)
+            mat.texture_rgba = _bold_comic_strokes(mat.texture_rgba, arch.brow_rgb, thicken=7)
         elif mat.role == "hair" and not mat.name.startswith("Grafted_"):
             mat.texture_rgba = _recolor_hair_texture(mat.texture_rgba, arch.hair_rgb)
             mat.shade_color = arch.hair_shade

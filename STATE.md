@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-23 (Milestone 16 · Etapa 1 — Aparência Geral HD estilo Tree of Savior: Malha Studio 3D Esculpida, 4 Garotas Base em Roupa de Baixo Simples & Foco de Refinamento na Elfa Loira)
+> **Última atualização**: 2026-11-23 (Milestone 16 · Etapa 1b — Estilização Comic-Ink HD estilo Rapscallion × Dungeon Squad × Tree of Savior: Traço Nanquim Sobel 960×1200, Proporções ~4.5 Cabeças Curvilíneas & Olhar Expressivo)
 
 ---
 
@@ -15,7 +15,7 @@
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
 | Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
 | Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py` | 🟢 Validado E2E | Presets `sky_sanctuary` (padrão) e `dark_sanctuary` com Qwen 2.1 relighting 1:1 + Wan 2.2 opcional |
-| Render 3D & 2.5D (`render/`) | `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Novo `vrm_sculptor.py` esculpindo malha studio VRM 100% íntegra (`Victoria_Rubin.vrm` + cabelo longo enxertado de `vroid_sample.vrm` + orelhas élficas 3D + retexturização HD) nos **4 arquétipos base em roupa de baixo simples** (`elfa_loira`, `humana_ruiva`, `androide_rosa`, `vampira_negra`), renderizados em **Tree of Savior HD (`640×800` MSAA 4x)** com sombreamento quente *subsurface* na pele e brilho *angel-ring* no cabelo |
+| Render 3D & 2.5D (`render/`) | `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Pipeline **Comic-Ink HD** (`960×1200` MRT + Sobel nanquim externo/profundidade/normais -> `640×800`, cel-shading gráfico recortado com faixa *subsurface* quente e correção de `GL_BLEND` em MRT para costas 100% limpas) + `vrm_sculptor.py` esculpindo proporções **~4.5 cabeças Rapscallion × Dungeon Squad** (busto cheio, cintura ampulheta, quadris/coxas/panturrilhas encorpadas, delineado alado grosso, sobrancelhas expressivas e orelhas élficas 3D) nos 4 arquétipos base em roupa de baixo simples |
 | Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma pela praça `sky_sanctuary`, poses 360° (`idle` natural, `walk`, `wave`, `dance`, `stretch`, `sit_work`, `sleep`), emotes RO, sono e sussurros |
 | Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio com seletor direto das **4 garotas base HD** (`Lyra`, `Freya`, `Airi`, `Lilith`) + `.VRM` externos |
 | App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 31/31 Verdes | `pytest` completo + `render_showcase.py --scene sky_sanctuary --vrm elfa_loira` |
@@ -29,7 +29,7 @@
   3. `androide_rosa` (**Airi — Androide Rosa**): cabelo rosa-pastel longo, olhos safira, roupa de baixo rosa-pérola.
   4. `vampira_negra` (**Lilith — Vampira**): rabo lateral preto-esmeralda, sardas sutis, olhos jade, roupa de baixo preta/carmesim.
 - **Cenário Padrão — Observatório Celeste (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**: Praça aberta ensolarada estilo Tree of Savior reiluminada 1:1 via Qwen 2.1 (`day`, `sunset`, `night`, `rain`).
-- **Prévias & GIFs Validados**: `m16_four_girls_base.png`, `m16_elfa_loira_turnaround.png`, `m16_elfa_sky_showcase.png` e `m16_elfa_sky_demo.gif` (enviados ao Telegram).
+- **Prévias & GIFs Validados**: `m16_elfa_comic_turnaround.png`, `m16_comic_sky_showcase.png`, `m16_comic_sky_demo.gif` e `m16_four_girls_base.png` (enviados ao Telegram).
 
 ---
 

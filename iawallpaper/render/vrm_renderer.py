@@ -1,18 +1,19 @@
-"""VRM RENDERER — Renderizador 3D estilo Tree of Savior (HD MSAA 4x Painterly Cel-Shaded) & Modo Pixel-Art opcional.
+"""VRM RENDERER — Renderizador 3D Comic/Illustration HD (Rapscallion × Dungeon Squad × Tree of Savior) via ModernGL.
 
-Suporta dois perfis de renderização em GPU via ModernGL (OpenGL 3.3 Core Profile):
-1. **Modo Tree of Savior HD (`pixel_art=False`, padrão a partir do Milestone 16)**:
-   - Renderização nativa em alta definição (`640x800`, MSAA 4x) preservando cada detalhe do rosto
-     (olhos em camadas, cílios, sobrancelhas, rubor, lábios, mechas de cabelo, rendas e corpete).
-   - Shader cel-shaded pictórico estilo *Tree of Savior*:
-     * Sombreamento quente *subsurface* na pele/rosto (tons pêssego/âmbar em vez de cinza/roxo frio) +
-       brilho especular suave de pele viva.
-     * Faixa de brilho especular anime em arco (*hair gloss halo*) nos cabelos.
-     * Contorno fino *inverted-hull* em tinta café-escuro apenas no corpo/cabelo/roupas (mantendo o rosto
-       limpo e legível em qualquer distância no desktop).
-     * Rim-light Fresnel sincronizado ao ciclo circadiano (`AtmospherePalette`).
-2. **Modo Retro Pixel-Art 3D (`pixel_art=True`, opcional)**:
-   - Mantém o pipeline MRT `152x190` + contorno 1px + Nearest-Neighbor disponível caso desejado.
+Pipeline GPU de 2 passos em alta definição supersampled (`960×1200` MRT -> pós-processamento Sobel Ink -> `640×800`):
+1. **Passo 1 (Geometria 3D -> MRT `960×1200`)**:
+   - Attachment 0 (`RGBA8`): Cel-shading gráfico nítido de 2.5 bandas estilo ilustração 2D (transição de sombra
+     marcada e quente *subsurface* na pele, brilho especular recortado tipo pintura *Rapscallion/ToS*, faixa
+     *angel-ring* no cabelo e rim-light sincronizado ao ciclo dia/noite).
+   - Attachment 1 (`RGBA16F`): `(view_normal.x, view_normal.y, view_depth, flags)` para detecção exata de
+     linhas de tinta na tela.
+2. **Passo 2 (Shader Fullscreen de Traço Nanquim 2D — Comic Ink Lineart)**:
+   - Calcula bordas Sobel em **Alpha** (contorno externo espesso e expressivo), **Profundidade** (linhas
+     nítidas separando mechas de cabelo, queixo, busto, braços, quadris e coxas) e **Normais** (dobras
+     anatômicas e de roupa, suavizadas no interior do rosto para manter olhos e expressão 100% cristalinos!).
+   - Redução suave para `640×800` gerando traço limpo anti-serrilhado idêntico a ilustração 2D pintada à mão!
+
+Também mantém modo opcional Retro Pixel-Art (`pixel_art=True`).
 """
 
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ import math
 
 import moderngl
 import numpy as np
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 
 from ..core.emotion import EmotionState
@@ -46,6 +48,7 @@ uniform float u_outline_extrude;
 
 out vec3 v_world_pos;
 out vec3 v_world_norm;
+out vec3 v_view_norm;
 out vec2 v_uv;
 out float v_view_depth;
 
@@ -74,8 +77,10 @@ void main() {
     }
     vec4 world_p = u_model * local_p;
     vec4 view_p = u_view * world_p;
+    vec3 w_norm = normalize(mat3(u_model) * local_n);
     v_world_pos = world_p.xyz;
-    v_world_norm = normalize(mat3(u_model) * local_n);
+    v_world_norm = w_norm;
+    v_view_norm = normalize(mat3(u_view) * w_norm);
     v_uv = in_uv;
     v_view_depth = -view_p.z;
     gl_Position = u_mvp * local_p;
@@ -86,6 +91,7 @@ _FRAGMENT_SHADER = """
 #version 330 core
 in vec3 v_world_pos;
 in vec3 v_world_norm;
+in vec3 v_view_norm;
 in vec2 v_uv;
 in float v_view_depth;
 
@@ -125,7 +131,7 @@ void main() {
     }
     if (u_is_outline == 1) {
         f_color = vec4(u_outline_color, 1.0);
-        f_meta = vec4(v_view_depth, u_mat_group, 0.0, 0.0);
+        f_meta = vec4(0.0, 0.0, v_view_depth, 0.0);
         return;
     }
 
@@ -133,13 +139,15 @@ void main() {
     if (u_is_emissive == 1) {
         vec3 glow_col = clamp(albedo * 1.18 + vec3(0.08), 0.0, 1.0);
         f_color = vec4(glow_col, (u_alpha_mode == 0) ? 1.0 : alpha);
-        f_meta = vec4(v_view_depth, u_mat_group, 1.0, 0.0);
+        f_meta = vec4(0.0, 0.0, v_view_depth, 2.0);
         return;
     }
 
     vec3 N = normalize(v_world_norm);
+    vec3 VN = normalize(v_view_norm);
     if (!gl_FrontFacing) {
         N = -N;
+        VN = -VN;
     }
     vec3 L = normalize(u_light_dir);
     vec3 V = normalize(u_cam_pos - v_world_pos);
@@ -149,89 +157,80 @@ void main() {
     vec3 col;
 
     if (u_pixel_art == 1) {
-        float band;
-        if (u_is_face == 1) {
-            band = (ndotl > -0.18) ? 1.0 : 0.68;
-        } else {
-            band = (ndotl > 0.24) ? 1.0 : ((ndotl > -0.10) ? 0.56 : 0.14);
-        }
+        float band = (u_is_face == 1)
+            ? ((ndotl > -0.18) ? 1.0 : 0.68)
+            : ((ndotl > 0.24) ? 1.0 : ((ndotl > -0.10) ? 0.56 : 0.14));
         vec3 deep_shade = mix(u_shade_color, vec3(0.42, 0.34, 0.56), 0.45);
         vec3 lit_c = albedo * (u_light_color * 0.96 + u_ambient_color * 0.14);
         vec3 mid_c = albedo * mix(deep_shade, vec3(1.0), 0.45) * (u_ambient_color * 0.72 + vec3(0.24));
         vec3 shd_c = albedo * deep_shade * (u_ambient_color * 0.56 + vec3(0.16));
         col = (band >= 0.85) ? lit_c : ((band >= 0.35) ? mid_c : shd_c);
-        if (u_is_face == 0) {
-            float sp_pow = (u_is_gold == 1) ? 14.0 : ((u_is_hair == 1) ? 16.0 : 24.0);
-            float sp_raw = pow(max(dot(N, H), 0.0), sp_pow);
-            float sp_step = (sp_raw > ((u_is_gold == 1) ? 0.32 : 0.46)) ? 1.0 : 0.0;
-            float sp_gain = (u_is_gold == 1) ? 0.42 : ((u_is_hair == 1) ? 0.28 : 0.16);
-            col += mix(vec3(1.0), u_light_color, 0.35) * sp_step * sp_gain;
-        }
         float fr = pow(1.0 - max(dot(N, V), 0.0), 2.8);
-        float rim_step = (fr > 0.48 && u_is_face == 0) ? 1.0 : 0.0;
-        col += u_rim_color * rim_step * u_rim_strength * 0.42;
+        col += u_rim_color * ((fr > 0.48 && u_is_face == 0) ? 1.0 : 0.0) * u_rim_strength * 0.42;
     } else {
-        // ── Shader Pictórico HD estilo Tree of Savior (ToS) ──
+        // ── Shader Comic / Ilustração 2D (Rapscallion × Dungeon Squad × Tree of Savior!) ──
+        // Transição de cel-shading NÍTIDA e quente (zero gradiente plástico 3D de boneca!)
         if (u_is_face == 1) {
-            // Iluminação facial frontal generosa e suave (preserva 100% da leitura de olhos, blush e sorriso!)
-            float face_lit = smoothstep(-0.38, 0.24, ndotl) * 0.30 + 0.70;
-            vec3 warm_face_shade = albedo * mix(u_shade_color, vec3(0.92, 0.74, 0.70), 0.55);
-            vec3 lit_face = albedo * (u_light_color * 0.90 + u_ambient_color * 0.16);
-            col = mix(warm_face_shade, lit_face, face_lit);
-            // Leve fresnel rosado suave nas bochechas/orelhas
-            float fr_f = pow(1.0 - max(dot(N, V), 0.0), 3.6);
-            col += u_rim_color * fr_f * u_rim_strength * 0.18;
+            // Rosto luminoso com corte suave apenas na sombra lateral/queixo (preserva 100% dos olhos e expressão!)
+            float f_band = smoothstep(-0.28, -0.06, ndotl);
+            vec3 face_shd = albedo * mix(u_shade_color, vec3(0.84, 0.58, 0.56), 0.50) * (u_ambient_color * 0.72 + vec3(0.26));
+            vec3 face_lit = albedo * (u_light_color * 0.92 + u_ambient_color * 0.14);
+            col = mix(face_shd, face_lit, f_band * 0.52 + 0.48);
+            // Borda iluminada quente na silhueta do rosto
+            float fr_f = smoothstep(0.62, 0.78, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_f * u_rim_strength * 0.22;
         } else if (u_is_skin == 1) {
-            // Pele viva com banda subsurface quente (pêssego/coral na transição luz-sombra!) + brilho úmido suave
-            float toon = smoothstep(-0.14, 0.18, ndotl);
-            float sss_band = exp(-pow((ndotl - 0.02) / 0.16, 2.0));
-            vec3 skin_lit = albedo * (u_light_color * 0.94 + u_ambient_color * 0.14);
-            vec3 skin_shd = albedo * mix(u_shade_color, vec3(0.78, 0.54, 0.52), 0.55) * (u_ambient_color * 0.72 + vec3(0.24));
-            col = mix(skin_shd, skin_lit, toon);
-            col += vec3(0.14, 0.05, 0.03) * sss_band * albedo;
-            // Brilho especular acetinado suave de pele (colo, busto, coxas — estilo Tree of Savior!)
-            float spec_skin = smoothstep(0.58, 0.90, pow(max(dot(N, H), 0.0), 20.0));
-            col += mix(vec3(1.0, 0.95, 0.88), u_light_color, 0.40) * spec_skin * 0.12;
-            float fr_s = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-            col += u_rim_color * fr_s * u_rim_strength * 0.42;
+            // Cel-shading gráfico de pele (corte marcado estilo Rapscallion + borda coral subsurface + gloss recortado!)
+            float band1 = smoothstep(-0.04, 0.05, ndotl);
+            float band2 = smoothstep(-0.42, -0.28, ndotl);
+            float sss_edge = exp(-pow((ndotl - 0.005) / 0.085, 2.0));
+            vec3 sk_lit = albedo * (u_light_color * 0.95 + u_ambient_color * 0.12);
+            vec3 sk_mid = albedo * mix(u_shade_color, vec3(0.76, 0.46, 0.44), 0.52) * (u_ambient_color * 0.68 + vec3(0.26));
+            vec3 sk_deep = albedo * mix(u_shade_color, vec3(0.56, 0.32, 0.36), 0.58) * (u_ambient_color * 0.56 + vec3(0.20));
+            col = mix(mix(sk_deep, sk_mid, band2), sk_lit, band1);
+            // Faixa quente coral-pêssego exatamente na linha do terminador (assinatura Rapscallion!)
+            col += vec3(0.18, 0.05, 0.03) * sss_edge * albedo;
+            // Brilho especular gráfico recortado (highlight pintado no busto, ombros e coxas!)
+            float spec_raw = pow(max(dot(N, H), 0.0), 26.0);
+            float spec_cut = smoothstep(0.58, 0.68, spec_raw);
+            col += mix(vec3(1.0, 0.96, 0.90), u_light_color, 0.30) * spec_cut * 0.19;
+            // Rim-light em degrau gráfico nítido
+            float fr_s = smoothstep(0.56, 0.68, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_s * u_rim_strength * 0.36;
         } else if (u_is_hair == 1) {
-            // Cabelo anime estilo ToS com sombra saturada quente e anel de brilho especular (angel ring!)
-            float toon_h = smoothstep(-0.16, 0.16, ndotl);
-            float mid_h = smoothstep(-0.45, -0.05, ndotl);
-            vec3 h_lit = albedo * (u_light_color * 0.96 + u_ambient_color * 0.14);
-            vec3 h_mid = albedo * mix(u_shade_color, vec3(1.0), 0.45) * (u_ambient_color * 0.76 + vec3(0.20));
-            vec3 h_shd = albedo * u_shade_color * (u_ambient_color * 0.62 + vec3(0.16));
-            col = mix(mix(h_shd, h_mid, mid_h), h_lit, toon_h);
-            // Anel especular alongado horizontalmente (assinatura de cabelo anime pintado à mão!)
-            vec3 H_aniso = normalize(vec3(H.x * 0.55, H.y * 1.45, H.z));
-            float gloss = smoothstep(0.60, 0.86, pow(max(dot(N, H_aniso), 0.0), 16.0));
-            float gloss_sharp = smoothstep(0.82, 0.94, pow(max(dot(N, H_aniso), 0.0), 32.0));
-            col += mix(vec3(1.0, 0.98, 0.92), u_light_color, 0.25) * (gloss * 0.20 + gloss_sharp * 0.24);
-            float fr_h = pow(1.0 - max(dot(N, V), 0.0), 2.8);
-            col += u_rim_color * fr_h * u_rim_strength * 0.55;
+            // Cabelo com sombreamento gráfico em 2.5 bandas + faixa de brilho recortada estilo anime/HQ!
+            float h_band1 = smoothstep(-0.06, 0.04, ndotl);
+            float h_band2 = smoothstep(-0.44, -0.30, ndotl);
+            vec3 h_lit = albedo * (u_light_color * 0.96 + u_ambient_color * 0.12);
+            vec3 h_mid = albedo * mix(u_shade_color, vec3(1.0), 0.38) * (u_ambient_color * 0.70 + vec3(0.22));
+            vec3 h_shd = albedo * u_shade_color * (u_ambient_color * 0.56 + vec3(0.16));
+            col = mix(mix(h_shd, h_mid, h_band2), h_lit, h_band1);
+            vec3 H_aniso = normalize(vec3(H.x * 0.52, H.y * 1.55, H.z));
+            float gloss = smoothstep(0.70, 0.78, pow(max(dot(N, H_aniso), 0.0), 18.0));
+            col += mix(vec3(1.0, 0.98, 0.92), u_light_color, 0.22) * gloss * 0.32;
+            float fr_h = smoothstep(0.58, 0.70, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_h * u_rim_strength * 0.44;
         } else {
-            // Roupas, couro, renda e ornamentos dourados com 2.5 bandas ricas e brilho suave
-            float toon_c = smoothstep(-0.10, 0.14, ndotl);
-            float deep_c = smoothstep(-0.48, -0.10, ndotl);
-            vec3 c_lit = albedo * (u_light_color * 0.94 + u_ambient_color * 0.14);
-            vec3 c_mid = albedo * mix(u_shade_color, vec3(1.0), 0.35) * (u_ambient_color * 0.72 + vec3(0.22));
-            vec3 c_shd = albedo * u_shade_color * (u_ambient_color * 0.56 + vec3(0.16));
-            col = mix(mix(c_shd, c_mid, deep_c), c_lit, toon_c);
-            float sp_pow = (u_is_gold == 1) ? 16.0 : 28.0;
-            float sp = smoothstep(0.45, 0.78, pow(max(dot(N, H), 0.0), sp_pow));
-            col += mix(vec3(1.0, 0.96, 0.85), u_light_color, 0.35) * sp * ((u_is_gold == 1) ? 0.44 : 0.14);
-            float fr_c = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-            col += u_rim_color * fr_c * u_rim_strength * 0.52;
+            float c_band = smoothstep(-0.04, 0.05, ndotl);
+            vec3 c_lit = albedo * (u_light_color * 0.94 + u_ambient_color * 0.12);
+            vec3 c_shd = albedo * u_shade_color * (u_ambient_color * 0.58 + vec3(0.20));
+            col = mix(c_shd, c_lit, c_band);
+            float sp = smoothstep(0.55, 0.66, pow(max(dot(N, H), 0.0), (u_is_gold == 1) ? 14.0 : 24.0));
+            col += mix(vec3(1.0, 0.95, 0.84), u_light_color, 0.30) * sp * ((u_is_gold == 1) ? 0.44 : 0.16);
+            float fr_c = smoothstep(0.58, 0.70, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_c * u_rim_strength * 0.40;
         }
     }
 
     if (u_is_eye == 1) {
-        col = mix(col, albedo * 1.22 + u_rim_color * 0.08, 0.55);
+        col = mix(col, albedo * 1.24 + u_rim_color * 0.08, 0.62);
     }
 
     col = clamp(col, 0.0, 1.0);
     f_color = vec4(col, (u_alpha_mode == 0) ? 1.0 : alpha);
-    f_meta = vec4(v_view_depth, u_mat_group, 0.0, (u_is_face == 1 || u_is_eye == 1) ? 1.0 : 0.0);
+    // flags: 0=corpo/roupa/cabelo (traço cheio), 1=rosto/olhos (traço suave interno, contorno externo normal!), 2=emissivo
+    float flag = (u_is_face == 1 || u_is_eye == 1) ? 1.0 : 0.0;
+    f_meta = vec4(VN.x, VN.y, v_view_depth, flag);
 }
 """
 
@@ -243,7 +242,122 @@ void main() {
 }
 """
 
-_POST_FS = """
+_COMIC_INK_FS = """
+#version 330 core
+uniform sampler2D u_color_tex;
+uniform sampler2D u_meta_tex;
+uniform vec3 u_ink_color;
+uniform float u_outer_radius;   // raio em px do contorno externo (ex: 2.2 em 960x1200)
+
+out vec4 f_out;
+
+void main() {
+    ivec2 p = ivec2(gl_FragCoord.xy);
+    ivec2 sz = textureSize(u_color_tex, 0);
+    vec4 c = texelFetch(u_color_tex, p, 0);
+    vec4 m = texelFetch(u_meta_tex, p, 0);
+
+    // 1. Contorno externo expressivo tipo nanquim HQ (Rapscallion / Dungeon Squad!)
+    if (c.a < 0.45) {
+        float best = 0.0;
+        float glow = 0.0;
+        vec3 em_col = vec3(0.0);
+        int rad = int(ceil(u_outer_radius));
+        for (int dy = -rad; dy <= rad; dy++) {
+            for (int dx = -rad; dx <= rad; dx++) {
+                float d = length(vec2(float(dx), float(dy)));
+                if (d > u_outer_radius + 0.15) continue;
+                ivec2 q = clamp(p + ivec2(dx, dy), ivec2(0), sz - ivec2(1));
+                vec4 nc = texelFetch(u_color_tex, q, 0);
+                if (nc.a >= 0.45) {
+                    vec4 nm = texelFetch(u_meta_tex, q, 0);
+                    float w = smoothstep(u_outer_radius + 0.15, max(0.0, u_outer_radius - 0.85), d);
+                    if (nm.a > 1.5) {
+                        glow = max(glow, w * 0.45);
+                        em_col = max(em_col, nc.rgb);
+                    } else {
+                        best = max(best, w);
+                    }
+                }
+            }
+        }
+        if (best > 0.02) {
+            f_out = vec4(u_ink_color, best);
+            return;
+        }
+        if (glow > 0.02) {
+            f_out = vec4(em_col, glow);
+            return;
+        }
+        f_out = vec4(0.0);
+        return;
+    }
+
+    // Elementos emissivos preservam brilho puro
+    if (m.a > 1.5) {
+        f_out = c;
+        return;
+    }
+
+    // 2. Linhas internas de nanquim via Sobel em Profundidade + Normais (queixo, busto, coxas, braços, mechas, orelhas!)
+    bool is_face = (m.a > 0.5 && m.a < 1.5);
+    float d_center = m.z;
+    vec2 n_center = m.xy;
+
+    // Amostra vizinhos a 1px e 2px para traço encorpado e suave no supersampling 960x1200!
+    ivec2 offs4[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
+    ivec2 offs8[4] = ivec2[4](ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2));
+
+    float depth_edge = 0.0;
+    float norm_edge = 0.0;
+    float sil_inner = 0.0;
+
+    for (int i = 0; i < 4; i++) {
+        ivec2 q1 = clamp(p + offs4[i], ivec2(0), sz - ivec2(1));
+        vec4 c1 = texelFetch(u_color_tex, q1, 0);
+        vec4 m1 = texelFetch(u_meta_tex, q1, 0);
+        if (c1.a < 0.45) {
+            sil_inner = max(sil_inner, 0.85);
+            continue;
+        }
+        if (m1.a > 1.5) continue;
+
+        // Salto de profundidade (somente no lado mais distante -> linha limpa sem engrossar demais!)
+        float dd1 = d_center - m1.z;
+        if (dd1 > 0.028) {
+            depth_edge = max(depth_edge, smoothstep(0.028, 0.072, dd1));
+        }
+        // Dobras de superfície (normais mudando bruscamente -> sulco do busto, clavícula, coxas, orelha!)
+        if (!is_face) {
+            float dn = length(n_center - m1.xy);
+            if (dn > 0.36) {
+                norm_edge = max(norm_edge, smoothstep(0.36, 0.78, dn) * 0.78);
+            }
+        }
+
+        // Segunda coroa (2px) para dar peso de nanquim nos saltos grandes (cabelo sobre rosto, braço sobre tronco!)
+        ivec2 q2 = clamp(p + offs8[i], ivec2(0), sz - ivec2(1));
+        vec4 c2 = texelFetch(u_color_tex, q2, 0);
+        vec4 m2 = texelFetch(u_meta_tex, q2, 0);
+        if (c2.a >= 0.45 && m2.a < 1.5) {
+            float dd2 = d_center - m2.z;
+            if (dd2 > 0.055) {
+                depth_edge = max(depth_edge, smoothstep(0.055, 0.11, dd2) * (is_face ? 0.45 : 0.75));
+            }
+        }
+    }
+
+    // No interior do rosto, atenua linhas internas de profundidade para nunca sujar olhos/bochechas,
+    // mas mantém 100% o contorno nítido do queixo e mechas!
+    float ink = max(sil_inner * 0.65, max(depth_edge * (is_face ? 0.55 : 0.92), norm_edge));
+    // Tinta quente rica (mistura o próprio tom escurecido com café-ameixa para traço orgânico Rapscallion!)
+    vec3 colored_ink = mix(u_ink_color, c.rgb * 0.22, 0.35);
+    vec3 final_rgb = mix(c.rgb, colored_ink, clamp(ink, 0.0, 0.94));
+    f_out = vec4(clamp(final_rgb, 0.0, 1.0), c.a);
+}
+"""
+
+_POST_PIXEL_FS = """
 #version 330 core
 uniform sampler2D u_color_tex;
 uniform sampler2D u_meta_tex;
@@ -256,64 +370,24 @@ void main() {
     ivec2 sz = textureSize(u_color_tex, 0);
     vec4 c = texelFetch(u_color_tex, p, 0);
     vec4 m = texelFetch(u_meta_tex, p, 0);
-
     ivec2 offs[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
 
     if (c.a < 0.5) {
         bool has_solid = false;
-        bool has_emissive = false;
-        vec3 em_col = vec3(0.0);
         for (int i = 0; i < 4; i++) {
             ivec2 q = clamp(p + offs[i], ivec2(0), sz - ivec2(1));
-            vec4 nc = texelFetch(u_color_tex, q, 0);
-            vec4 nm = texelFetch(u_meta_tex, q, 0);
-            if (nc.a >= 0.5) {
-                if (nm.b > 0.5) {
-                    has_emissive = true;
-                    em_col = max(em_col, nc.rgb);
-                } else {
-                    has_solid = true;
-                }
-            }
+            if (texelFetch(u_color_tex, q, 0).a >= 0.5) has_solid = true;
         }
-        if (has_solid) {
-            f_out = vec4(u_ink_color, 1.0);
-            return;
-        }
-        if (has_emissive) {
-            f_out = vec4(em_col, 0.45);
-            return;
-        }
-        f_out = vec4(0.0);
+        f_out = has_solid ? vec4(u_ink_color, 1.0) : vec4(0.0);
         return;
     }
-
-    if (m.b > 0.5) {
-        f_out = c;
-        return;
-    }
-
-    float depth = m.r;
-    float group = m.g;
-    bool is_face = (m.a > 0.5);
     float edge = 0.0;
     for (int i = 0; i < 4; i++) {
         ivec2 q = clamp(p + offs[i], ivec2(0), sz - ivec2(1));
-        vec4 nc = texelFetch(u_color_tex, q, 0);
         vec4 nm = texelFetch(u_meta_tex, q, 0);
-        if (nc.a < 0.5 || nm.b > 0.5) {
-            continue;
-        }
-        float nd = nm.r;
-        if (depth - nd > 0.065) {
-            edge = max(edge, is_face ? 0.42 : 0.62);
-        } else if (!is_face && abs(group - nm.g) > 0.5 && depth >= nd - 0.015) {
-            edge = max(edge, 0.36);
-        }
+        if (m.z - nm.z > 0.06) edge = max(edge, 0.62);
     }
-
-    vec3 col = mix(c.rgb, u_ink_color, edge);
-    col = floor(col * 18.0 + 0.5) / 18.0;
+    vec3 col = floor(mix(c.rgb, u_ink_color, edge) * 18.0 + 0.5) / 18.0;
     f_out = vec4(clamp(col, 0.0, 1.0), c.a);
 }
 """
@@ -372,7 +446,6 @@ _ROLE_GROUP_ID: dict[str, float] = {
 
 
 def compute_role_tints(persona: Persona, outfit_key: str, dynamic_recolor: bool = True) -> dict[str, tuple[float, float, float]]:
-    """Calcula multiplicadores sutis de cor por papel semântico para adaptar VRMs externos ao traje/persona."""
     base = {
         "hair": (1.0, 1.0, 1.0),
         "eye": (1.0, 1.0, 1.0),
@@ -412,7 +485,7 @@ def compute_role_tints(persona: Persona, outfit_key: str, dynamic_recolor: bool 
 
 
 class VrmRenderer:
-    """Renderizador hardware OpenGL 3.3 estilo Tree of Savior HD (`640x800` MSAA 4x) + modo Pixel-Art opcional."""
+    """Renderizador 3D Comic/Illustration HD (960×1200 MRT + Sobel Nanquim -> 640×800) & modo Pixel-Art opcional."""
 
     def __init__(
         self,
@@ -422,10 +495,13 @@ class VrmRenderer:
         samples: int = 4,
         pixel_art: bool = False,
         pixel_size: tuple[int, int] = (152, 190),
+        supersample: float = 1.5,
     ):
         self.model = model
         self.width = int(width)
         self.height = int(height)
+        self.ss_w = int(round(self.width * supersample))
+        self.ss_h = int(round(self.height * supersample))
         self.pixel_art = bool(pixel_art)
         self.pixel_w, self.pixel_h = int(pixel_size[0]), int(pixel_size[1])
         self.last_foot_v: float = 0.88
@@ -434,19 +510,17 @@ class VrmRenderer:
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
         self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA, moderngl.ONE, moderngl.ONE_MINUS_SRC_ALPHA)
 
-        # Framebuffers HD MSAA 4x (padrão estilo Tree of Savior!)
-        max_samples = min(samples, getattr(self.ctx, "max_samples", 4))
-        if max_samples >= 2:
-            self._msaa_color = self.ctx.renderbuffer((self.width, self.height), components=4, samples=max_samples)
-            self._msaa_depth = self.ctx.depth_renderbuffer((self.width, self.height), samples=max_samples)
-            self._fbo_draw = self.ctx.framebuffer(
-                color_attachments=[self._msaa_color],
-                depth_attachment=self._msaa_depth,
-            )
-            self._fbo_resolve = self.ctx.simple_framebuffer((self.width, self.height), components=4)
-        else:
-            self._fbo_draw = self.ctx.simple_framebuffer((self.width, self.height), components=4)
-            self._fbo_resolve = self._fbo_draw
+        # Framebuffers Comic HD Supersampled MRT (960×1200 -> Sobel Ink -> downsample suave p/ 640×800!)
+        self._hd_color_tex = self.ctx.texture((self.ss_w, self.ss_h), 4)
+        self._hd_color_tex.filter = (moderngl.NEAREST, moderngl.NEAREST)
+        self._hd_meta_tex = self.ctx.texture((self.ss_w, self.ss_h), 4, dtype="f2")
+        self._hd_meta_tex.filter = (moderngl.NEAREST, moderngl.NEAREST)
+        self._hd_depth = self.ctx.depth_renderbuffer((self.ss_w, self.ss_h))
+        self._fbo_hd_geom = self.ctx.framebuffer(
+            color_attachments=[self._hd_color_tex, self._hd_meta_tex],
+            depth_attachment=self._hd_depth,
+        )
+        self._fbo_hd_out = self.ctx.simple_framebuffer((self.ss_w, self.ss_h), components=4)
 
         # Framebuffers opcionais do modo Retro Pixel-Art 3D
         self._pa_color_tex = self.ctx.texture((self.pixel_w, self.pixel_h), 4)
@@ -464,12 +538,18 @@ class VrmRenderer:
         self.prog["u_albedo"].value = 0
         self.prog["u_bone_tex"].value = 1
 
-        self._post_prog = self.ctx.program(vertex_shader=_POST_VS, fragment_shader=_POST_FS)
-        self._post_prog["u_color_tex"].value = 0
-        self._post_prog["u_meta_tex"].value = 1
+        self._comic_prog = self.ctx.program(vertex_shader=_POST_VS, fragment_shader=_COMIC_INK_FS)
+        self._comic_prog["u_color_tex"].value = 0
+        self._comic_prog["u_meta_tex"].value = 1
+
+        self._pixel_prog = self.ctx.program(vertex_shader=_POST_VS, fragment_shader=_POST_PIXEL_FS)
+        self._pixel_prog["u_color_tex"].value = 0
+        self._pixel_prog["u_meta_tex"].value = 1
+
         quad = np.array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0], dtype=np.float32)
         self._quad_vbo = self.ctx.buffer(quad.tobytes())
-        self._quad_vao = self.ctx.vertex_array(self._post_prog, [(self._quad_vbo, "2f", "in_pos")])
+        self._quad_comic_vao = self.ctx.vertex_array(self._comic_prog, [(self._quad_vbo, "2f", "in_pos")])
+        self._quad_pixel_vao = self.ctx.vertex_array(self._pixel_prog, [(self._quad_vbo, "2f", "in_pos")])
 
         self._white_tex = self.ctx.texture((1, 1), 4, bytes([255, 255, 255, 255]))
         self._mat_textures: list[moderngl.Texture] = []
@@ -550,26 +630,25 @@ class VrmRenderer:
         dynamic_recolor: bool = True,
         camera_focus: str = "full",
     ) -> QPixmap:
-        """Renderiza o frame atual em `QPixmap` RGBA (`camera_focus`: `'full'` corpo inteiro ou `'portrait'` close-up rosto!)."""
+        """Renderiza o frame atual com traço nanquim Comic HD (`960×1200` -> `640×800`) ou Pixel-Art opcional."""
         self._upload_bones_and_morphs(animator)
 
-        is_builtin = self.model.name.startswith("DungeonSquad_")
+        is_builtin = self.model.name.startswith(("DungeonSquad_", "ToS_"))
         h = self.model.height
         min_y = self.model.min_y
 
         if camera_focus == "portrait":
-            # Enquadramento retrato busto/rosto para inspeção fina de expressão e cabelo!
-            target_y = min_y + h * 0.78
-            eye = np.array([0.0, target_y + h * 0.03, h * 0.96], dtype=np.float32)
+            target_y = min_y + h * 0.77
+            eye = np.array([0.0, target_y + h * 0.02, h * 0.96], dtype=np.float32)
             target = np.array([0.0, target_y, 0.0], dtype=np.float32)
         else:
-            center_y = min_y + h * (0.51 if is_builtin else 0.50)
-            dist = h * (2.68 if is_builtin else 2.55)
-            eye = np.array([0.0, center_y + h * (0.20 if is_builtin else 0.28), dist], dtype=np.float32)
+            center_y = min_y + h * 0.50
+            dist = h * 2.55
+            eye = np.array([0.0, center_y + h * 0.22, dist], dtype=np.float32)
             target = np.array([0.0, center_y - h * 0.01, 0.0], dtype=np.float32)
 
-        rt_w = self.pixel_w if self.pixel_art else self.width
-        rt_h = self.pixel_h if self.pixel_art else self.height
+        rt_w = self.pixel_w if self.pixel_art else self.ss_w
+        rt_h = self.pixel_h if self.pixel_art else self.ss_h
         proj = _perspective(27.0, rt_w / max(float(rt_h), 1.0), 0.1, 20.0)
         view = _look_at(eye, target, np.array([0.0, 1.0, 0.0], dtype=np.float32))
         model_m = np.eye(4, dtype=np.float32)
@@ -584,56 +663,39 @@ class VrmRenderer:
         self.prog["u_view"].write(np.ascontiguousarray(view.T, dtype=np.float32).tobytes())
         self.prog["u_cam_pos"].value = (float(eye[0]), float(eye[1]), float(eye[2]))
 
-        lx = (sun_x_norm - 0.5) * 1.1 + 0.36
-        l_dir = np.array([lx, 0.78, 0.92], dtype=np.float32)
+        lx = (sun_x_norm - 0.5) * 1.1 + 0.42
+        l_dir = np.array([lx, 0.72, 0.85], dtype=np.float32)
         l_dir /= max(float(np.linalg.norm(l_dir)), 1e-6)
         self.prog["u_light_dir"].value = (float(l_dir[0]), float(l_dir[1]), float(l_dir[2]))
 
         tr, tg, tb = atmosphere.avatar_tint
-        ta = clamp(atmosphere.avatar_tint_alpha, 0.0, 0.68)
+        ta = clamp(atmosphere.avatar_tint_alpha, 0.0, 0.65)
         light_col = (
-            1.0 * (1.0 - ta * 0.28) + (tr / 255.0) * (ta * 0.38),
-            1.0 * (1.0 - ta * 0.28) + (tg / 255.0) * (ta * 0.38),
-            1.0 * (1.0 - ta * 0.28) + (tb / 255.0) * (ta * 0.38),
+            1.0 * (1.0 - ta * 0.28) + (tr / 255.0) * (ta * 0.36),
+            1.0 * (1.0 - ta * 0.28) + (tg / 255.0) * (ta * 0.36),
+            1.0 * (1.0 - ta * 0.28) + (tb / 255.0) * (ta * 0.36),
         )
         amb_col = (
-            0.80 * (1.0 - ta * 0.38) + (tr / 255.0) * (ta * 0.48),
-            0.80 * (1.0 - ta * 0.38) + (tg / 255.0) * (ta * 0.48),
-            0.84 * (1.0 - ta * 0.38) + (tb / 255.0) * (ta * 0.48),
+            0.80 * (1.0 - ta * 0.36) + (tr / 255.0) * (ta * 0.46),
+            0.78 * (1.0 - ta * 0.36) + (tg / 255.0) * (ta * 0.46),
+            0.84 * (1.0 - ta * 0.36) + (tb / 255.0) * (ta * 0.46),
         )
         rr, rg, rb = atmosphere.rim_light
         self.prog["u_light_color"].value = light_col
         self.prog["u_ambient_color"].value = amb_col
         self.prog["u_rim_color"].value = (rr / 255.0, rg / 255.0, rb / 255.0)
-        self.prog["u_rim_strength"].value = 0.48 + ta * 0.36
-        # Tinta marrom-café/ameixa escura estilo Tree of Savior (muito mais suave e artística que preto duro!)
-        self.prog["u_outline_color"].value = (0.14, 0.07, 0.09)
+        self.prog["u_rim_strength"].value = 0.52 + ta * 0.36
+        self.prog["u_outline_color"].value = (0.11, 0.05, 0.07)
         self.prog["u_pixel_art"].value = 1 if self.pixel_art else 0
 
         role_tints = compute_role_tints(persona, outfit_key, dynamic_recolor=(dynamic_recolor and not is_builtin))
 
         if self.pixel_art:
             self._fbo_pa_geom.use()
-            self.ctx.viewport = (0, 0, self.pixel_w, self.pixel_h)
-            self.ctx.clear(0.0, 0.0, 0.0, 0.0, depth=1.0)
         else:
-            self._fbo_draw.use()
-            self.ctx.viewport = (0, 0, self.width, self.height)
-            self.ctx.clear(0.0, 0.0, 0.0, 0.0, depth=1.0)
-            # Contorno fino elegante estilo Tree of Savior (inverted-hull delicado fora do rosto/olhos!)
-            self.ctx.enable(moderngl.CULL_FACE)
-            self.ctx.front_face = "cw"
-            self.prog["u_is_outline"].value = 1
-            self.prog["u_outline_extrude"].value = 0.0026 if camera_focus == "portrait" else 0.0034
-            for gp in self._sorted_prims:
-                mat = self.model.materials[gp.prim.material_index] if 0 <= gp.prim.material_index < len(self.model.materials) else None
-                if mat is None or mat.alpha_mode != "OPAQUE" or mat.role in ("face", "eye", "emissive"):
-                    continue
-                self._bind_skin(gp.prim.skin_index)
-                self.prog["u_has_tex"].value = 0
-                self.prog["u_alpha_mode"].value = 0
-                self.prog["u_mat_group"].value = _ROLE_GROUP_ID.get(mat.role, 3.0)
-                gp.vao.render(moderngl.TRIANGLES)
+            self._fbo_hd_geom.use()
+        self.ctx.viewport = (0, 0, rt_w, rt_h)
+        self.ctx.clear(0.0, 0.0, 0.0, 0.0, depth=1.0)
 
         self.ctx.enable(moderngl.DEPTH_TEST)
         self.ctx.front_face = "ccw"
@@ -652,20 +714,31 @@ class VrmRenderer:
                 self.prog["u_base_color"].value = mat.base_color
                 self.prog["u_shade_color"].value = mat.shade_color
                 self.prog["u_role_tint"].value = role_tints.get(mat.role, (1.0, 1.0, 1.0))
-                self.prog["u_alpha_mode"].value = alpha_code.get(mat.alpha_mode, 0)
-                self.prog["u_alpha_cutoff"].value = mat.alpha_cutoff
+                # Hair e camadas faciais usam alpha-test (MASK + depth_mask=True) para nunca vazar rosto atrás do cabelo!
+                effective_alpha_mode = mat.alpha_mode
+                effective_cutoff = mat.alpha_cutoff
+                if mat.role in ("face", "eye", "hair", "other") and mat.alpha_mode == "BLEND":
+                    effective_alpha_mode = "MASK"
+                    effective_cutoff = 0.22 if mat.role == "hair" else 0.18
+                self.prog["u_alpha_mode"].value = alpha_code.get(effective_alpha_mode, 0)
+                self.prog["u_alpha_cutoff"].value = effective_cutoff
                 self.prog["u_is_face"].value = 1 if mat.role == "face" else 0
                 self.prog["u_is_skin"].value = 1 if mat.role == "skin" else 0
                 self.prog["u_is_eye"].value = 1 if mat.role == "eye" else 0
                 self.prog["u_is_hair"].value = 1 if mat.role == "hair" else 0
                 self.prog["u_is_emissive"].value = 1 if mat.role == "emissive" else 0
                 self.prog["u_is_gold"].value = 1 if mat.role == "gold" else 0
-                self.prog["u_mat_group"].value = _ROLE_GROUP_ID.get(mat.role, 3.0)
                 if mat.double_sided:
                     self.ctx.disable(moderngl.CULL_FACE)
                 else:
                     self.ctx.enable(moderngl.CULL_FACE)
-                self.ctx.depth_mask = mat.alpha_mode != "BLEND"
+                if effective_alpha_mode == "BLEND":
+                    self.ctx.enable(moderngl.BLEND)
+                    self.ctx.depth_mask = False
+                else:
+                    # Desativa GL_BLEND em OPAQUE/MASK para nunca corromper o attachment MRT `f_meta` (normais/profundidade)!
+                    self.ctx.disable(moderngl.BLEND)
+                    self.ctx.depth_mask = True
             else:
                 self._white_tex.use(location=0)
                 self.prog["u_has_tex"].value = 0
@@ -679,7 +752,6 @@ class VrmRenderer:
                 self.prog["u_is_hair"].value = 0
                 self.prog["u_is_emissive"].value = 0
                 self.prog["u_is_gold"].value = 0
-                self.prog["u_mat_group"].value = 3.0
                 self.ctx.depth_mask = True
 
             gp.vao.render(moderngl.TRIANGLES)
@@ -687,16 +759,17 @@ class VrmRenderer:
         self.ctx.depth_mask = True
         self.ctx.disable(moderngl.CULL_FACE)
 
+        # Passo 2: Pós-processamento de traço nanquim (Comic Ink HD em 960×1200 ou Pixel-Art 1px)
+        self.ctx.disable(moderngl.DEPTH_TEST)
+        self.ctx.disable(moderngl.BLEND)
         if self.pixel_art:
             self._fbo_pa_out.use()
             self.ctx.viewport = (0, 0, self.pixel_w, self.pixel_h)
-            self.ctx.disable(moderngl.DEPTH_TEST)
-            self.ctx.disable(moderngl.BLEND)
             self.ctx.clear(0.0, 0.0, 0.0, 0.0)
             self._pa_color_tex.use(location=0)
             self._pa_meta_tex.use(location=1)
-            self._post_prog["u_ink_color"].value = (0.07, 0.04, 0.11)
-            self._quad_vao.render(moderngl.TRIANGLE_STRIP)
+            self._pixel_prog["u_ink_color"].value = (0.07, 0.04, 0.11)
+            self._quad_pixel_vao.render(moderngl.TRIANGLE_STRIP)
             self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
 
             raw = self._fbo_pa_out.read(components=4, alignment=1)
@@ -705,13 +778,24 @@ class VrmRenderer:
             qimg = QImage(flipped.data, self.pixel_w, self.pixel_h, self.pixel_w * 4, QImage.Format_RGBA8888).copy()
             return QPixmap.fromImage(qimg)
 
-        if self._fbo_draw is not self._fbo_resolve:
-            self.ctx.copy_framebuffer(self._fbo_resolve, self._fbo_draw)
+        self._fbo_hd_out.use()
+        self.ctx.viewport = (0, 0, self.ss_w, self.ss_h)
+        self.ctx.clear(0.0, 0.0, 0.0, 0.0)
+        self._hd_color_tex.use(location=0)
+        self._hd_meta_tex.use(location=1)
+        # Tinta nanquim café-ameixa profunda (assinatura Rapscallion × Dungeon Squad!)
+        self._comic_prog["u_ink_color"].value = (0.08, 0.03, 0.05)
+        # Contorno externo encorpado de ilustração 2D (nítido tanto no close-up quanto na praça 1080p!)
+        self._comic_prog["u_outer_radius"].value = 2.6 if camera_focus == "portrait" else 3.5
+        self._quad_comic_vao.render(moderngl.TRIANGLE_STRIP)
+        self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
 
-        raw = self._fbo_resolve.read(components=4, alignment=1)
-        arr = np.frombuffer(raw, dtype=np.uint8).reshape((self.height, self.width, 4))
+        raw = self._fbo_hd_out.read(components=4, alignment=1)
+        arr = np.frombuffer(raw, dtype=np.uint8).reshape((self.ss_h, self.ss_w, 4))
         flipped = np.ascontiguousarray(arr[::-1, :, :])
-        qimg = QImage(flipped.data, self.width, self.height, self.width * 4, QImage.Format_RGBA8888).copy()
+        qimg = QImage(flipped.data, self.ss_w, self.ss_h, self.ss_w * 4, QImage.Format_RGBA8888).copy()
+        if (self.ss_w, self.ss_h) != (self.width, self.height):
+            qimg = qimg.scaled(self.width, self.height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
         return QPixmap.fromImage(qimg)
 
     def _bind_skin(self, skin_idx: int) -> None:
