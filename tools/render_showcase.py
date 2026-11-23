@@ -269,13 +269,13 @@ def render_animated_gif(
     persona_id: str,
     scene_id: str,
     out_path: Path,
-    width: int = 800,
-    height: int = 450,
-    fps: int = 12,
+    width: int = 720,
+    height: int = 405,
+    fps: int = 20,
     render_style: str = "vrm_3d",
     vrm_name: str = "",
 ) -> Path:
-    """Renderiza GIF animado de 8s demonstrando caminhada 360°, subida de costas, aceno e dança giratória."""
+    """Renderiza GIF animado fluido em 20 FPS demonstrando caminhada 360°, cabelo esvoaçante, aceno e giro."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -292,7 +292,7 @@ def render_animated_gif(
         vrm_path=vrm_p,
     )
     canvas.avatar.vrm_dynamic_recolor = False
-    canvas.avatar.outfit = "starlight"
+    canvas.avatar.outfit = "base"
 
     canvas.circadian = compute_circadian(17.8)  # Golden hour cinematográfico na praça!
     canvas.weather = WeatherState(condition="clear", intensity=0.0, temperature_c=23.0, wind_speed=8.0)
@@ -339,8 +339,8 @@ def render_animated_gif(
             canvas.avatar.show_emote("sparkle", duration=2.0)
             canvas.scene.set_whisper("Giro 360° estilo Tree of Savior!", 1.0)
 
-        # Sub-steps de 25ms para física de mola ultra suave
-        sub = 3
+        # Sub-steps de 25ms para física de mola e cabelo ultra suaves
+        sub = 2
         for _ in range(sub):
             canvas.step_animation(dt / sub)
 

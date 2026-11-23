@@ -45,6 +45,11 @@ uniform mat4 u_view;
 uniform sampler2D u_bone_tex;
 uniform int u_has_skin;
 uniform float u_outline_extrude;
+uniform int u_hair_flow;
+uniform float u_head_y;
+uniform vec3 u_hair_sway;
+uniform float u_hair_flare;
+uniform float u_anim_time;
 
 out vec3 v_world_pos;
 out vec3 v_world_norm;
@@ -72,6 +77,21 @@ void main() {
     }
     vec4 local_p = skin_m * vec4(in_pos, 1.0);
     vec3 local_n = normalize(mat3(skin_m) * in_norm);
+
+    // Física secundária fluida em tempo real nos fios longos do cabelo (rastro ao andar, brisa e abertura no giro!)
+    if (u_hair_flow == 1) {
+        float drop = clamp((u_head_y - local_p.y) / 0.52, 0.0, 1.0);
+        float flex = drop * drop;
+        float wave = sin(u_anim_time * 3.4 - drop * 4.5 + local_p.x * 7.5);
+        float wave2 = cos(u_anim_time * 2.3 - drop * 3.2 + local_p.z * 6.5);
+        vec2 rad = local_p.xz;
+        float rlen = max(length(rad), 0.001);
+        vec2 rdir = rad / rlen;
+        local_p.x += (u_hair_sway.x + wave * 0.025 + rdir.x * u_hair_flare) * flex;
+        local_p.z += (u_hair_sway.z + wave2 * 0.018 + rdir.y * u_hair_flare) * flex;
+        local_p.y += (u_hair_sway.y + abs(u_hair_flare) * 0.25) * flex;
+    }
+
     if (u_outline_extrude > 0.0) {
         local_p.xyz += local_n * u_outline_extrude;
     }
@@ -168,57 +188,56 @@ void main() {
         float fr = pow(1.0 - max(dot(N, V), 0.0), 2.8);
         col += u_rim_color * ((fr > 0.48 && u_is_face == 0) ? 1.0 : 0.0) * u_rim_strength * 0.42;
     } else {
-        // ── Shader Comic / Ilustração 2D (Rapscallion × Dungeon Squad × Tree of Savior!) ──
-        // Transição de cel-shading NÍTIDA e quente (zero gradiente plástico 3D de boneca!)
+        // ── Shader Aquarela / Guache 2D estilo Tree of Savior (ZERO plástico especular 3D!) ──
+        // Segredo do ToS: iluminação plana de ilustração (quase 2D!), sombras quentes pastel aquareladas,
+        // ZERO brilho plástico Phong na pele, textura sutil de papel/pincel e luz de borda delicada!
+        float paper = fract(sin(dot(floor(gl_FragCoord.xy * 0.5), vec2(12.9898, 78.233))) * 43758.5453);
+        float grain = (paper - 0.5) * 0.022;
+
         if (u_is_face == 1) {
-            // Rosto luminoso com corte suave apenas na sombra lateral/queixo (preserva 100% dos olhos e expressão!)
-            float f_band = smoothstep(-0.28, -0.06, ndotl);
-            vec3 face_shd = albedo * mix(u_shade_color, vec3(0.84, 0.58, 0.56), 0.50) * (u_ambient_color * 0.72 + vec3(0.26));
-            vec3 face_lit = albedo * (u_light_color * 0.92 + u_ambient_color * 0.14);
-            col = mix(face_shd, face_lit, f_band * 0.52 + 0.48);
-            // Borda iluminada quente na silhueta do rosto
-            float fr_f = smoothstep(0.62, 0.78, 1.0 - max(dot(N, V), 0.0));
-            col += u_rim_color * fr_f * u_rim_strength * 0.22;
+            // Rosto 92% plano estilo ilustração 2D ToS (elimina manchas/sombras 3D feias no nariz e bochechas!)
+            float f_band = smoothstep(-0.36, 0.10, ndotl);
+            vec3 face_shd = albedo * mix(u_shade_color, vec3(0.92, 0.78, 0.76), 0.65);
+            vec3 face_lit = albedo * mix(vec3(1.0), u_light_color, 0.35);
+            col = mix(face_shd, face_lit, 0.76 + 0.24 * f_band) + grain * 0.4;
         } else if (u_is_skin == 1) {
-            // Cel-shading gráfico de pele (corte marcado estilo Rapscallion + borda coral subsurface + gloss recortado!)
-            float band1 = smoothstep(-0.04, 0.05, ndotl);
-            float band2 = smoothstep(-0.42, -0.28, ndotl);
-            float sss_edge = exp(-pow((ndotl - 0.005) / 0.085, 2.0));
-            vec3 sk_lit = albedo * (u_light_color * 0.95 + u_ambient_color * 0.12);
-            vec3 sk_mid = albedo * mix(u_shade_color, vec3(0.76, 0.46, 0.44), 0.52) * (u_ambient_color * 0.68 + vec3(0.26));
-            vec3 sk_deep = albedo * mix(u_shade_color, vec3(0.56, 0.32, 0.36), 0.58) * (u_ambient_color * 0.56 + vec3(0.20));
-            col = mix(mix(sk_deep, sk_mid, band2), sk_lit, band1);
-            // Faixa quente coral-pêssego exatamente na linha do terminador (assinatura Rapscallion!)
-            col += vec3(0.18, 0.05, 0.03) * sss_edge * albedo;
-            // Brilho especular gráfico recortado (highlight pintado no busto, ombros e coxas!)
-            float spec_raw = pow(max(dot(N, H), 0.0), 26.0);
-            float spec_cut = smoothstep(0.58, 0.68, spec_raw);
-            col += mix(vec3(1.0, 0.96, 0.90), u_light_color, 0.30) * spec_cut * 0.19;
-            // Rim-light em degrau gráfico nítido
-            float fr_s = smoothstep(0.56, 0.68, 1.0 - max(dot(N, V), 0.0));
-            col += u_rim_color * fr_s * u_rim_strength * 0.36;
+            // Pele aveludada fosca estilo aquarela Tree of Savior (ZERO brilho plástico branco 3D!)
+            float band = smoothstep(-0.18, 0.16, ndotl);
+            float warm_term = exp(-pow((ndotl + 0.03) / 0.16, 2.0));
+            vec3 sk_lit = albedo * mix(vec3(1.04), u_light_color * 1.02, 0.34);
+            vec3 sk_shd = albedo * mix(u_shade_color, vec3(0.86, 0.62, 0.58), 0.56) * mix(vec3(0.88), u_ambient_color, 0.38);
+            col = mix(sk_shd, sk_lit, 0.12 + 0.88 * band);
+            // Leve calor pêssego-aquarela na borda da sombra
+            col += vec3(0.075, 0.022, 0.014) * warm_term * albedo;
+            // Gradiente suave de pintura aquarela vindo do céu (técnica clássica 2D ToS!)
+            col *= (0.93 + 0.09 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0));
+            // Luz de recorte suave apenas na silhueta externa
+            float fr_s = smoothstep(0.70, 0.86, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_s * u_rim_strength * 0.18 + grain;
         } else if (u_is_hair == 1) {
-            // Cabelo com sombreamento gráfico em 2.5 bandas + faixa de brilho recortada estilo anime/HQ!
-            float h_band1 = smoothstep(-0.06, 0.04, ndotl);
-            float h_band2 = smoothstep(-0.44, -0.30, ndotl);
-            vec3 h_lit = albedo * (u_light_color * 0.96 + u_ambient_color * 0.12);
-            vec3 h_mid = albedo * mix(u_shade_color, vec3(1.0), 0.38) * (u_ambient_color * 0.70 + vec3(0.22));
-            vec3 h_shd = albedo * u_shade_color * (u_ambient_color * 0.56 + vec3(0.16));
-            col = mix(mix(h_shd, h_mid, h_band2), h_lit, h_band1);
-            vec3 H_aniso = normalize(vec3(H.x * 0.52, H.y * 1.55, H.z));
-            float gloss = smoothstep(0.70, 0.78, pow(max(dot(N, H_aniso), 0.0), 18.0));
-            col += mix(vec3(1.0, 0.98, 0.92), u_light_color, 0.22) * gloss * 0.32;
-            float fr_h = smoothstep(0.58, 0.70, 1.0 - max(dot(N, V), 0.0));
-            col += u_rim_color * fr_h * u_rim_strength * 0.44;
+            // Cabelo guache/aquarela estilo ToS: 2 bandas macias + faixa de brilho pintada delicada (não metálica!)
+            float h_band = smoothstep(-0.12, 0.10, ndotl);
+            vec3 h_lit = albedo * mix(vec3(1.0), u_light_color, 0.35);
+            vec3 h_shd = albedo * mix(u_shade_color, vec3(0.76, 0.60, 0.42), 0.35) * mix(vec3(0.82), u_ambient_color, 0.40);
+            col = mix(h_shd, h_lit, h_band);
+            // Faixa de brilho suave horizontal (angel-ring aquarelado)
+            vec3 H_aniso = normalize(vec3(H.x * 0.45, H.y * 1.60, H.z));
+            float gloss = smoothstep(0.76, 0.88, pow(max(dot(N, H_aniso), 0.0), 14.0));
+            col += vec3(0.18, 0.16, 0.10) * gloss;
+            float fr_h = smoothstep(0.66, 0.82, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_h * u_rim_strength * 0.24 + grain;
         } else {
-            float c_band = smoothstep(-0.04, 0.05, ndotl);
-            vec3 c_lit = albedo * (u_light_color * 0.94 + u_ambient_color * 0.12);
-            vec3 c_shd = albedo * u_shade_color * (u_ambient_color * 0.58 + vec3(0.20));
+            // Tecidos e lingerie foscos estilo ilustração 2D (sem brilho plástico!)
+            float c_band = smoothstep(-0.10, 0.10, ndotl);
+            vec3 c_lit = albedo * mix(vec3(1.0), u_light_color, 0.38);
+            vec3 c_shd = albedo * mix(u_shade_color, vec3(0.68, 0.58, 0.66), 0.45) * mix(vec3(0.80), u_ambient_color, 0.40);
             col = mix(c_shd, c_lit, c_band);
-            float sp = smoothstep(0.55, 0.66, pow(max(dot(N, H), 0.0), (u_is_gold == 1) ? 14.0 : 24.0));
-            col += mix(vec3(1.0, 0.95, 0.84), u_light_color, 0.30) * sp * ((u_is_gold == 1) ? 0.44 : 0.16);
-            float fr_c = smoothstep(0.58, 0.70, 1.0 - max(dot(N, V), 0.0));
-            col += u_rim_color * fr_c * u_rim_strength * 0.40;
+            if (u_is_gold == 1) {
+                float sp = smoothstep(0.60, 0.74, pow(max(dot(N, H), 0.0), 16.0));
+                col += vec3(0.32, 0.28, 0.18) * sp;
+            }
+            float fr_c = smoothstep(0.68, 0.84, 1.0 - max(dot(N, V), 0.0));
+            col += u_rim_color * fr_c * u_rim_strength * 0.22 + grain;
         }
     }
 
@@ -327,11 +346,11 @@ void main() {
         if (dd1 > 0.028) {
             depth_edge = max(depth_edge, smoothstep(0.028, 0.072, dd1));
         }
-        // Dobras de superfície (normais mudando bruscamente -> sulco do busto, clavícula, coxas, orelha!)
+        // Dobras de superfície (somente dobras realmente nítidas — mantém pele limpa estilo aquarela 2D ToS!)
         if (!is_face) {
             float dn = length(n_center - m1.xy);
-            if (dn > 0.36) {
-                norm_edge = max(norm_edge, smoothstep(0.36, 0.78, dn) * 0.78);
+            if (dn > 0.46) {
+                norm_edge = max(norm_edge, smoothstep(0.46, 0.86, dn) * 0.58);
             }
         }
 
@@ -639,17 +658,18 @@ class VrmRenderer:
 
         if camera_focus == "portrait":
             target_y = min_y + h * 0.77
-            eye = np.array([0.0, target_y + h * 0.02, h * 0.96], dtype=np.float32)
+            eye = np.array([0.0, target_y + h * 0.015, h * 1.68], dtype=np.float32)
             target = np.array([0.0, target_y, 0.0], dtype=np.float32)
         else:
+            # Câmera teleobjetiva quase ortográfica estilo Tree of Savior (FOV 15.5° — elimina distorção 3D!)
             center_y = min_y + h * 0.50
-            dist = h * 2.55
-            eye = np.array([0.0, center_y + h * 0.22, dist], dtype=np.float32)
+            dist = h * 4.45
+            eye = np.array([0.0, center_y + h * 0.36, dist], dtype=np.float32)
             target = np.array([0.0, center_y - h * 0.01, 0.0], dtype=np.float32)
 
         rt_w = self.pixel_w if self.pixel_art else self.ss_w
         rt_h = self.pixel_h if self.pixel_art else self.ss_h
-        proj = _perspective(27.0, rt_w / max(float(rt_h), 1.0), 0.1, 20.0)
+        proj = _perspective(15.5, rt_w / max(float(rt_h), 1.0), 0.2, 30.0)
         view = _look_at(eye, target, np.array([0.0, 1.0, 0.0], dtype=np.float32))
         model_m = np.eye(4, dtype=np.float32)
         mvp = proj @ view @ model_m
@@ -662,6 +682,19 @@ class VrmRenderer:
         self.prog["u_model"].write(np.ascontiguousarray(model_m.T, dtype=np.float32).tobytes())
         self.prog["u_view"].write(np.ascontiguousarray(view.T, dtype=np.float32).tobytes())
         self.prog["u_cam_pos"].value = (float(eye[0]), float(eye[1]), float(eye[2]))
+
+        # Parâmetros de física fluida de cabelo no vertex shader (inércia de passo, brisa, bounce e abertura no giro!)
+        head_ni = self.model.humanoid_bones.get("head", -1)
+        head_world_y = float(animator.world_matrices[head_ni][1, 3]) if 0 <= head_ni < len(animator.world_matrices) else (min_y + h * 0.82)
+        self.prog["u_head_y"].value = head_world_y
+        self.prog["u_anim_time"].value = float(animator.time)
+        self.prog["u_hair_sway"].value = (
+            float(animator.hair_trail_x),
+            float(animator.hair_bounce_y),
+            float(animator.hair_trail_z),
+        )
+        self.prog["u_hair_flare"].value = float(animator.hair_flare)
+        self.prog["u_hair_flow"].value = 0
 
         lx = (sun_x_norm - 0.5) * 1.1 + 0.42
         l_dir = np.array([lx, 0.72, 0.85], dtype=np.float32)
@@ -726,6 +759,7 @@ class VrmRenderer:
                 self.prog["u_is_skin"].value = 1 if mat.role == "skin" else 0
                 self.prog["u_is_eye"].value = 1 if mat.role == "eye" else 0
                 self.prog["u_is_hair"].value = 1 if mat.role == "hair" else 0
+                self.prog["u_hair_flow"].value = 1 if (mat.role == "hair" and "hairback" not in mat.name.lower()) else 0
                 self.prog["u_is_emissive"].value = 1 if mat.role == "emissive" else 0
                 self.prog["u_is_gold"].value = 1 if mat.role == "gold" else 0
                 if mat.double_sided:
@@ -750,6 +784,7 @@ class VrmRenderer:
                 self.prog["u_is_skin"].value = 0
                 self.prog["u_is_eye"].value = 0
                 self.prog["u_is_hair"].value = 0
+                self.prog["u_hair_flow"].value = 0
                 self.prog["u_is_emissive"].value = 0
                 self.prog["u_is_gold"].value = 0
                 self.ctx.depth_mask = True
@@ -783,10 +818,9 @@ class VrmRenderer:
         self.ctx.clear(0.0, 0.0, 0.0, 0.0)
         self._hd_color_tex.use(location=0)
         self._hd_meta_tex.use(location=1)
-        # Tinta nanquim café-ameixa profunda (assinatura Rapscallion × Dungeon Squad!)
-        self._comic_prog["u_ink_color"].value = (0.08, 0.03, 0.05)
-        # Contorno externo encorpado de ilustração 2D (nítido tanto no close-up quanto na praça 1080p!)
-        self._comic_prog["u_outer_radius"].value = 2.6 if camera_focus == "portrait" else 3.5
+        # Tinta sépia-café quente estilo aquarela Tree of Savior (muito mais orgânica e 2D que preto chapado!)
+        self._comic_prog["u_ink_color"].value = (0.16, 0.08, 0.09)
+        self._comic_prog["u_outer_radius"].value = 2.4 if camera_focus == "portrait" else 3.2
         self._quad_comic_vao.render(moderngl.TRIANGLE_STRIP)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
 

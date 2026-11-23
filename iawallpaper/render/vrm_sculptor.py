@@ -60,8 +60,8 @@ GIRL_ARCHETYPES: dict[str, GirlArchetype] = {
     "elfa_loira": GirlArchetype(
         id="elfa_loira",
         label="Lyra — Elfa Loira",
-        skin_rgb=(234, 170, 132),
-        skin_shade=(0.72, 0.42, 0.36),
+        skin_rgb=(238, 178, 142),
+        skin_shade=(0.80, 0.52, 0.46),
         blush_rgb=(228, 76, 66),
         blush_strength=0.72,
         lip_rgb=(218, 96, 88),
@@ -75,14 +75,14 @@ GIRL_ARCHETYPES: dict[str, GirlArchetype] = {
         elf_ears=True,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.26,
-        bust_boost=2.12,
-        waist_pinch=0.80,
-        hip_boost=1.56,
-        thigh_boost=1.58,
-        calf_boost=1.26,
-        arm_boost=1.14,
-        leg_compact=0.73,
+        head_scale=1.28,
+        bust_boost=1.98,
+        waist_pinch=0.81,
+        hip_boost=1.48,
+        thigh_boost=1.46,
+        calf_boost=1.22,
+        arm_boost=1.12,
+        leg_compact=0.74,
         torso_compact=0.89,
     ),
     "humana_ruiva": GirlArchetype(
@@ -214,8 +214,8 @@ def _paint_face_texture(orig: np.ndarray, arch: GirlArchetype) -> np.ndarray:
     blush_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     bd = ImageDraw.Draw(blush_layer)
     br, bg, bb = arch.blush_rgb
-    a_cheek = int(135 * arch.blush_strength)
-    a_nose = int(85 * arch.blush_strength)
+    a_cheek = int(125 * arch.blush_strength)
+    a_nose = int(34 * arch.blush_strength)
     for cx_r in (0.33, 0.67):
         cx = int(w * cx_r)
         cy = int(h * 0.635)
@@ -289,21 +289,14 @@ def _paint_victoria_body_base_texture(orig: np.ndarray, arch: GirlArchetype) -> 
         base[is_panties, 1] = np.clip(ug * p_sh[is_panties], 0, 255).astype(np.uint8)
         base[is_panties, 2] = np.clip(ub * p_sh[is_panties], 0, 255).astype(np.uint8)
 
-    # Pinta traço nanquim sutil de HQ nas clavículas, sulco do busto e umbigo (assinatura Rapscallion!)
+    # Pinta traço sépia-aquarela orgânico nas clavículas, decote e umbigo (assinatura Tree of Savior × Rapscallion!)
     img = Image.fromarray(base, mode="RGBA")
-    d = ImageDraw.Draw(img)
     cx = w // 2
-    ink = (42, 18, 22, 255)
-    soft_ink = (max(0, arch.skin_rgb[0] - 88), max(0, arch.skin_rgb[1] - 92), max(0, arch.skin_rgb[2] - 82), 210)
-    # Clavículas estilizadas em HQ
-    d.line([(cx - int(w * 0.088), int(h * 0.125)), (cx - int(w * 0.016), int(h * 0.136))], fill=soft_ink, width=4)
-    d.line([(cx + int(w * 0.088), int(h * 0.125)), (cx + int(w * 0.016), int(h * 0.136))], fill=soft_ink, width=4)
-    # Sulco central expressivo do decote (cleavage line estilo Rapscallion!)
-    d.line([(cx, int(h * 0.215)), (cx, int(h * 0.282))], fill=ink, width=5)
-    # Umbigo desenhado com traço delicado de HQ
-    d.arc([cx - 8, int(h * 0.398), cx + 8, int(h * 0.418)], start=20, end=160, fill=soft_ink, width=4)
+    ink = (88, 46, 42, 228)
+    soft_ink = (max(0, arch.skin_rgb[0] - 72), max(0, arch.skin_rgb[1] - 78), max(0, arch.skin_rgb[2] - 72), 185)
 
-    # Sutiã tomara-que-caia simples com contorno nanquim nítido de ilustração 2D!
+    # Sutiã tomara-que-caia base (pintura limpa em aquarela com renda creme!)
+    d = ImageDraw.Draw(img)
     band_y0 = int(h * 0.268)
     band_y1 = int(h * 0.308)
     d.rectangle([int(w * 0.238), band_y0, int(w * 0.762), band_y1], fill=(ur, ug, ub, 255))
@@ -312,12 +305,23 @@ def _paint_victoria_body_base_texture(orig: np.ndarray, arch: GirlArchetype) -> 
         by = int(h * 0.255)
         d.ellipse([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], fill=(ur, ug, ub, 255))
         d.arc([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], start=185, end=355, fill=(tr, tg, tb, 255), width=7)
-        d.arc([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], start=192, end=348, fill=ink, width=3)
-        # Linha inferior de sombra/nanquim sob cada seio
-        d.arc([bx - int(w * 0.066), by - int(h * 0.036), bx + int(w * 0.066), by + int(h * 0.058)], start=25, end=155, fill=ink, width=4)
-    d.line([(int(w * 0.238), band_y1), (int(w * 0.762), band_y1)], fill=ink, width=4)
-    # Contorno nanquim sutil no cós da calcinha
-    d.line([(int(w * 0.24), int(h * 0.482)), (int(w * 0.76), int(h * 0.482))], fill=ink, width=4)
+
+    # Camada de traço sépia macio (suavizada com GaussianBlur 1px para fundir como tinta aquarela 2D!)
+    ink_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    idraw = ImageDraw.Draw(ink_layer)
+    idraw.line([(cx - int(w * 0.088), int(h * 0.125)), (cx - int(w * 0.016), int(h * 0.136))], fill=soft_ink, width=4)
+    idraw.line([(cx + int(w * 0.088), int(h * 0.125)), (cx + int(w * 0.016), int(h * 0.136))], fill=soft_ink, width=4)
+    idraw.line([(cx, int(h * 0.218)), (cx, int(h * 0.280))], fill=ink, width=4)
+    idraw.arc([cx - 8, int(h * 0.398), cx + 8, int(h * 0.418)], start=20, end=160, fill=soft_ink, width=4)
+    for sign in (-1, 1):
+        bx = cx + sign * int(w * 0.068)
+        by = int(h * 0.255)
+        idraw.arc([bx - int(w * 0.069), by - int(h * 0.044), bx + int(w * 0.069), by + int(h * 0.056)], start=192, end=348, fill=ink, width=3)
+        idraw.arc([bx - int(w * 0.066), by - int(h * 0.036), bx + int(w * 0.066), by + int(h * 0.058)], start=25, end=155, fill=ink, width=3)
+    idraw.line([(int(w * 0.238), band_y1), (int(w * 0.762), band_y1)], fill=ink, width=3)
+    idraw.line([(int(w * 0.24), int(h * 0.482)), (int(w * 0.76), int(h * 0.482))], fill=ink, width=3)
+    ink_layer = ink_layer.filter(ImageFilter.GaussianBlur(radius=1.0))
+    img = Image.alpha_composite(img, ink_layer)
 
     return np.array(img, dtype=np.uint8)
 
@@ -607,13 +611,14 @@ def _sculpt_body_vertices(model: VrmModel, arch: GirlArchetype) -> None:
         p[:, 0] *= (1.0 - (1.0 - arch.waist_pinch) * waist_w)
         p[:, 2] *= (1.0 - (1.0 - arch.waist_pinch) * 0.55 * waist_w)
 
-        # 3. Quadris amplos, glúteos redondos suaves e coxas grossas com afinamento natural no joelho (ref 96078865!)
+        # 3. Quadris amplos, glúteos redondos suaves e coxas curvilíneas com transição ultra-orgânica até o joelho!
         y_calf = h_ref * 0.24
-        y_knee = h_ref * 0.39
-        knee_taper = np.clip((y - y_knee) / 0.14, 0.0, 1.0)  # afina suavemente chegando no joelho para dobrar limpo!
-        hip_w = np.exp(-((y - (y_hips - 0.01)) / 0.155) ** 2)
-        thigh_w = np.exp(-((y - (y_thigh + 0.01)) / 0.155) ** 2) * (0.25 + 0.75 * knee_taper)
-        calf_w = np.exp(-((y - y_calf) / 0.130) ** 2) * np.clip((y - 0.09) / 0.09, 0.0, 1.0)
+        y_knee = h_ref * 0.36
+        knee_taper = np.clip((y - y_knee) / 0.19, 0.0, 1.0)
+        knee_taper = knee_taper * knee_taper * (3.0 - 2.0 * knee_taper)  # smoothstep C1 -> ZERO quina em perfil!
+        hip_w = np.exp(-((y - (y_hips - 0.01)) / 0.165) ** 2)
+        thigh_w = np.exp(-((y - (y_thigh + 0.01)) / 0.185) ** 2) * (0.28 + 0.72 * knee_taper)
+        calf_w = np.exp(-((y - y_calf) / 0.135) ** 2) * np.clip((y - 0.09) / 0.09, 0.0, 1.0)
 
         hip_x_gain = (arch.hip_boost - 1.0) * 0.68 * hip_w
         thigh_x_gain = (arch.thigh_boost - 1.0) * 0.60 * thigh_w
@@ -741,6 +746,8 @@ def build_sculpted_vrm_girl(
             )
             model.primitives.append(ear_prim)
 
-    # 6. Proporções estilizadas Tree of Savior (~5.2 cabeças)
+    # 6. Proporções estilizadas Tree of Savior (~4.3 cabeças) e suavização do morph 'happy' p/ manter olhos grandes abertos!
+    if "happy" in model.expressions:
+        model.expressions["happy"] = [(mi, mo, bw * 0.62) for (mi, mo, bw) in model.expressions["happy"]]
     _apply_tos_proportions(model, arch)
     return model

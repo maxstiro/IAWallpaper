@@ -137,11 +137,20 @@ class VrmAnimator:
         # Expressões faciais suavizadas (0..1)
         self.expr_weights: dict[str, float] = {}
 
-        # Estado de física secundária (oscilação suave para SpringBones de cabelo/roupas)
+        # Estado de física secundária (oscilação suave para SpringBones + vertex shader de cabelo fluido!)
         self._spring_sway_x: float = 0.0
         self._spring_sway_z: float = 0.0
         self._spring_vel_x: float = 0.0
         self._spring_vel_z: float = 0.0
+        self.hair_trail_x: float = 0.0
+        self.hair_trail_z: float = 0.0
+        self.hair_bounce_y: float = 0.0
+        self.hair_flare: float = 0.0
+        self._hair_vel_x: float = 0.0
+        self._hair_vel_z: float = 0.0
+        self._hair_vel_y: float = 0.0
+        self._prev_hips_y: float = 0.0
+        self._yaw_vel: float = 0.0
 
         # Ordem topológica (pai sempre antes de filho) para FK em passagem única
         self._topo_order: list[int] = self._build_topo_order()
@@ -233,68 +242,94 @@ class VrmAnimator:
             return e, hips_off
 
         if action == "walk":
+            # Caminhada ultra-fluida estilo Tree of Savior + desfile elegante (ref 96078865):
+            # Ação sobreposta (overlapping action) em cascata: quadril -> coluna -> peito -> cabeça -> braço -> antebraço -> pulso!
             ph = self.walk_phase
-            s = math.sin(ph)
-            c = math.cos(ph)
+            # Pequena assimetria rítmica (impulso firme + passagem aérea graciosa)
+            ph_e = ph + 0.12 * math.sin(ph)
+            s0 = math.sin(ph_e)
+            c0 = math.cos(ph_e)
+            s_spine = math.sin(ph_e - 0.34)
+            s_chest = math.sin(ph_e - 0.66)
+            s_head = math.sin(ph_e - 0.96)
+            s_arm = math.sin(ph_e - 0.24)
+            s_fore = math.sin(ph_e - 0.78)
+            s_hand = math.sin(ph_e - 1.28)
+            step_bob = abs(math.cos(ph_e - 0.18))
+            chest_bob = abs(math.cos(ph_e - 0.56))
+            bank = clamp(self._yaw_vel * 0.032, -6.5, 6.5)
 
-            # Caminhada confiante estilo ref 96078865 (desfile elegante): tronco erguido, rebolado suave,
-            # passos graciosos e braços relaxados ao lado do corpo com leve dobra natural nos cotovelos!
-            hips_off = (s * 0.020, abs(c) * 0.032 - 0.016, 0.0)
-            e["hips"] = (4.5, s * 11.5, -s * 6.5)
-            e["spine"] = (-5.0, -s * 7.5, s * 4.0)
-            e["chest"] = (-3.5 + abs(c) * 2.2, -s * 5.0, s * 2.0)
-            e["upperChest"] = (abs(c) * 1.8 - 0.8, 0.0, 0.0)
-            e["neck"] = (3.0, s * 2.5, -s * 1.5)
-            e["head"] = (-1.5, s * 3.5 + look_x * 12.0, -s * 2.0)
+            hips_off = (s0 * 0.022, step_bob * 0.034 - 0.017, 0.0)
+            e["hips"] = (4.2 + step_bob * 1.4, s0 * 12.0, -s0 * 6.8 + bank * 0.45)
+            e["spine"] = (-4.8 + chest_bob * 1.2, -s_spine * 8.0, s_spine * 4.4 + bank * 0.55)
+            e["chest"] = (-3.4 + chest_bob * 2.4, -s_chest * 5.2, s_chest * 2.4 + bank * 0.35)
+            e["upperChest"] = (chest_bob * 2.0 - 0.8, 0.0, 0.0)
+            e["neck"] = (2.6, s_head * 2.8, -s_head * 1.6 - bank * 0.35)
+            e["head"] = (-1.6 + chest_bob * 1.4, s_head * 4.0 + look_x * 12.0, -s_head * 2.4 - bank * 0.4)
 
-            e["leftUpperLeg"] = (-s * 29.0 - 2.0, 2.5, 2.5)
-            e["leftLowerLeg"] = (max(0.0, -c) * 42.0 + 6.0, 0.0, 0.0)
-            e["leftFoot"] = (-max(0.0, s) * 10.0 + max(0.0, -c) * 16.0, 0.0, 0.0)
+            # Passada fluida com absorção macia de joelho no contato e rolamento natural de tornozelo!
+            l_swing = max(0.0, -math.cos(ph_e - 0.10))
+            r_swing = max(0.0, math.cos(ph_e - 0.10))
+            l_cushion = max(0.0, math.sin(ph_e + 0.35)) * 7.5
+            r_cushion = max(0.0, -math.sin(ph_e + 0.35)) * 7.5
 
-            e["rightUpperLeg"] = (s * 29.0 - 2.0, -2.5, -2.5)
-            e["rightLowerLeg"] = (max(0.0, c) * 42.0 + 6.0, 0.0, 0.0)
-            e["rightFoot"] = (-max(0.0, -s) * 10.0 + max(0.0, c) * 16.0, 0.0, 0.0)
+            e["leftUpperLeg"] = (-s0 * 30.0 - 2.5, 2.5, 2.5)
+            e["leftLowerLeg"] = (l_swing * 44.0 + l_cushion + 5.5, 0.0, 0.0)
+            e["leftFoot"] = (-max(0.0, s0) * 11.0 + l_swing * 18.0 - l_cushion * 0.4, 0.0, 0.0)
 
-            # Braços balançando soltos e femininos ao lado do corpo (cotovelos levemente flexionados ~16°-28°!)
-            e["leftShoulder"] = (0.0, 0.0, -4.0)
-            e["leftUpperArm"] = (4.0, s * 18.0 - 3.0, -68.0)
-            e["leftLowerArm"] = (0.0, -14.0 - max(0.0, -s) * 16.0, -4.0)
-            e["leftHand"] = (0.0, 0.0, 8.0)
-            e["rightShoulder"] = (0.0, 0.0, 4.0)
-            e["rightUpperArm"] = (4.0, s * 18.0 + 3.0, 68.0)
-            e["rightLowerArm"] = (0.0, 14.0 + max(0.0, s) * 16.0, 4.0)
-            e["rightHand"] = (0.0, 0.0, -8.0)
+            e["rightUpperLeg"] = (s0 * 30.0 - 2.5, -2.5, -2.5)
+            e["rightLowerLeg"] = (r_swing * 44.0 + r_cushion + 5.5, 0.0, 0.0)
+            e["rightFoot"] = (-max(0.0, -s0) * 11.0 + r_swing * 18.0 - r_cushion * 0.4, 0.0, 0.0)
+
+            # Braços com follow-through sedoso (cotovelo e punho acompanham atrasados como desenho 2D!)
+            e["leftShoulder"] = (0.0, -s_chest * 2.5, -4.0 + chest_bob * 1.6)
+            e["leftUpperArm"] = (4.5, s_arm * 20.0 - 3.0, -68.0 + chest_bob * 2.0)
+            e["leftLowerArm"] = (0.0, -15.0 - max(0.0, -s_fore) * 19.0 - max(0.0, s_fore) * 4.0, -4.0 + s_fore * 3.0)
+            e["leftHand"] = (s_hand * 5.0, 0.0, 8.0 + s_hand * 9.0)
+            e["rightShoulder"] = (0.0, -s_chest * 2.5, 4.0 - chest_bob * 1.6)
+            e["rightUpperArm"] = (4.5, s_arm * 20.0 + 3.0, 68.0 - chest_bob * 2.0)
+            e["rightLowerArm"] = (0.0, 15.0 + max(0.0, s_fore) * 19.0 + max(0.0, -s_fore) * 4.0, 4.0 + s_fore * 3.0)
+            e["rightHand"] = (-s_hand * 5.0, 0.0, -8.0 + s_hand * 9.0)
         elif action == "wave":
-            w = math.sin(t * 8.0)
-            sway = math.sin(t * 2.4)
-            hips_off = (sway * 0.014, breath * 0.005, 0.0)
-            e["hips"] = (0.0, sway * 4.0, -sway * 3.0)
-            e["spine"] = (-3.0, -sway * 3.0, sway * 3.0)
-            e["chest"] = (-2.0, -5.0, 2.0)
-            e["head"] = (-2.0 + look_y * 6.0, look_x * 14.0 + w * 4.0, 6.0 + w * 3.5)
-            # Braço esquerdo relaxado (segura cajado/espada) + braço direito erguido ao lado acenando alegremente!
-            e["leftUpperArm"] = (8.0, -10.0, -64.0)
-            e["leftLowerArm"] = (0.0, -28.0, -8.0)
-            e["rightShoulder"] = (0.0, 0.0, -10.0)
-            e["rightUpperArm"] = (-8.0, 26.0, -22.0 + w * 9.0)
-            e["rightLowerArm"] = (0.0, 14.0, -52.0 + w * 22.0)
-            e["rightHand"] = (0.0, 0.0, w * 12.0)
+            # Aceno alegre em cascata (ombro -> braço -> antebraço -> pulso com atraso orgânico!)
+            w0 = math.sin(t * 6.8)
+            w1 = math.sin(t * 6.8 - 0.65)
+            w2 = math.sin(t * 6.8 - 1.25)
+            sway0 = math.sin(t * 1.8)
+            sway1 = math.sin(t * 1.8 - 0.55)
+            hips_off = (sway0 * 0.016, breath * 0.006, 0.0)
+            e["hips"] = (2.0, 12.0 + sway0 * 4.5, -4.0 - sway0 * 3.0)
+            e["spine"] = (-3.5, -7.0 - sway1 * 3.5, 3.0 + sway1 * 3.0)
+            e["chest"] = (-2.5 + breath * 1.8, -5.0 + w0 * 1.5, 2.0)
+            e["head"] = (-2.0 + look_y * 6.0, look_x * 14.0 - 4.0 + w1 * 3.8, 6.0 + w1 * 4.0)
+            e["leftUpperArm"] = (8.0, -12.0 - sway1 * 3.0, -64.0)
+            e["leftLowerArm"] = (0.0, -28.0 + sway1 * 4.0, -8.0)
+            e["leftHand"] = (0.0, 0.0, 10.0 + sway1 * 5.0)
+            e["rightShoulder"] = (0.0, 0.0, -10.0 + w0 * 2.0)
+            e["rightUpperArm"] = (-8.0, 26.0, -22.0 + w0 * 10.0)
+            e["rightLowerArm"] = (0.0, 14.0, -52.0 + w1 * 24.0)
+            e["rightHand"] = (w2 * 6.0, 0.0, w2 * 18.0)
         elif action in ("dance", "music_sway"):
-            beat = math.sin(t * 5.2)
-            half = math.sin(t * 2.6)
-            hips_off = (half * 0.028, abs(beat) * 0.032 - 0.01, 0.0)
-            e["hips"] = (2.0, half * 14.0, -half * 5.0)
-            e["spine"] = (-3.0, -half * 10.0, half * 5.5)
-            e["chest"] = (-3.0, -beat * 8.0, -half * 3.0)
-            e["head"] = (-4.0 + beat * 4.0, half * 10.0, beat * 6.5)
-            e["leftUpperArm"] = (-10.0, -22.0 + beat * 16.0, -26.0 - abs(beat) * 20.0)
-            e["leftLowerArm"] = (0.0, -34.0 - beat * 18.0, 14.0)
-            e["rightUpperArm"] = (-10.0, 22.0 + beat * 16.0, 26.0 + abs(beat) * 20.0)
-            e["rightLowerArm"] = (0.0, 34.0 - beat * 18.0, -14.0)
-            e["leftUpperLeg"] = (-10.0 - beat * 8.0, 0.0, 4.0)
-            e["leftLowerLeg"] = (16.0 + abs(beat) * 14.0, 0.0, 0.0)
-            e["rightUpperLeg"] = (-10.0 + beat * 8.0, 0.0, -4.0)
-            e["rightLowerLeg"] = (16.0 + abs(beat) * 14.0, 0.0, 0.0)
+            beat0 = math.sin(t * 4.8)
+            beat1 = math.sin(t * 4.8 - 0.55)
+            beat2 = math.sin(t * 4.8 - 1.15)
+            half0 = math.sin(t * 2.4)
+            half1 = math.sin(t * 2.4 - 0.60)
+            hips_off = (half0 * 0.030, abs(beat0) * 0.032 - 0.012, 0.0)
+            e["hips"] = (3.0, half0 * 15.0, -half0 * 5.5)
+            e["spine"] = (-3.5, -half1 * 10.0, half1 * 5.5)
+            e["chest"] = (-3.5 + abs(beat1) * 2.0, -beat1 * 8.0, -half1 * 3.0)
+            e["head"] = (-4.0 + beat2 * 4.5, half1 * 10.0, beat2 * 7.0)
+            e["leftUpperArm"] = (-10.0, -22.0 + beat0 * 18.0, -26.0 - abs(beat0) * 20.0)
+            e["leftLowerArm"] = (0.0, -34.0 - beat1 * 20.0, 14.0 + beat1 * 6.0)
+            e["leftHand"] = (beat2 * 8.0, 0.0, 16.0 + beat2 * 14.0)
+            e["rightUpperArm"] = (-10.0, 22.0 + beat0 * 18.0, 26.0 + abs(beat0) * 20.0)
+            e["rightLowerArm"] = (0.0, 34.0 - beat1 * 20.0, -14.0 + beat1 * 6.0)
+            e["rightHand"] = (-beat2 * 8.0, 0.0, -16.0 + beat2 * 14.0)
+            e["leftUpperLeg"] = (-10.0 - beat0 * 8.0, 0.0, 4.0)
+            e["leftLowerLeg"] = (16.0 + abs(beat0) * 14.0, 0.0, 0.0)
+            e["rightUpperLeg"] = (-10.0 + beat0 * 8.0, 0.0, -4.0)
+            e["rightLowerLeg"] = (16.0 + abs(beat0) * 14.0, 0.0, 0.0)
         elif action == "stretch":
             arch = math.sin(clamp(self.action_timer / 4.0, 0.0, 1.0) * math.pi)
             hips_off = (0.0, arch * 0.022, 0.0)
@@ -355,36 +390,44 @@ class VrmAnimator:
                 e["rightLowerArm"] = (0.0, 42.0 - ds_breath * 4.0, -16.0)
                 e["rightHand"] = (0.0, 0.0, -14.0)
             else:
-                # Postura Pin-Up / Dungeon Squad viva (refs 96444929 & 141744777):
-                # Corpo em 3/4 com curva em S marcante, quadril jogado de lado, mão esquerda apoiada na cintura,
-                # braço direito gracioso aberto/gesticulando, perna direita relaxada à frente e respiração com bounce!
-                hips_off = (0.022 + sway * 0.015, -0.028 + ds_breath * 0.012, 0.0)
-                e["hips"] = (6.0, 22.0 + sway * 5.0, -8.5 - sway * 2.5)
-                e["spine"] = (-7.5 + ds_breath * 2.2, -10.0 - sway * 3.0, 6.5 + sway * 2.0)
-                e["chest"] = (-5.5 + ds_breath * 3.2, -6.0 + sway * 2.0, 2.5)
-                e["upperChest"] = (-2.0 + ds_breath * 2.4, -2.0, 0.0)
-                e["neck"] = (3.5 + look_y * 4.0, -6.0 + look_x * 6.0, -2.5)
+                # Postura Pin-Up / ToS viva com Ação Sobreposta em Cascata (refs 96444929 & 141744777):
+                # Onda orgânica sobe do quadril -> coluna -> busto -> ombros -> braços/pulsos -> cabeça!
+                w0 = math.sin(t * 1.25) + 0.22 * math.sin(t * 2.50)
+                w1 = math.sin(t * 1.25 - 0.45) + 0.22 * math.sin(t * 2.50 - 0.90)
+                w2 = math.sin(t * 1.25 - 0.85) + 0.22 * math.sin(t * 2.50 - 1.70)
+                w3 = math.sin(t * 1.25 - 1.25)
+                b0 = math.sin(t * 2.45)
+                b1 = math.sin(t * 2.45 - 0.48)
+                b2 = math.sin(t * 2.45 - 0.92)
+                b3 = math.sin(t * 2.45 - 1.38)
+
+                hips_off = (0.022 + w0 * 0.016, -0.026 + b0 * 0.011, 0.0)
+                e["hips"] = (5.8 + b0 * 0.8, 21.0 + w0 * 5.2, -8.2 - w0 * 2.8)
+                e["spine"] = (-7.2 + b1 * 2.4, -9.5 - w1 * 3.4, 6.2 + w1 * 2.2)
+                e["chest"] = (-5.2 + b2 * 3.4, -5.8 + w2 * 2.4, 2.4 - w2 * 1.0)
+                e["upperChest"] = (-1.8 + b2 * 2.5, -1.8, 0.0)
+                e["neck"] = (3.2 + look_y * 4.0 - b2 * 1.0, -5.8 + look_x * 6.0, -2.4 + w2 * 1.2)
                 e["head"] = (
-                    4.0 + look_y * 6.5 + (6.0 if caressing else 0.0),
-                    -14.0 + look_x * 14.0 + math.sin(t * 1.4) * 3.0,
-                    -6.5 + sway * 2.5 + (6.0 if caressing else 0.0),
+                    3.8 + look_y * 6.5 - b3 * 1.8 + (6.0 if caressing else 0.0),
+                    -13.5 + look_x * 14.0 + w3 * 3.8,
+                    -6.0 + w3 * 3.2 + (6.0 if caressing else 0.0),
                 )
-                # Perna esquerda firme sustentando o quadril + perna direita avançada com joelho relaxado (ref 96444929!)
-                e["leftUpperLeg"] = (-4.0, 8.0, 8.0 + sway * 1.2)
-                e["leftLowerLeg"] = (9.0, 0.0, -2.0)
+                # Perna esquerda firme sustentando o quadril + perna direita avançada com joelho relaxado!
+                e["leftUpperLeg"] = (-4.0, 8.0, 8.0 + w0 * 1.4)
+                e["leftLowerLeg"] = (9.0 - b0 * 1.5, 0.0, -2.0)
                 e["leftFoot"] = (-4.0, 0.0, -6.0)
-                e["rightUpperLeg"] = (-16.0, -14.0, -13.0 + sway * 1.4)
-                e["rightLowerLeg"] = (24.0, 0.0, 4.0)
+                e["rightUpperLeg"] = (-16.0 + b0 * 1.2, -14.0, -13.0 + w0 * 1.5)
+                e["rightLowerLeg"] = (24.0 - b0 * 2.0, 0.0, 4.0)
                 e["rightFoot"] = (10.0, 0.0, 8.0)
-                # Mão direita apoiada estilosa no quadril/cintura + braço esquerdo aberto convidativo com palma virada!
-                e["rightShoulder"] = (0.0, 0.0, 8.0 - ds_breath * 1.5)
-                e["rightUpperArm"] = (14.0, -18.0, 44.0 - ds_breath * 2.0)
-                e["rightLowerArm"] = (0.0, 74.0, 32.0)
-                e["rightHand"] = (0.0, 0.0, -24.0)
-                e["leftShoulder"] = (0.0, 0.0, -4.0 + ds_breath * 2.0)
-                e["leftUpperArm"] = (-8.0, -18.0 - sway * 4.0, -46.0 + ds_breath * 3.0)
-                e["leftLowerArm"] = (0.0, -44.0 + ds_breath * 4.5, 16.0)
-                e["leftHand"] = (12.0, 0.0, 22.0)
+                # Mão direita apoiada estilosa no quadril + braço esquerdo aberto com follow-through de pulso!
+                e["rightShoulder"] = (0.0, 0.0, 8.0 - b1 * 1.8)
+                e["rightUpperArm"] = (14.0, -18.0 + w1 * 1.5, 44.0 - b1 * 2.4)
+                e["rightLowerArm"] = (0.0, 74.0, 32.0 + b2 * 2.5)
+                e["rightHand"] = (0.0, 0.0, -24.0 + b3 * 4.0)
+                e["leftShoulder"] = (0.0, 0.0, -4.0 + b1 * 2.4)
+                e["leftUpperArm"] = (-8.0, -18.0 - w1 * 4.5, -46.0 + b2 * 3.6)
+                e["leftLowerArm"] = (0.0, -44.0 + b3 * 5.8 - w2 * 3.0, 16.0 + b3 * 3.5)
+                e["leftHand"] = (12.0 + b3 * 6.0, 0.0, 22.0 + w3 * 8.0)
 
         # Sobrepõe braço direito segurando guarda-chuva na chuva (em pé/caminhada)
         if raining and action not in ("sleep", "sit_work", "sit_relax"):
@@ -433,25 +476,38 @@ class VrmAnimator:
             self._spin_offset_deg += spin_err * clamp(dt * 6.5, 0.0, 1.0)
 
         yaw_err = _shortest_angle_deg(self.yaw_deg, self.target_yaw_deg)
+        prev_yaw = self.yaw_deg
         self.yaw_deg = (self.yaw_deg + yaw_err * (1.0 - math.exp(-dt * 9.5))) % 360.0
+        dyaw = _shortest_angle_deg(prev_yaw, self.yaw_deg)
+        inst_yaw_vel = (dyaw / max(dt, 1e-4)) + (110.0 if action == "dance" else 0.0)
+        self._yaw_vel += (inst_yaw_vel - self._yaw_vel) * clamp(dt * 8.0, 0.0, 1.0)
 
-        # 2. Blend exponencial suave das rotações ósseas
+        # 2. Blend exponencial fluido com inércia diferenciada por grupo ósseo (pernas firmes, tronco/braços/mãos sedosos!)
         targets, target_hips = self._compute_targets(action, look_x, look_y, asleep, raining, caressing)
-        k = 1.0 - math.exp(-dt * (12.0 if action == "walk" else 7.5))
+        k_leg = 1.0 - math.exp(-dt * (14.5 if action == "walk" else 8.5))
+        k_torso = 1.0 - math.exp(-dt * (10.5 if action == "walk" else 7.2))
+        k_arm = 1.0 - math.exp(-dt * (9.5 if action == "walk" else 6.8))
         for b in _ANIM_BONES:
+            if "Leg" in b or "Foot" in b or b == "hips":
+                kb = k_leg
+            elif "Arm" in b or "Hand" in b or b in ("head", "neck"):
+                kb = k_arm
+            else:
+                kb = k_torso
             dst = np.array(targets.get(b, (0.0, 0.0, 0.0)), dtype=np.float32)
-            self._cur_euler[b] += (dst - self._cur_euler[b]) * k
-        self.hips_offset += (np.array(target_hips, dtype=np.float32) - self.hips_offset) * k
+            self._cur_euler[b] += (dst - self._cur_euler[b]) * kb
+        prev_hy = float(self.hips_offset[1])
+        self.hips_offset += (np.array(target_hips, dtype=np.float32) - self.hips_offset) * k_leg
+        hips_vel_y = (float(self.hips_offset[1]) - prev_hy) / max(dt, 1e-4)
 
-        # 3. Expressões faciais VRM (olhar confiante levemente semicerrado estilo Rapscallion + piscar + humor LIF!)
+        # 3. Expressões faciais VRM (olhos grandes brilhantes estilo Tree of Savior + piscar natural + humor LIF!)
         mood = "sleepy" if asleep else emotion.mood
-        sultry_base = 0.12 if (not asleep and mood not in ("pouty", "shy")) else 0.0
         want_expr: dict[str, float] = {
-            "blink": clamp(1.0 if asleep else (0.85 if caressing else max(sultry_base, blink_amount)), 0.0, 1.0),
-            "happy": 0.45 if (mood in ("happy", "affectionate") or action in ("wave", "dance") or caressing) else 0.22,
-            "relaxed": 0.48 if mood in ("cozy", "calm", "sleepy") else 0.0,
-            "angry": 0.55 if mood == "pouty" else 0.0,
-            "sad": 0.35 if mood == "shy" else 0.0,
+            "blink": clamp(1.0 if asleep else (0.85 if caressing else blink_amount), 0.0, 1.0),
+            "happy": 0.45 if (mood in ("happy", "affectionate") or action in ("wave", "dance") or caressing) else 0.14,
+            "relaxed": 0.30 if mood in ("cozy", "calm", "sleepy") else 0.0,
+            "angry": 0.50 if mood == "pouty" else 0.0,
+            "sad": 0.30 if mood == "shy" else 0.0,
             "surprised": 0.0,
         }
         ek = 1.0 - math.exp(-dt * 10.0)
@@ -459,13 +515,29 @@ class VrmAnimator:
             cur_w = self.expr_weights.get(ename, 0.0)
             self.expr_weights[ename] = cur_w + (target_w - cur_w) * ek
 
-        # 4. Física de mola secundária para SpringBones (cabelos e saia reagem à brisa, passo e giro!)
+        # 4. Física de mola secundária para SpringBones + rastro real de cabelo em mundo 3D!
         wind_x = math.sin(self.time * 2.1) * (4.0 + wind_speed * 0.45) - move_dx * 220.0
         wind_z = math.cos(self.time * 1.7) * (3.0 + wind_speed * 0.35) - (10.0 if action == "walk" else 0.0) - (14.0 if action == "dance" else 0.0)
         self._spring_vel_x += (-36.0 * (self._spring_sway_x - wind_x) - 6.0 * self._spring_vel_x) * dt
         self._spring_sway_x = clamp(self._spring_sway_x + self._spring_vel_x * dt, -24.0, 24.0)
         self._spring_vel_z += (-36.0 * (self._spring_sway_z - wind_z) - 6.0 * self._spring_vel_z) * dt
         self._spring_sway_z = clamp(self._spring_sway_z + self._spring_vel_z * dt, -24.0, 24.0)
+
+        # Rastro fluido de cabelo no espaço do mundo (+X = direita na tela, +Z = direção da câmera):
+        # Quando anda para direita (+move_dx), o cabelo esvoaça para esquerda (-X)!
+        # Quando anda para frente (+move_dy), o cabelo esvoaça para trás (-Z)!
+        breeze = 0.018 + wind_speed * 0.0022
+        tgt_hx = clamp(-move_dx * 1.85 + math.sin(self.time * 1.95) * breeze - self._yaw_vel * 0.00045, -0.16, 0.16)
+        tgt_hz = clamp(-move_dy * 1.65 + math.cos(self.time * 1.55) * breeze * 0.75 - (0.045 if action == "walk" else 0.0), -0.16, 0.16)
+        tgt_hy = clamp(-hips_vel_y * 0.18 + (0.025 if action == "dance" else 0.0), -0.05, 0.06)
+        self._hair_vel_x += (-42.0 * (self.hair_trail_x - tgt_hx) - 7.5 * self._hair_vel_x) * dt
+        self.hair_trail_x = clamp(self.hair_trail_x + self._hair_vel_x * dt, -0.19, 0.19)
+        self._hair_vel_z += (-42.0 * (self.hair_trail_z - tgt_hz) - 7.5 * self._hair_vel_z) * dt
+        self.hair_trail_z = clamp(self.hair_trail_z + self._hair_vel_z * dt, -0.19, 0.19)
+        self._hair_vel_y += (-48.0 * (self.hair_bounce_y - tgt_hy) - 8.0 * self._hair_vel_y) * dt
+        self.hair_bounce_y = clamp(self.hair_bounce_y + self._hair_vel_y * dt, -0.06, 0.07)
+        tgt_flare = clamp(abs(self._yaw_vel) / 140.0, 0.0, 1.0) * 0.075
+        self.hair_flare += (tgt_flare - self.hair_flare) * clamp(dt * 6.0, 0.0, 1.0)
 
         self.solve_fk()
 
