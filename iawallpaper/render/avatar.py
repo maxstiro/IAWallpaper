@@ -84,12 +84,17 @@ class AvatarRig:
         sprite_dirs: list[Path] | Path | None = None,
         render_style: str = "world_sprite",
         vrm_path: Path | None = None,
+        live2d_dir: Path | None = None,
     ):
         self.persona = persona
         self.sprite_dirs = self._normalize_dirs(sprite_dirs)
-        self.render_style: str = render_style  # "vrm_3d" | "world_sprite" | "portrait"
-        self.outfit: str = "casual"
+        self.render_style: str = render_style  # "live2d_25d" | "vrm_3d" | "world_sprite" | "portrait"
+        self.outfit: str = "base"
         self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | dance | admire_view | music_sway | sleep
+
+        # Motor 2.5D Live2D / Spine2D em GPU (Arte 2D pura deformada em malha elástica contínua!)
+        self.live2d_dir: Path | None = None
+        self._live2d_renderer = None
 
         # Motor 3D HD estilo Tree of Savior (640x800 MSAA 4x, com modo Pixel-Art opcional)
         self.vrm_path: Path | None = None
@@ -165,10 +170,40 @@ class AvatarRig:
         self._prev_sprite: QPixmap | None = None
         self._sprite_fade_t: float = 1.0
         self.reload_sprites()
+        if live2d_dir is not None:
+            self.set_live2d_rig(live2d_dir)
         if vrm_path is not None:
             self.set_vrm_model(vrm_path)
         elif self.render_style == "vrm_3d":
             self.set_vrm_model("dungeon_squad")
+
+    def has_live2d(self) -> bool:
+        return self._live2d_renderer is not None
+
+    def set_live2d_rig(self, rig_dir: Path | str | None) -> bool:
+        """Carrega rig 2.5D Live2D/Spine2D (malha elástica contínua sobre arte 2D pura do ComfyUI)."""
+        if self._live2d_renderer is not None:
+            self._live2d_renderer.release()
+            self._live2d_renderer = None
+        self.live2d_dir = None
+        if not rig_dir:
+            return False
+        p = Path(rig_dir)
+        if not (p.is_dir() and (p / "base.png").is_file()):
+            return False
+        try:
+            from .live2d_mesh import load_live2d_rig_from_dir
+
+            rend = load_live2d_rig_from_dir(p, width=640, height=800)
+            if rend is None:
+                return False
+            self._live2d_renderer = rend
+            self.live2d_dir = p
+            log(f"[live2d] Motor Live2D 2.5D carregado: {p.name} ({len(rend.front_mesh.indices) // 3} tris elásticos)")
+            return True
+        except Exception as exc:
+            log(f"[live2d] Falha ao carregar rig Live2D 2.5D ({p}): {exc}")
+            return False
 
     def _rebuild_builtin_dungeon_squad(self, archetype_id: str | None = None) -> bool:
         """Constrói/atualiza em tempo real um dos 4 arquétipos base em HD (sobre malha studio VRM ou fallback procedural)."""
@@ -536,6 +571,26 @@ class AvatarRig:
             else:
                 self.blink_amount = max(0.0, self.blink_amount - dt * 8.0)
 
+        # Atualiza o motor 2.5D Live2D/Spine2D em GPU (arte 2D pura com malha elástica contínua!)
+        if self._live2d_renderer is not None:
+            self._live2d_renderer.update(
+                dt=dt,
+                action=self.action,
+                walk_phase=self.walk_phase,
+                action_timer=self.action_timer,
+                emotion=emotion,
+                blink_amount=self.blink_amount,
+                look_x=self.look_x,
+                look_y=self.look_y,
+                facing=self.facing,
+                move_dir=self.move_dir,
+                move_dx=self._move_dx,
+                move_dy=self._move_dy,
+                wind_speed=self._last_wind,
+                asleep=asleep,
+                caressing=caressing,
+            )
+
         # Atualiza o motor 3D VRM (giro 360°, expressões faciais LIF, piscar, look-at e SpringBones!)
         if self._vrm_animator is not None:
             self._vrm_animator.update(
@@ -607,8 +662,15 @@ class AvatarRig:
         is_walking = self.action == "walk"
         breath = math.sin(self.time * (1.35 if asleep else 2.25))
 
-        # Prioridade 0: Motor 3D Cel-Shaded em GPU (VRM 0.x/1.0 — 360° real, expressões faciais e trajes dinâmicos!)
-        if self.render_style == "vrm_3d" and self._vrm_renderer is not None and self._vrm_animator is not None:
+        # Prioridade 0A: Motor 2.5D Live2D / Spine2D em GPU (Arte 2D pura com malha elástica contínua!)
+        if self.render_style == "live2d_25d" and self._live2d_renderer is not None:
+            lift = max(0.0, -self.bounce_y)
+            self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+            self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
+            draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
+            self._paint_live2d_25d(painter, foot_x, foot_y, draw_y, u, atmosphere, raining)
+        # Prioridade 0B: Motor 3D Cel-Shaded em GPU (VRM 0.x/1.0 — 360° real, expressões faciais e trajes dinâmicos!)
+        elif self.render_style in ("vrm_3d", "live2d_25d") and self._vrm_renderer is not None and self._vrm_animator is not None:
             lift = max(0.0, -self.bounce_y)
             self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
             self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
@@ -662,6 +724,60 @@ class AvatarRig:
 
         if self.emote_kind:
             self._paint_ro_emote_balloon(painter, self.head_rect.center().x(), self.head_rect.top() - 8 * u, u)
+
+    def _paint_live2d_25d(
+        self,
+        painter: QPainter,
+        foot_x: float,
+        foot_y: float,
+        draw_y: float,
+        u: float,
+        atmosphere: AtmospherePalette,
+        raining: bool,
+    ) -> None:
+        """Renderiza o avatar 2.5D Live2D/Spine2D (malha elástica contínua sobre arte 2D pura) ancorado em `draw_y`."""
+        if self._live2d_renderer is None:
+            return
+        pm = self._live2d_renderer.render_pixmap(atmosphere=atmosphere, outfit_key=self.outfit, camera_focus="full")
+        if pm.isNull():
+            return
+
+        frame_h = 465.0 * u
+        frame_w = frame_h * (pm.width() / max(pm.height(), 1))
+        foot_v = self._live2d_renderer.last_foot_v
+        top_offset = -frame_h * foot_v
+
+        if raining:
+            painter.save()
+            painter.translate(foot_x, foot_y + 2 * u)
+            painter.scale(1.0, -0.32)
+            painter.setOpacity(0.20)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            painter.drawPixmap(QRectF(-frame_w * 0.5, top_offset, frame_w, frame_h), pm, QRectF(pm.rect()))
+            painter.restore()
+
+        painter.save()
+        if self.caress_glow > 0.05:
+            rim_r, rim_g, rim_b = atmosphere.rim_light
+            aura = QRadialGradient(QPointF(foot_x, draw_y - frame_h * 0.44), frame_h * 0.42)
+            aura.setColorAt(0.0, QColor(rim_r, rim_g, rim_b, int(92 * self.caress_glow)))
+            aura.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(aura)
+            painter.drawEllipse(QPointF(foot_x, draw_y - frame_h * 0.44), frame_h * 0.34, frame_h * 0.42)
+
+        painter.translate(foot_x, draw_y)
+        painter.rotate(self.tilt_deg)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        painter.drawPixmap(QRectF(-frame_w * 0.5, top_offset, frame_w, frame_h), pm, QRectF(pm.rect()))
+        painter.restore()
+
+        body_h = frame_h * 0.78
+        if raining and self.action not in ("sleep", "sit_work"):
+            self._paint_umbrella(painter, foot_x + 14 * u, draw_y - body_h * 1.04, u, atmosphere)
+
+        self.body_rect = QRectF(foot_x - frame_w * 0.28, draw_y - body_h, frame_w * 0.56, body_h)
+        self.head_rect = QRectF(foot_x - frame_w * 0.22, draw_y - body_h * 1.02, frame_w * 0.44, body_h * 0.26)
 
     def _paint_vrm_3d(
         self,

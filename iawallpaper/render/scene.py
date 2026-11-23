@@ -160,7 +160,7 @@ class SceneCompositor:
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        is_world = avatar.render_style in ("vrm_3d", "world_sprite")
+        is_world = avatar.render_style in ("live2d_25d", "vrm_3d", "world_sprite")
         raining = weather.condition in ("rain", "storm")
         bg_key = self._pick_bg_key(circadian, weather, prefer_diorama=is_world)
         if bg_key is not None:

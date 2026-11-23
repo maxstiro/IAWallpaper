@@ -374,3 +374,56 @@ def test_dungeon_squad_pixel_art_3d_outfits_and_360():
     assert 40.0 < canvas.avatar._vrm_animator.yaw_deg < 140.0
     img_walk = canvas.render_to_image(640, 360)
     assert not img_walk.isNull()
+
+
+def test_live2d_25d_gpu_mesh_engine(tmp_path):
+    _ensure_qapp()
+    from PIL import Image, ImageDraw
+
+    # Cria sprite 2D full-body sintético + blink 1:1 + outfit modular 1:1 + vista costas
+    rig_dir = tmp_path / "elfa_test"
+    rig_dir.mkdir()
+    base = Image.new("RGBA", (320, 480), (0, 0, 0, 0))
+    d = ImageDraw.Draw(base)
+    # Cabelo longo loiro atrás
+    d.ellipse([96, 18, 224, 150], fill=(246, 218, 134, 255))
+    d.rectangle([94, 85, 226, 255], fill=(246, 218, 134, 255))
+    # Orelhas élficas longas
+    d.polygon([(112, 72), (50, 52), (108, 92)], fill=(238, 178, 142, 255))
+    d.polygon([(208, 72), (270, 52), (212, 92)], fill=(238, 178, 142, 255))
+    # Cabeça + pescoço + tronco curvilíneo
+    d.ellipse([116, 36, 204, 128], fill=(238, 178, 142, 255))
+    d.rectangle([146, 122, 174, 148], fill=(238, 178, 142, 255))
+    d.ellipse([112, 146, 208, 268], fill=(238, 178, 142, 255))
+    # Braços separados em A-pose
+    d.line([(114, 158), (74, 282)], fill=(238, 178, 142, 255), width=22)
+    d.line([(206, 158), (246, 282)], fill=(238, 178, 142, 255), width=22)
+    # Pernas separadas até os pés
+    d.line([(134, 260), (124, 466)], fill=(238, 178, 142, 255), width=32)
+    d.line([(186, 260), (196, 466)], fill=(238, 178, 142, 255), width=32)
+    base.save(rig_dir / "base.png")
+    base.save(rig_dir / "base_blink.png")
+    base.save(rig_dir / "base_happy.png")
+    base.save(rig_dir / "base_back.png")
+
+    outfit = Image.new("RGBA", (320, 480), (0, 0, 0, 0))
+    ImageDraw.Draw(outfit).rectangle([118, 170, 202, 250], fill=(80, 120, 220, 220))
+    outfit.save(rig_dir / "outfit_casual.png")
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, render_style="live2d_25d", live2d_dir=rig_dir)
+    assert canvas.avatar.has_live2d()
+    assert len(canvas.avatar._live2d_renderer.front_mesh.indices) > 300
+
+    for act, outfit_k in (("idle", "base"), ("walk", "casual"), ("wave", "base"), ("dance", "base")):
+        canvas.avatar.outfit = outfit_k
+        if act == "walk":
+            canvas.avatar.walk_to(0.75, 0.85)
+        else:
+            canvas.avatar.target_x, canvas.avatar.target_y = canvas.avatar.pos_x, canvas.avatar.pos_y
+            canvas.avatar.trigger_action(act)
+        for _ in range(8):
+            canvas.step_animation(0.05)
+        frame = canvas.render_to_image(640, 360)
+        assert not frame.isNull()
+        assert not canvas.avatar.head_rect.isEmpty()

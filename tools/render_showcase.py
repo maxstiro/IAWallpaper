@@ -114,10 +114,10 @@ def render_world_showcase(
     persona_id: str,
     scene_id: str,
     out_path: Path,
-    render_style: str = "vrm_3d",
+    render_style: str = "live2d_25d",
     vrm_name: str = "",
 ) -> Path:
-    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (Motor 3D VRM ou Clipes 2D Wan 2.2)."""
+    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (Motor 2.5D Live2D/Spine2D, 3D VRM ou Clipes Wan 2.2)."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -126,20 +126,22 @@ def render_world_showcase(
     paths = Paths(base_dir=ROOT)
     persona = load_persona(persona_id, personas_dir=paths.personas_dir)
     vrm_p = paths.resolve_vrm_model(vrm_name) if render_style == "vrm_3d" else None
+    l2d_p = paths.resolve_live2d_rig(vrm_name or "elfa_loira") if render_style == "live2d_25d" else None
     canvas = WallpaperCanvas(
         persona,
         sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
         scene_dirs=[paths.scene_assets(scene_id), paths.scene_generated_assets(scene_id)],
         render_style=render_style,
         vrm_path=vrm_p,
+        live2d_dir=l2d_p,
     )
     canvas.avatar.vrm_dynamic_recolor = False  # preserva as cores nativas do VRM no showcase
 
     shots = [
-        (10.5, "clear", "overlook", "idle", "base", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada — Elfa Loira HD (Tree of Savior)!"),
-        (18.0, "clear", "lantern", "wave", "base", "affectionate", "Carinhosa", "heart", "IDLE", "Por do sol — Rosto expressivo & aceno em tempo real!"),
-        (16.0, "rain", "garden_l", "walk", "base", "cozy", "Aconchegada", "music", "MUSIC", "Chuva suave — Caminhada 360° com reflexo molhado!"),
-        (23.5, "clear", "music_spot", "dance", "base", "happy", "Animada", "sparkle", "IDLE", "Noite magica — Giro 360° sob a lua e vaga-lumes!"),
+        (10.5, "clear", "overlook", "idle", "base", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada — Elfa Loira 2D (Motor Live2D/Spine2D)!"),
+        (18.0, "clear", "lantern", "wave", "base", "affectionate", "Carinhosa", "heart", "IDLE", "Por do sol — Sorriso 2D real & aceno elastico!"),
+        (16.0, "rain", "garden_l", "walk", "base", "cozy", "Aconchegada", "music", "MUSIC", "Chuva suave — Caminhada fluida & reflexo molhado!"),
+        (23.5, "clear", "music_spot", "dance", "base", "happy", "Animada", "sparkle", "IDLE", "Noite magica — Danca Live2D sob a lua e vaga-lumes!"),
     ]
 
     tiles: list[Image.Image] = []
@@ -272,10 +274,10 @@ def render_animated_gif(
     width: int = 720,
     height: int = 405,
     fps: int = 20,
-    render_style: str = "vrm_3d",
+    render_style: str = "live2d_25d",
     vrm_name: str = "",
 ) -> Path:
-    """Renderiza GIF animado fluido em 20 FPS demonstrando caminhada 360°, cabelo esvoaçante, aceno e giro."""
+    """Renderiza GIF animado fluido em 20 FPS demonstrando motor Live2D/Spine2D, caminhada, cabelo fluido e aceno."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -284,12 +286,14 @@ def render_animated_gif(
     paths = Paths(base_dir=ROOT)
     persona = load_persona(persona_id, personas_dir=paths.personas_dir)
     vrm_p = paths.resolve_vrm_model(vrm_name) if render_style == "vrm_3d" else None
+    l2d_p = paths.resolve_live2d_rig(vrm_name or "elfa_loira") if render_style == "live2d_25d" else None
     canvas = WallpaperCanvas(
         persona,
         sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
         scene_dirs=[paths.scene_assets(scene_id), paths.scene_generated_assets(scene_id)],
         render_style=render_style,
         vrm_path=vrm_p,
+        live2d_dir=l2d_p,
     )
     canvas.avatar.vrm_dynamic_recolor = False
     canvas.avatar.outfit = "base"
@@ -305,7 +309,7 @@ def render_animated_gif(
     canvas.avatar.pos_x = 0.36
     canvas.avatar.pos_y = 0.90
     canvas.avatar.walk_to(0.68, 0.89, arrive_action="idle")
-    canvas.scene.set_whisper("Passeando em 3D pela praca (giro 360°)...", 1.0)
+    canvas.scene.set_whisper("Passeando em Live2D 2.5D pela praca...", 1.0)
     canvas.render_to_image(width, height)
     for _ in range(20):
         canvas.step_animation(0.05)
@@ -316,7 +320,7 @@ def render_animated_gif(
 
     frames: list[Image.Image] = []
     dt = 1.0 / fps
-    total_frames = int(fps * 8.0)  # 96 frames = 8 segundos fluidos
+    total_frames = int(fps * 8.0)  # 160 frames = 8 segundos fluidos @ 20 FPS
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_frame = out_path.parent / "_gif_frame.png"
@@ -324,7 +328,7 @@ def render_animated_gif(
     for i in range(total_frames):
         if i == int(fps * 1.9):
             canvas.avatar.walk_to(canvas.avatar.pos_x - 0.05, 0.72, arrive_action="idle")
-            canvas.scene.set_whisper("Subindo os degraus ate a arvore sagrada...", 1.0)
+            canvas.scene.set_whisper("Subindo os degraus (vista costas 2D)...", 1.0)
         elif i == int(fps * 3.4):
             canvas.avatar.walk_to(0.42, 0.85, arrive_action="wave")
             canvas.scene.set_whisper("Voltando para o centro da praca...", 1.0)
@@ -333,11 +337,11 @@ def render_animated_gif(
             canvas.avatar.target_y = canvas.avatar.pos_y
             canvas.avatar.trigger_action("wave")
             canvas.avatar.show_emote("heart", duration=1.8)
-            canvas.scene.set_whisper("Oi! Expressao facial & aceno em tempo real!", 1.0)
+            canvas.scene.set_whisper("Oi! Piscar & sorriso 2D pintados a mao!", 1.0)
         elif i == int(fps * 6.4):
             canvas.avatar.trigger_action("dance")
             canvas.avatar.show_emote("sparkle", duration=2.0)
-            canvas.scene.set_whisper("Giro 360° estilo Tree of Savior!", 1.0)
+            canvas.scene.set_whisper("Danca elastica estilo Live2D / Spine2D!", 1.0)
 
         # Sub-steps de 25ms para física de mola e cabelo ultra suaves
         sub = 2
@@ -365,7 +369,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--persona", default="mira")
     parser.add_argument("--scene", default="sky_sanctuary")
-    parser.add_argument("--style", choices=("vrm_3d", "world_sprite"), default="vrm_3d")
+    parser.add_argument("--style", choices=("live2d_25d", "vrm_3d", "world_sprite"), default="live2d_25d")
     parser.add_argument("--vrm", default="elfa_loira", help="Arquétipo HD ('elfa_loira'|'humana_ruiva'|'androide_rosa'|'vampira_negra') ou caminho .vrm.")
     parser.add_argument("--mode", choices=("world", "scenes", "expressions", "outfits", "sprites", "rig_parts", "gif"), default="world")
     parser.add_argument("--out", default="showcase.png")

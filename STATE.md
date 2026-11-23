@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-23 (Milestone 16 · Etapa 1d — Shader Aquarela Fosco Tree of Savior sem brilho 3D, Câmera Teleobjetiva 15.5°, Cabelo Fluido por Vertex Shader & Animação com Ação Sobreposta em 20 FPS)
+> **Última atualização**: 2026-11-23 (Milestone 17 — Pivô para Motor 2.5D Live2D / Spine2D em GPU `live2d_mesh.py`: Arte 2D Pura do ComfyUI + Malha Elástica Geodésica Contínua + Expressões 1:1 + Vista Costas + Outfits em Camadas)
 
 ---
 
@@ -10,15 +10,15 @@
 | Módulo | Caminho | Status | Notas |
 |---|---|---|---|
 | Infra & Docs | `PROJETO.md`, `STATE.md`, `roadmap.md`, `AGENTS.md`, `venv/` | 🟢 Concluído | Venv Python 3.12 com PySide6, NumPy, Pillow, psutil, pywin32, moderngl, pytest |
-| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Padrão `sky_sanctuary` + `vrm_model="elfa_loira"` + `render_style="vrm_3d"` |
+| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Padrão `sky_sanctuary` + `render_style="live2d_25d"` (`elfa_loira`) com fallback automático para `vrm_3d` |
 | Núcleo Neural (`core/`) | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | 🟢 Validado | 438 neurônios LIF, aprendizado 3 fatores, Rescorla-Wagner, Bandit, Mira & Nyx |
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
 | Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
-| Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py` | 🟢 Validado E2E | Presets `sky_sanctuary` (padrão) e `dark_sanctuary` com Qwen 2.1 relighting 1:1 + Wan 2.2 opcional |
-| Render 3D & 2.5D (`render/`) | `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Pipeline **Aquarela/Guache Tree of Savior** (`960×1200` MRT + Sobel sépia-café -> `640×800`): ZERO brilho plástico 3D na pele, rosto 92% plano com olhos grandes abertos, câmera teleobjetiva quase ortográfica (`FOV 15.5°`), textura sutil de papel, **física fluida de cabelo no vertex shader** (rastro de caminhada, brisa e abertura em giro 360°) e **animação em cascata (*overlapping action*)** em `VrmAnimator` (quadril -> coluna -> peito -> cabeça -> braços -> pulsos) |
-| Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma pela praça `sky_sanctuary`, poses 360° (`idle` natural, `walk`, `wave`, `dance`, `stretch`, `sit_work`, `sleep`), emotes RO, sono e sussurros |
-| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio com seletor direto das **4 garotas base HD** (`Lyra`, `Freya`, `Airi`, `Lilith`) + `.VRM` externos |
-| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 31/31 Verdes | `pytest` completo + `render_showcase.py --scene sky_sanctuary --vrm elfa_loira` |
+| Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py` | 🟢 Validado E2E | Presets `sky_sanctuary` (padrão) e `dark_sanctuary` + geração de rigs Live2D 2.5D (`base.png`, `base_blink.png`, `base_happy.png`, `base_back.png`) via Qwen Image 2.1 Edit |
+| Render 2.5D & 3D (`render/`) | `live2d_mesh.py`, `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | **Motor 2.5D Live2D / Spine2D próprio na GPU (`live2d_mesh.py`)**: arte 2D pura (ZERO aspecto 3D!), detecção automática de marcos anatômicos, malha triangular elástica contínua (~7.000 tris) com skinning geodésico sem pontes/cortes, *Head Parallax Turn 2.5D*, mola *soft-body* no busto/respiração, cabelo fluido e micro-twitch nas orelhas élficas, expressões 2D reais 1:1 (`base_blink.png`, `base_happy.png`), vista costas (`base_back.png`) e suporte nativo a camadas modulares de roupas (`outfit_*.png`) |
+| Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma pela praça `sky_sanctuary`, poses fluidas (`idle`, `walk`, `wave`, `dance`, `stretch`, `sit_work`, `sleep`), emotes RO, sono e sussurros |
+| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio com seletor **✨ Motor 2.5D Live2D / Spine2D (Arte 2D Pura)** + fallback 3D VRM / Wan 2.2 |
+| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 32/32 Verdes | `pytest` completo + `render_showcase.py --style live2d_25d --scene sky_sanctuary --vrm elfa_loira` |
 
 ---
 
@@ -29,7 +29,9 @@
   3. `androide_rosa` (**Airi — Androide Rosa**): cabelo rosa-pastel longo, olhos safira, roupa de baixo rosa-pérola.
   4. `vampira_negra` (**Lilith — Vampira**): rabo lateral preto-esmeralda, sardas sutis, olhos jade, roupa de baixo preta/carmesim.
 - **Cenário Padrão — Observatório Celeste (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**: Praça aberta ensolarada estilo Tree of Savior reiluminada 1:1 via Qwen 2.1 (`day`, `sunset`, `night`, `rain`).
-- **Prévias & GIFs Validados**: `m16_tos_fluid_sheet.png`, `m16_tos_sky_showcase.png`, `m16_tos_sky_demo_tg.gif` (20 FPS) e `m16_four_girls_base.png` (enviados ao Telegram).
+- **Rig Live2D 2.5D Ativo (`assets/generated/live2d/elfa_loira/`)**:
+  - `base.png` (Elfa Loira fiel 1:1 à referência Rapscallion × Tree of Savior em roupa de baixo marrom/creme), `base_blink.png` (piscar 1:1 pintado à mão), `base_happy.png` (sorriso radiante 1:1) e `base_back.png` (vista de costas 180°).
+- **Prévias & GIFs Validados**: `m17_l2d_sheet.png`, `m17_l2d_sky_showcase.png` e `m17_l2d_sky_demo_tg.gif` (20 FPS enviados ao Telegram).
 
 ---
 

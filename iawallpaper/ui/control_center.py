@@ -233,6 +233,7 @@ class ControlCenterWindow(QWidget):
         persona_row.addWidget(btn_new_persona)
 
         self.cb_render_style = QComboBox()
+        self.cb_render_style.addItem("✨ Motor 2.5D Live2D / Spine2D (Arte 2D Pura · Malha Elástica GPU)", "live2d_25d")
         self.cb_render_style.addItem("Motor 3D Cel-Shaded (VRM · Giro 360° estilo Tree of Savior)", "vrm_3d")
         self.cb_render_style.addItem("Clipes 2D Animados (Wan 2.2 · Arte ComfyUI)", "world_sprite")
         self.cb_render_style.addItem("Retrato Visual Novel (Busto 2.5D)", "portrait")

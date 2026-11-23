@@ -35,6 +35,8 @@ class Paths:
         self.generated_dir = self.assets_dir / "generated"
         self.vrm_dir = self.assets_dir / "vrm"
         self.vrm_generated_dir = self.generated_dir / "vrm"
+        self.live2d_dir = self.assets_dir / "live2d"
+        self.live2d_generated_dir = self.generated_dir / "live2d"
 
         self.settings_file = self.data_dir / "settings.json"
         self.routine_file = self.data_dir / "routine.json"
@@ -103,3 +105,20 @@ class Paths:
                     return cand
         models = self.list_vrm_models()
         return models[0] if models else None
+
+    def resolve_live2d_rig(self, name_or_path: str = "elfa_loira") -> Path | None:
+        """Resolve a pasta de um rig Live2D 2.5D (`base.png` + expressões/costas/outfits 1:1)."""
+        key = str(name_or_path or "elfa_loira").strip()
+        direct = Path(key)
+        if direct.is_dir() and (direct / "base.png").is_file():
+            return direct
+        for root in (self.live2d_generated_dir, self.live2d_dir):
+            cand = root / key.lower()
+            if cand.is_dir() and (cand / "base.png").is_file():
+                return cand
+        for root in (self.live2d_generated_dir, self.live2d_dir):
+            if root.is_dir():
+                for sub in sorted(root.iterdir()):
+                    if sub.is_dir() and (sub / "base.png").is_file():
+                        return sub
+        return None
