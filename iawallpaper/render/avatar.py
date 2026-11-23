@@ -91,9 +91,12 @@ class AvatarRig:
         self.outfit: str = "casual"
         self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | dance | admire_view | music_sway | sleep
 
-        # Motor 3D Cel-Shaded (VRM 0.x / 1.0 + ModernGL GPU)
+        # Motor 3D HD Pixel-Art / Cel-Shaded (Dungeon Squad procedural + VRM 0.x / 1.0 via ModernGL GPU)
         self.vrm_path: Path | None = None
         self.vrm_dynamic_recolor: bool = True
+        self.vrm_pixel_art: bool = True
+        self._builtin_dungeon_squad: bool = False
+        self._ds_built_key: tuple[str, str] | None = None
         self._vrm_model = None
         self._vrm_animator = None
         self._vrm_renderer = None
@@ -163,9 +166,49 @@ class AvatarRig:
         self.reload_sprites()
         if vrm_path is not None:
             self.set_vrm_model(vrm_path)
+        elif self.render_style == "vrm_3d":
+            self.set_vrm_model("dungeon_squad")
 
-    def set_vrm_model(self, path: Path | None) -> bool:
-        """Carrega (ou descarrega) um modelo 3D `.vrm` / `.glb` para o motor cel-shaded em GPU."""
+    def _rebuild_builtin_dungeon_squad(self) -> bool:
+        """Constrói/atualiza em tempo real o avatar 3D esculpido estilo Dungeon Squad para a persona e traje atuais."""
+        prev_anim = self._vrm_animator
+        if self._vrm_renderer is not None:
+            self._vrm_renderer.release()
+        self._vrm_model = None
+        self._vrm_animator = None
+        self._vrm_renderer = None
+        try:
+            from .dungeon_avatar import build_dungeon_squad_model
+            from .vrm_animator import VrmAnimator
+            from .vrm_renderer import VrmRenderer
+
+            model = build_dungeon_squad_model(self.persona, self.outfit)
+            animator = VrmAnimator(model)
+            if prev_anim is not None:
+                animator.time = prev_anim.time
+                animator.walk_phase = prev_anim.walk_phase
+                animator.yaw_deg = prev_anim.yaw_deg
+                animator.target_yaw_deg = prev_anim.target_yaw_deg
+            renderer = VrmRenderer(model, width=512, height=640, samples=4, pixel_art=self.vrm_pixel_art, pixel_size=(152, 190))
+            self._vrm_model = model
+            self._vrm_animator = animator
+            self._vrm_renderer = renderer
+            self._builtin_dungeon_squad = True
+            self._ds_built_key = (self.persona.id, self.outfit)
+            self.vrm_path = Path("dungeon_squad")
+            log(f"[vrm] Avatar 3D Dungeon Squad construído: {model.name} (pixel_art={self.vrm_pixel_art})")
+            return True
+        except Exception as err:
+            log(f"[vrm] Falha ao construir avatar Dungeon Squad: {err}")
+            return False
+
+    def set_vrm_model(self, path: Path | str | None) -> bool:
+        """Carrega o avatar 3D Dungeon Squad nativo (`"dungeon_squad"`) ou um modelo `.vrm` / `.glb` externo."""
+        if path is not None and str(path).strip().lower() in ("dungeon_squad", "builtin:dungeon_squad"):
+            return self._rebuild_builtin_dungeon_squad()
+
+        self._builtin_dungeon_squad = False
+        self._ds_built_key = None
         if self._vrm_renderer is not None:
             self._vrm_renderer.release()
         self._vrm_model = None
@@ -181,7 +224,8 @@ class AvatarRig:
 
             model = load_vrm(Path(path))
             animator = VrmAnimator(model)
-            renderer = VrmRenderer(model, width=512, height=640, samples=4)
+            animator.stylized_proportions = self.vrm_pixel_art
+            renderer = VrmRenderer(model, width=512, height=640, samples=4, pixel_art=self.vrm_pixel_art, pixel_size=(152, 190))
             self._vrm_model = model
             self._vrm_animator = animator
             self._vrm_renderer = renderer
@@ -615,7 +659,11 @@ class AvatarRig:
         raining: bool,
         sun_x_norm: float,
     ) -> None:
-        """Renderiza o avatar 3D cel-shaded MToon em GPU com sola dos pés projetada exatamente em `draw_y`."""
+        """Renderiza o avatar 3D (HD Pixel-Art Nearest-Neighbor estilo Dungeon Squad ou MToon suave) ancorado em `draw_y`."""
+        if self._builtin_dungeon_squad and self._ds_built_key != (self.persona.id, self.outfit):
+            self._rebuild_builtin_dungeon_squad()
+        if self._vrm_renderer is None or self._vrm_animator is None:
+            return
         pm = self._vrm_renderer.render_pixmap(
             animator=self._vrm_animator,
             atmosphere=atmosphere,
@@ -627,8 +675,9 @@ class AvatarRig:
         if pm.isNull():
             return
 
-        # Altura total do FBO projetada na escala Tree of Savior (~370px de altura corporal útil a 1080p)
-        frame_h = 465.0 * u
+        # Altura total do FBO projetada na escala Tree of Savior / Dungeon Squad
+        use_smooth = not getattr(self._vrm_renderer, "pixel_art", False)
+        frame_h = (495.0 if self._builtin_dungeon_squad else 465.0) * u
         frame_w = frame_h * (pm.width() / max(pm.height(), 1))
         foot_v = self._vrm_renderer.last_foot_v
         top_offset = -frame_h * foot_v
@@ -639,7 +688,7 @@ class AvatarRig:
             painter.translate(foot_x, foot_y + 2 * u)
             painter.scale(1.0, -0.32)
             painter.setOpacity(0.18)
-            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, use_smooth)
             painter.drawPixmap(QRectF(-frame_w * 0.5, top_offset, frame_w, frame_h), pm, QRectF(pm.rect()))
             painter.restore()
 
@@ -655,7 +704,8 @@ class AvatarRig:
 
         painter.translate(foot_x, draw_y)
         painter.rotate(self.tilt_deg)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        # Nearest-Neighbor (`SmoothPixmapTransform=False`) preserva blocos de pixel nítidos estilo Dungeon Squad!
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, use_smooth)
         painter.drawPixmap(QRectF(-frame_w * 0.5, top_offset, frame_w, frame_h), pm, QRectF(pm.rect()))
         painter.restore()
 
@@ -693,13 +743,15 @@ class AvatarRig:
         return next(iter(self._clips.keys()))
 
     def _paint_rpg_ground_aura(self, painter: QPainter, foot_x: float, foot_y: float, u: float, atmo: AtmospherePalette) -> None:
-        """Sigilo mágico oculto giratório estilo Dungeon Squad sob os pés (sempre sutil no idle, intenso em skills/aceno/dança!)."""
+        """Círculo mágico celeste/dourado sob os pés (sutil em ações mágicas, aceno, dança ou carinho)."""
         intense = self.action in ("wave", "dance", "music_sway", "stretch") or self.caress_glow > 0.1 or bool(self.emote_kind)
-        strength = 0.92 if self.action in ("dance", "music_sway") else (0.82 if intense else 0.36)
-        pulse = 0.90 + 0.10 * math.sin(self.time * 4.2)
-        # Paleta arcana carmesim-violeta estilo Dungeon Squad
-        c_outer = QColor(235, 58, 128)
-        c_inner = QColor(175, 92, 255)
+        if not intense:
+            return
+        strength = 0.88 if self.action in ("dance", "music_sway") else 0.65
+        pulse = 0.92 + 0.08 * math.sin(self.time * 4.2)
+        ar, ag, ab = self.persona.accent_color
+        c_outer = QColor(245, 206, 112)
+        c_inner = QColor(ar, ag, ab)
 
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing, True)

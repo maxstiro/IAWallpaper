@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-23 (Milestone 14 — Refinamento Dark-Fantasy estilo Dungeon Squad: Shader Alto-Contraste, Olhos Luminosos, Sigilo Rúnico & Santuário Abissal)
+> **Última atualização**: 2026-11-23 (Milestone 15 — Avatar 3D HD Pixel-Art estilo Dungeon Squad: Rig Esculpido Voluptuoso, Pipeline 1px Ink Outline + Nearest-Neighbor, Trajes Modulares Dinâmicos & Cenário `sky_sanctuary`)
 
 ---
 
@@ -43,7 +43,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 | **Plataforma** | `iawallpaper/plataforma/` | `desktop_host.py`, `windows.py` | não | sim |
 | **Sense** | `iawallpaper/sense/` | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | não | não |
 | **Comfy** | `iawallpaper/comfy/` | `presets.py`, `bridge.py`, `workflows.py` | não | não |
-| **Render** | `iawallpaper/render/` | `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
+| **Render** | `iawallpaper/render/` | `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
 | **Mind** | `iawallpaper/mind/` | `director.py` | não | não |
 | **UI** | `iawallpaper/ui/` | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | sim | não |
 | **App** | `iawallpaper/app.py`, `main.py` | Orquestração principal, trava de instância única, ciclos 16ms/100ms/500ms/15m/30s, launcher `start_iawallpaper.ps1` | sim | sim |
@@ -81,3 +81,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
   - **Shader MToon Dark-Fantasy de Alto Contraste (`u_dark_fantasy=1`)**: contorno escuro nítido (`0.0042`), sombras profundas roxo-obsidiana, brilho especular anime em cabelo/roupas, olhos emissivos luminosos e *rim-light* arcano vibrante.
   - **Pose Confiante & Sigilo Rúnico Oculto**: *idle* com peso jogado no quadril e mão na cintura + círculo mágico carmesim-violeta com hexagrama giratório sob os pés (`_paint_rpg_ground_aura`).
   - **Avatar Gótico Padrão & Cenário *Santuário Abissal* (`dark_sanctuary`)**: `Darkness_Shibu.vrm` como padrão + pátio gótico obsidiano com runas e braseiros reiluminado 1:1 via Qwen Image 2.1 (`day`, `sunset`, `night`, `rain`), mantendo `sky_sanctuary` e o modo 2D Wan 2.2 selecionáveis. Validado com **30/30 testes verdes**, showcase e GIF 3D no Telegram.
+- **Milestone 15** (2026-11-23): **Avatar 3D HD Pixel-Art estilo *Dungeon Squad* + Restauração do Cenário `sky_sanctuary` (`dungeon_avatar.py`, `vrm_renderer.py`, `vrm_animator.py`, `avatar.py`, `config.py`, `control_center.py`)**:
+  - **Gerador 3D Esculpido Modular (`render/dungeon_avatar.py`)**: Constrói em memória (`< 40 ms`, 100% compatível com `VrmModel` e `VrmAnimator`) uma waifu estilizada nas proporções autênticas de *Dungeon Squad* (~4.2 cabeças, rosto anime com franja longa e olhos tipo joia, busto farto esculpido, cintura ampulheta, quadris largos e coxas grossas, botas altas de salto, capa dupla escura com barra dourada e SpringBones, rabo-de-cavalo esvoaçante, halo celestial dourado giratório, chamas arcanas nas mãos e cajado crescente / espada rúnica modular na mão esquerda). Troca trajes (`starlight` Astral/Titan, `focus` Sacerdotisa Caída, `casual` Valquíria) e cores de Persona ao vivo sem pré-renderizar vídeos por movimento!
+  - **Pipeline GPU HD Pixel-Art 3D (`render/vrm_renderer.py`, `avatar.py`)**: FBO MRT `152x190` sem MSAA com cel-shading quantizado em 3 bandas + shader fullscreen de pós-processamento desenhando contorno externo exato de **1 pixel**, contornos internos por profundidade/material e aura luminosa em elementos emissivos, composto com **Nearest-Neighbor (`SmoothPixmapTransform=False`)** a >250 FPS.
+  - **Pose Heroica A-Frame & Cenário Padrão Restaurado**: Base larga confiante estilo `Titan_idle` / `Stheno_idle` + restauração da praça ensolarada `sky_sanctuary` como padrão (mantendo `dark_sanctuary` e `.VRM` externos selecionáveis na Central de Controle). Validado visualmente (folha 3 trajes × 4 ângulos, showcase 4 horários e GIF 8s no Telegram) com **31/31 testes verdes**.

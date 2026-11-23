@@ -145,6 +145,9 @@ class VrmAnimator:
 
         # Ordem topológica (pai sempre antes de filho) para FK em passagem única
         self._topo_order: list[int] = self._build_topo_order()
+        self._is_ds_builtin: bool = model.name.startswith("DungeonSquad_")
+        self._halo_node: int = next((n.index for n in model.nodes if n.name == "halo_ring"), -1)
+        self.stylized_proportions: bool = False  # opcional para estilizar VRMs externos no padrão Dungeon Squad
         self.world_matrices: list[np.ndarray] = [np.eye(4, dtype=np.float32) for _ in model.nodes]
         self.skin_matrices: list[np.ndarray] = []
         self.mesh_morph_weights: dict[int, dict[int, float]] = {}
@@ -262,12 +265,12 @@ class VrmAnimator:
             e["spine"] = (-3.0, -sway * 3.0, sway * 3.0)
             e["chest"] = (-2.0, -5.0, 2.0)
             e["head"] = (-2.0 + look_y * 6.0, look_x * 14.0 + w * 4.0, 6.0 + w * 3.5)
-            # Braço esquerdo relaxado + braço direito erguido acenando alegremente!
+            # Braço esquerdo relaxado (segura cajado/espada) + braço direito erguido ao lado acenando alegremente!
             e["leftUpperArm"] = (8.0, -10.0, -64.0)
             e["leftLowerArm"] = (0.0, -28.0, -8.0)
-            e["rightShoulder"] = (0.0, 0.0, -16.0)
-            e["rightUpperArm"] = (-14.0, 18.0, -44.0 + w * 10.0)
-            e["rightLowerArm"] = (0.0, 24.0, -68.0 + w * 24.0)
+            e["rightShoulder"] = (0.0, 0.0, -10.0)
+            e["rightUpperArm"] = (-8.0, 26.0, -22.0 + w * 9.0)
+            e["rightLowerArm"] = (0.0, 14.0, -52.0 + w * 22.0)
             e["rightHand"] = (0.0, 0.0, w * 12.0)
         elif action in ("dance", "music_sway"):
             beat = math.sin(t * 5.2)
@@ -311,29 +314,50 @@ class VrmAnimator:
             e["rightUpperArm"] = (22.0, 34.0, 56.0)
             e["rightLowerArm"] = (0.0, 56.0 - tap * 6.0, 0.0)
         else:
-            # Idle confiante e sedutor estilo Dungeon Squad: peso jogado num quadril, mão estilosa na cintura, olhar provocante!
-            sway = math.sin(t * 1.35)
-            hips_off = (0.018 + sway * 0.014, breath * 0.005, 0.0)
-            e["hips"] = (2.0, 9.0 + sway * 4.5, -5.5 - sway * 2.5)
-            e["spine"] = (-3.5 + breath * 1.5, -7.0 - sway * 3.0, 4.5 + sway * 2.0)
-            e["chest"] = (-2.5 + breath * 2.0, -3.5 + sway * 2.5, 2.0)
-            e["neck"] = (look_y * 5.0 - 2.0, look_x * 8.0 - 3.0, -3.0)
+            # Idle icônico estilo Dungeon Squad (Titan / Stheno / Beholder):
+            # Base aberta confiante em A-frame, busto em destaque com respiração viva,
+            # tronco levemente em 3/4 e mãos abertas canalizando chamas arcanas!
+            sway = math.sin(t * 1.65)
+            ds_breath = math.sin(t * 3.1)
+            hips_off = (0.015 + sway * 0.012, -0.025 + ds_breath * 0.010, 0.0)
+            e["hips"] = (2.0, 14.0 + sway * 4.5, -4.5 - sway * 2.0)
+            e["spine"] = (-3.0 + ds_breath * 2.2, -9.0 - sway * 3.0, 3.5 + sway * 1.8)
+            e["chest"] = (-3.5 + ds_breath * 2.8, -4.5 + sway * 2.2, 1.5)
+            e["upperChest"] = (-1.5 + ds_breath * 1.6, 0.0, 0.0)
+            e["neck"] = (look_y * 4.5 - 1.5, look_x * 8.0 - 2.0, -2.0)
             e["head"] = (
-                look_y * 7.0 + 3.0 + (6.0 if caressing else 0.0),
-                look_x * 14.0 + math.sin(t * 1.4) * 3.0,
-                -5.5 + sway * 2.5 + (6.0 if caressing else 0.0),
+                look_y * 7.0 + 2.0 + (6.0 if caressing else 0.0),
+                look_x * 14.0 - 4.0 + math.sin(t * 1.4) * 3.0,
+                -4.0 + sway * 2.4 + (6.0 if caressing else 0.0),
             )
-            e["leftUpperLeg"] = (-6.0, 4.0, 5.5 + sway * 1.5)
-            e["leftLowerLeg"] = (9.0, 0.0, 0.0)
-            e["rightUpperLeg"] = (3.0, -4.0, -4.0 + sway * 1.5)
-            e["rightLowerLeg"] = (4.0, 0.0, 0.0)
-            # Braço esquerdo solto gracioso + braço direito dobrado estiloso próximo à cintura!
-            e["leftUpperArm"] = (6.0, -10.0 - sway * 4.0, -62.0)
-            e["leftLowerArm"] = (0.0, -24.0 + breath * 3.0, -8.0)
-            e["rightShoulder"] = (0.0, 0.0, 6.0)
-            e["rightUpperArm"] = (12.0, 22.0 + sway * 3.0, 48.0)
-            e["rightLowerArm"] = (0.0, 62.0 - breath * 3.0, 24.0)
-            e["rightHand"] = (0.0, 0.0, -18.0)
+            if self._is_ds_builtin:
+                # Base larga poderosa em A-frame exibindo silhueta voluptuosa das coxas (Titan_idle!)
+                e["leftUpperLeg"] = (-5.0, 10.0, 21.0 + sway * 1.2)
+                e["leftLowerLeg"] = (10.0, 0.0, -5.0)
+                e["leftFoot"] = (-5.0, 0.0, -14.0)
+                e["rightUpperLeg"] = (4.0, -10.0, -21.0 + sway * 1.2)
+                e["rightLowerLeg"] = (8.0, 0.0, 5.0)
+                e["rightFoot"] = (-4.0, 0.0, 14.0)
+                # Ambas as mãos erguidas lateralmente canalizando energia arcana (Titan_idle!)
+                e["leftShoulder"] = (0.0, 0.0, -3.0 + ds_breath * 2.0)
+                e["leftUpperArm"] = (-8.0, -20.0 - sway * 3.5, -42.0 + ds_breath * 3.0)
+                e["leftLowerArm"] = (0.0, -38.0 + ds_breath * 4.0, 18.0)
+                e["leftHand"] = (0.0, 0.0, 14.0)
+                e["rightShoulder"] = (0.0, 0.0, 3.0 - ds_breath * 2.0)
+                e["rightUpperArm"] = (-10.0, 24.0 + sway * 3.5, 44.0 - ds_breath * 3.0)
+                e["rightLowerArm"] = (0.0, 42.0 - ds_breath * 4.0, -16.0)
+                e["rightHand"] = (0.0, 0.0, -14.0)
+            else:
+                e["leftUpperLeg"] = (-6.0, 4.0, 8.5 + sway * 1.5)
+                e["leftLowerLeg"] = (9.0, 0.0, 0.0)
+                e["rightUpperLeg"] = (3.0, -4.0, -7.5 + sway * 1.5)
+                e["rightLowerLeg"] = (4.0, 0.0, 0.0)
+                e["leftUpperArm"] = (6.0, -10.0 - sway * 4.0, -60.0)
+                e["leftLowerArm"] = (0.0, -24.0 + breath * 3.0, -8.0)
+                e["rightShoulder"] = (0.0, 0.0, 6.0)
+                e["rightUpperArm"] = (12.0, 22.0 + sway * 3.0, 48.0)
+                e["rightLowerArm"] = (0.0, 62.0 - breath * 3.0, 24.0)
+                e["rightHand"] = (0.0, 0.0, -18.0)
 
         # Sobrepõe braço direito segurando guarda-chuva na chuva (em pé/caminhada)
         if raining and action not in ("sleep", "sit_work", "sit_relax"):
@@ -448,6 +472,29 @@ class VrmAnimator:
                     (self._spring_sway_x + phase_off) * amp * 0.55 * xz_sign,
                 )
 
+        # Aplica rotação celeste suave no Halo Dourado atrás da cabeça (Dungeon Squad!)
+        if self._halo_node >= 0:
+            node_rot_delta[self._halo_node] = _quat_from_euler_xyz(
+                math.sin(self.time * 1.8) * 3.0,
+                math.cos(self.time * 1.4) * 4.0,
+                (self.time * 16.0) % 360.0,
+            )
+
+        # Escala estilizada opcional para VRMs externos aproximarem proporções compactas estilo Dungeon Squad
+        bone_scale_mul: dict[int, np.ndarray] = {}
+        if self.stylized_proportions and not self._is_ds_builtin:
+            scale_map = {
+                "head": (1.20, 1.18, 1.18),
+                "spine": (0.88, 0.94, 0.90),
+                "chest": (1.16, 1.00, 1.18),
+                "leftUpperLeg": (1.20, 0.92, 1.18),
+                "rightUpperLeg": (1.20, 0.92, 1.18),
+            }
+            for bname, sm in scale_map.items():
+                bi = hb.get(bname)
+                if bi is not None:
+                    bone_scale_mul[bi] = np.array(sm, dtype=np.float32)
+
         hips_node = hb.get("hips", -1)
         # Giro total 360° aplicado na raiz (corrige +180° automaticamente para VRM 0.x que olha -Z!)
         base_facing = 0.0 if model.is_vrm1 else 180.0
@@ -464,7 +511,8 @@ class VrmAnimator:
             q = n.rotation
             if ni in node_rot_delta:
                 q = _quat_mul(q, node_rot_delta[ni])
-            local_m = _mat4_from_trs(t, q, n.scale)
+            sc = n.scale * bone_scale_mul[ni] if ni in bone_scale_mul else n.scale
+            local_m = _mat4_from_trs(t, q, sc)
             local_mats[ni] = local_m
             if n.parent >= 0:
                 world[ni] = world[n.parent] @ local_m

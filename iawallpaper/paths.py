@@ -89,8 +89,10 @@ class Paths:
         return sorted(found.values(), key=lambda p: (pref.get(p.name.lower(), 5), p.name.lower()))
 
     def resolve_vrm_model(self, name_or_path: str = "") -> Path | None:
-        """Resolve o caminho de um modelo `.vrm` por nome/caminho absoluto ou escolhe o melhor padrão."""
+        """Resolve o caminho de um modelo `.vrm` ou o avatar procedural `"dungeon_squad"`."""
         if name_or_path:
+            if str(name_or_path).strip().lower() in ("dungeon_squad", "builtin:dungeon_squad"):
+                return Path("dungeon_squad")
             direct = Path(name_or_path)
             if direct.is_file():
                 return direct

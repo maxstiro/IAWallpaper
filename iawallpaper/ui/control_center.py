@@ -526,7 +526,8 @@ class ControlCenterWindow(QWidget):
     def _populate_vrm_models(self) -> None:
         self.cb_vrm.blockSignals(True)
         self.cb_vrm.clear()
-        self.cb_vrm.addItem("Automático (Melhor modelo .VRM disponível)", "")
+        self.cb_vrm.addItem("★ Dungeon Squad 3D Pixel-Art (Nativo · Trajes Dinâmicos)", "dungeon_squad")
+        self.cb_vrm.addItem("Automático (Melhor .VRM externo disponível)", "")
         for fp in self._vrm_models:
             self.cb_vrm.addItem(fp.name, fp.name)
         self.cb_vrm.blockSignals(False)

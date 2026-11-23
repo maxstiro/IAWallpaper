@@ -136,19 +136,20 @@ def render_world_showcase(
     canvas.avatar.vrm_dynamic_recolor = False  # preserva as cores nativas do VRM no showcase
 
     shots = [
-        (10.5, "clear", "overlook", "idle", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada na praca do observatorio!"),
-        (18.0, "clear", "lantern", "wave", "affectionate", "Carinhosa", "heart", "IDLE", "Oi! O por do sol na praca esta magico!"),
-        (16.0, "rain", "garden_l", "walk", "cozy", "Aconchegada", "music", "MUSIC", "Caminhando com guarda-chuva na chuva suave!"),
-        (23.5, "clear", "music_spot", "dance", "happy", "Animada", "sparkle", "IDLE", "Dancando sob a lua e os vaga-lumes!"),
+        (10.5, "clear", "overlook", "idle", "starlight", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada — Traje Astral (Pixel-Art 3D)!"),
+        (18.0, "clear", "lantern", "wave", "focus", "affectionate", "Carinhosa", "heart", "IDLE", "Por do sol — Traje Sacerdotisa + Cajado Crescente!"),
+        (16.0, "rain", "garden_l", "walk", "casual", "cozy", "Aconchegada", "music", "MUSIC", "Chuva suave — Traje Valquiria caminhando em 360°!"),
+        (23.5, "clear", "music_spot", "dance", "starlight", "happy", "Animada", "sparkle", "IDLE", "Noite magica — Giro 360° sob a lua e vaga-lumes!"),
     ]
 
     tiles: list[Image.Image] = []
     tmp_dir = out_path.parent
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    for idx, (hour, cond, spot, act, mood, label, emote, activity, whisper) in enumerate(shots):
+    for idx, (hour, cond, spot, act, outfit, mood, label, emote, activity, whisper) in enumerate(shots):
         canvas.circadian = compute_circadian(hour)
         canvas.weather = WeatherState(condition=cond, intensity=0.9 if cond != "clear" else 0.0, temperature_c=20.0)
+        canvas.avatar.outfit = outfit
         canvas.emotion = EmotionState(mood=mood, label=label, valence=0.8, arousal=0.5, blush=0.4)
         canvas.asleep = act == "sleep"
         canvas.affinity = 65.0
@@ -291,6 +292,7 @@ def render_animated_gif(
         vrm_path=vrm_p,
     )
     canvas.avatar.vrm_dynamic_recolor = False
+    canvas.avatar.outfit = "starlight"
 
     canvas.circadian = compute_circadian(17.8)  # Golden hour cinematográfico na praça!
     canvas.weather = WeatherState(condition="clear", intensity=0.0, temperature_c=23.0, wind_speed=8.0)
@@ -364,7 +366,7 @@ def main() -> int:
     parser.add_argument("--persona", default="mira")
     parser.add_argument("--scene", default="sky_sanctuary")
     parser.add_argument("--style", choices=("vrm_3d", "world_sprite"), default="vrm_3d")
-    parser.add_argument("--vrm", default="", help="Nome/caminho de modelo .vrm específico (vazio = padrão).")
+    parser.add_argument("--vrm", default="dungeon_squad", help="Nome/caminho de modelo .vrm ou 'dungeon_squad' (padrão).")
     parser.add_argument("--mode", choices=("world", "scenes", "expressions", "outfits", "sprites", "rig_parts", "gif"), default="world")
     parser.add_argument("--out", default="showcase.png")
     args = parser.parse_args()
