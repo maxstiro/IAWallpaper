@@ -136,7 +136,9 @@ class AvatarRig:
         self.pos_y: float = 0.78
         self.target_x: float = 0.52
         self.target_y: float = 0.78
+        self._waypoints: list[tuple[float, float]] = []
         self._arrive_action: str = "idle"
+        self._clip_fade_dur: float = 0.22
         self.facing: int = 1                   # -1 esquerda, +1 direita
         self.move_dir: str = "front"           # "side" | "back" | "front" (orientação 4-vias estilo RO/ToS!)
         self.walk_speed: float = 0.115
@@ -396,6 +398,7 @@ class AvatarRig:
         return self._rig is not None
 
     def walk_to(self, tx: float, ty: float, arrive_action: str = "idle", run: bool = False) -> None:
+        self._waypoints.clear()
         cx, cy = WorldStage.clamp_walkable(tx, ty)
         self.target_x = cx
         self.target_y = cy
@@ -412,6 +415,15 @@ class AvatarRig:
         else:
             self._running = False
             self.trigger_action(arrive_action)
+
+    def walk_path(self, points: list[tuple[float, float]], arrive_action: str = "idle", run: bool = False) -> None:
+        """Encadeia múltiplos waypoints sem parar nem exibir `idle` entre curvas de direção."""
+        clamped = [WorldStage.clamp_walkable(px, py) for px, py in points]
+        if not clamped:
+            return
+        first_x, first_y = clamped[0]
+        self.walk_to(first_x, first_y, arrive_action=arrive_action, run=run)
+        self._waypoints = list(clamped[1:])
 
     def trigger_action(self, action: str) -> None:
         if self._char_pack is not None and action != self.action:
@@ -554,6 +566,14 @@ class AvatarRig:
                 self._clip_time = 0.0
                 self.action_timer = 0.0
 
+        # Avança automaticamente para o próximo waypoint da rota sem passar por `idle`!
+        while self._waypoints and dist <= 0.016 and not caressing:
+            nx, ny = self._waypoints.pop(0)
+            self.target_x, self.target_y = nx, ny
+            dx = self.target_x - self.pos_x
+            dy = self.target_y - self.pos_y
+            dist = math.hypot(dx, dy)
+
         if dist > 0.008 and not caressing:
             self._trans_resolved = None
             self._pending_action = None
@@ -566,13 +586,14 @@ class AvatarRig:
                 resolved_move = self._char_pack.resolve_action(self.action, self.compass_dir)
                 if resolved_move is not None:
                     synced_speed = self._char_pack.synced_walk_speed_norm(resolved_move, depth_mul)
-                    decel = clamp(dist / 0.045, 0.48, 1.0)
+                    # Só desacelera ao chegar no ÚLTIMO waypoint (curvas intermediárias mantêm passo contínuo!)
+                    decel = 1.0 if self._waypoints else clamp(dist / 0.045, 0.48, 1.0)
                     actual_speed = synced_speed * decel
                     clip_speed_mul = resolved_move.speed_mul * clamp(actual_speed / max(synced_speed, 1e-4), 0.65, 1.35)
                     step_dist = min(dist, actual_speed * dt)
                     step_period = max(0.24, (resolved_move.clip.duration / max(clip_speed_mul, 0.25)) * 0.5)
                 else:
-                    speed_mul = clamp(dist / 0.055, 0.38, 1.0)
+                    speed_mul = 1.0 if self._waypoints else clamp(dist / 0.055, 0.38, 1.0)
                     clip_speed_mul = clamp(0.75 + 0.35 * speed_mul, 0.72, 1.12)
                     step_dist = min(dist, self.walk_speed * depth_mul * speed_mul * dt)
                     step_period = 0.34
@@ -645,7 +666,7 @@ class AvatarRig:
 
         self._clip_time += dt * clip_speed_mul
         if self._clip_fade_t < 1.0:
-            self._clip_fade_t = min(1.0, self._clip_fade_t + dt / 0.22)
+            self._clip_fade_t = min(1.0, self._clip_fade_t + dt / max(self._clip_fade_dur, 0.05))
             if self._clip_fade_t >= 1.0:
                 self._prev_clip_frame = None
 
@@ -783,15 +804,22 @@ class AvatarRig:
                 sig = (resolved.key, resolved.flip_x, resolved.reverse)
                 play_t = self._trans_time if self._trans_resolved is not None else self._clip_time
                 if sig != self._current_pack_sig:
+                    keep_stride_phase = False
                     if self._current_pack_sig is not None:
                         prev_k, prev_flip, prev_rev = self._current_pack_sig
                         prev_c = self._char_pack.clips.get(prev_k)
+                        keep_stride_phase = (
+                            self._trans_resolved is None
+                            and prev_k.startswith(("walk_", "run_"))
+                            and resolved.key.startswith(("walk_", "run_"))
+                        )
                         if prev_c is not None:
                             self._prev_clip_frame = prev_c.frame_at(self._clip_time, reverse=prev_rev)
                             self._prev_clip_flip = prev_flip
                             self._clip_fade_t = 0.0
+                            self._clip_fade_dur = 0.11 if keep_stride_phase else 0.20
                     self._current_pack_sig = sig
-                    if self._trans_resolved is None:
+                    if self._trans_resolved is None and not keep_stride_phase:
                         self._clip_time = 0.0
                         play_t = 0.0
                 lift = max(0.0, -self.bounce_y)

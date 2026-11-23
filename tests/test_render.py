@@ -547,3 +547,19 @@ def test_character_pack_8dir_mirroring_reversal_and_step_sync(tmp_path):
         canvas.step_animation(0.05)
     assert canvas.avatar.action == "idle" and canvas.avatar._trans_resolved is None
     assert not canvas.render_to_image(480, 270).isNull()
+
+    # Rota multi-waypoint (`walk_path`): curvas L -> N -> O sem NUNCA piscar `idle_SE` entre direções!
+    canvas.avatar.pos_x, canvas.avatar.pos_y = 0.35, 0.88
+    canvas.avatar.walk_path([(0.52, 0.88), (0.52, 0.74), (0.36, 0.74)], arrive_action="idle")
+    walk_sigs = []
+    for _ in range(180):
+        canvas.step_animation(0.05)
+        canvas.render_to_image(320, 180)
+        if canvas.avatar.action == "walk":
+            walk_sigs.append(canvas.avatar._current_pack_sig[0])
+        elif walk_sigs:
+            # Chegou ao final da rota -> verifica que nunca entrou em idle antes do fim!
+            break
+    assert "walk_L" in walk_sigs and "walk_N" in walk_sigs
+    assert "idle_SE" not in walk_sigs
+    assert canvas.avatar.action == "idle"
