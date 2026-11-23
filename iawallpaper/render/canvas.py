@@ -25,12 +25,12 @@ class WallpaperCanvas(QWidget):
     whisper_dismissed = Signal()
     cursor_approaching = Signal(bool)  # True quando cursor se aproxima suavemente da avatar
 
-    def __init__(self, persona: Persona, sprite_dirs=None, scene_dirs=None, render_style: str = "world_sprite", parent=None):
+    def __init__(self, persona: Persona, sprite_dirs=None, scene_dirs=None, render_style: str = "world_sprite", vrm_path=None, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.setMouseTracking(True)
 
-        self.avatar = AvatarRig(persona, sprite_dirs=sprite_dirs, render_style=render_style)
+        self.avatar = AvatarRig(persona, sprite_dirs=sprite_dirs, render_style=render_style, vrm_path=vrm_path)
         self.scene = SceneCompositor(scene_dirs=scene_dirs, seed=persona.seed)
         self.particles = ParticleEngine(seed=persona.seed + 17)
 
@@ -113,7 +113,7 @@ class WallpaperCanvas(QWidget):
             elif hit is not None:
                 self.avatar.impulse(vy=-210.0, tilt=(-5.0 if local_x < head_c.x() else 5.0))
                 self.avatar_poked.emit(hit)
-            elif self.avatar.render_style == "world_sprite" and (local_y / h) >= 0.72:
+            elif self.avatar.render_style in ("vrm_3d", "world_sprite") and (local_y / h) >= 0.65:
                 self.scene.stage.spawn_cursor_ripple(local_x / w, local_y / h)
                 self.ground_clicked.emit(local_x / w, local_y / h)
         self._was_mouse_down = left_down

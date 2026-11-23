@@ -33,6 +33,8 @@ class Paths:
         self.personas_dir = self.assets_dir / "personas"
         self.scenes_dir = self.assets_dir / "scenes"
         self.generated_dir = self.assets_dir / "generated"
+        self.vrm_dir = self.assets_dir / "vrm"
+        self.vrm_generated_dir = self.generated_dir / "vrm"
 
         self.settings_file = self.data_dir / "settings.json"
         self.routine_file = self.data_dir / "routine.json"
@@ -72,3 +74,29 @@ class Paths:
         if not valid_id(scene_id):
             raise ValueError(f"scene_id inválido: {scene_id!r}")
         return self.generated_dir / "scenes" / scene_id
+
+    def list_vrm_models(self) -> list[Path]:
+        """Lista todos os modelos 3D `.vrm` / `.glb` disponíveis nas pastas de assets."""
+        found: dict[str, Path] = {}
+        for folder in (self.vrm_generated_dir, self.vrm_dir):
+            if not folder.exists():
+                continue
+            for ext in ("*.vrm", "*.glb"):
+                for fp in sorted(folder.glob(ext)):
+                    found[fp.name.lower()] = fp
+        # Ordena priorizando os modelos femininos anime estilizados (Victoria_Rubin, AvatarSample_A, vroid_sample)
+        pref = {"victoria_rubin.vrm": 0, "avatarsample_a.vrm": 1, "vroid_sample.vrm": 2, "seed_san.vrm": 9}
+        return sorted(found.values(), key=lambda p: (pref.get(p.name.lower(), 5), p.name.lower()))
+
+    def resolve_vrm_model(self, name_or_path: str = "") -> Path | None:
+        """Resolve o caminho de um modelo `.vrm` por nome/caminho absoluto ou escolhe o melhor padrão."""
+        if name_or_path:
+            direct = Path(name_or_path)
+            if direct.is_file():
+                return direct
+            for folder in (self.vrm_dir, self.vrm_generated_dir):
+                cand = folder / name_or_path
+                if cand.is_file():
+                    return cand
+        models = self.list_vrm_models()
+        return models[0] if models else None

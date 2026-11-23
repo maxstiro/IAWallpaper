@@ -8,6 +8,9 @@ from .rig_cutter import AutoRiggedCharacter, RigPart, build_rig_from_apose
 from .scene import SceneCompositor
 from .skeleton import BoneWorld, CharacterSkeleton, PoseTargets, RigProportions
 from .sprite_clip import SpriteClip, load_clips_from_dirs, load_sprite_clip
+from .vrm_animator import VrmAnimator
+from .vrm_loader import VrmModel, load_vrm
+from .vrm_renderer import VrmRenderer, compute_role_tints
 from .world_stage import WorldStage
 
 __all__ = [
@@ -27,5 +30,10 @@ __all__ = [
     "SpriteClip",
     "load_clips_from_dirs",
     "load_sprite_clip",
+    "VrmAnimator",
+    "VrmModel",
+    "load_vrm",
+    "VrmRenderer",
+    "compute_role_tints",
     "WorldStage",
 ]

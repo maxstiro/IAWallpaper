@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-22 (Milestone 12 — Locomoção & Orientação 4-Vias Real via Qwen 2.1 Turnaround + Wan 2.2 Direcional)
+> **Última atualização**: 2026-11-22 (Milestone 13 — Motor 3D Cel-Shaded VRM 0.x/1.0 em GPU ModernGL + Modo 2D Wan 2.2 Opcional)
 
 ---
 
@@ -9,48 +9,45 @@
 
 | Módulo | Caminho | Status | Notas |
 |---|---|---|---|
-| Infra & Docs | `PROJETO.md`, `STATE.md`, `roadmap.md`, `AGENTS.md`, `venv/` | 🟢 Concluído | Venv Python 3.12 com 12 pacotes instalados |
-| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Escrita atômica anti-NaN e recuperação `.corrompido` |
+| Infra & Docs | `PROJETO.md`, `STATE.md`, `roadmap.md`, `AGENTS.md`, `venv/` | 🟢 Concluído | Venv Python 3.12 com PySide6, NumPy, Pillow, psutil, pywin32, moderngl, pytest |
+| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Resolução de `.vrm`/`.glb`, `render_style="vrm_3d"` padrão, escrita atômica anti-NaN |
 | Núcleo Neural (`core/`) | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | 🟢 Validado | 438 neurônios LIF, aprendizado 3 fatores, Rescorla-Wagner, Bandit, Mira & Nyx |
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
 | Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
-| Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py` | 🟢 Validado E2E | Qwen 2.1 Turnaround (`pose_side`/`pose_back`) + Wan 2.2 `WanFirstLastFrameToVideo` direcional + Qwen 2.1 relighting 1:1 |
-| Render (`render/`) | `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Orientação 4-vias (`side` dir/esq, `back`, `front`), velocidade/cadência acoplada à perspectiva, HUD responsivo, anel mágico RO/ToS |
-| Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma pela praça 2.5D (`overlook`, `lantern`, `music_spot`, `desk`, `cushion`), poses (`wave`/`dance`), emotes RO, sono e sussurros |
-| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + seletor Preset ComfyUI + Mundo 2.5D/Retrato + Criador de Waifu + Monitor Neural |
-| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 29/29 Verdes | `pytest` completo + `generate_pack.py --style world/clips/directional` + `render_showcase.py --mode world/gif` |
+| Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py` | 🟢 Validado E2E | Cenários 2.5D + Qwen 2.1 relighting 1:1 + Qwen Turnaround + Wan 2.2 `WanFirstLastFrameToVideo` |
+| Render 3D & 2.5D (`render/`) | `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | Motor 3D MToon OpenGL 3.3 (>300 FPS, MSAA 4x, GPU bone-texture skinning, giro 360°, morphs faciais, `VRMC_node_constraint`, SpringBones) + Clipes 2D Wan 2.2 opcionais |
+| Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma pela praça 2.5D, poses (`wave`/`dance`/`stretch`/`sit_work`/`sleep`), emotes RO, sono e sussurros |
+| Interface (`ui/`) | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | 🟢 Validado | Central 4 abas Dark Studio + seletor de Motor Visual (`vrm_3d` / `world_sprite` / `portrait`) + seletor/importador **📂 Carregar .VRM** + tingimento dinâmico |
+| App & Testes | `iawallpaper/app.py`, `main.py`, `start_iawallpaper.ps1`, `tools/`, `tests/` | 🟢 30/30 Verdes | `pytest` completo (incluindo GPU VRM 3D) + `render_showcase.py --style vrm_3d` |
 
 ---
 
-## 2. Assets Gerados Localmente (ComfyUI Read-Only, fora do Git)
-- **Mira — 6 Clipes RGBA Animados em Loop Infinito (`assets/generated/personas/mira/clip_*.webp`)**:
-  - Base `rig_base.png` (`RawSexyGlowingGemPencil(TOP)`) + turnaround fiel **Qwen 2.1** (`pose_side.png` em perfil 3/4 direita e `pose_back.png` de costas), animados via **Wan 2.2 14B Lightning (`WanFirstLastFrameToVideo`) + `isnet-anime` RemBG** (`25 frames`, `416x640`, `12 FPS`, RGBA limpo):
-    - `clip_idle.webp`: respiração orgânica, piscar, sorriso suave e brisa no cabelo.
-    - `clip_walk.webp`: caminhada frontal descendo em direção à câmera.
-    - `clip_walk_side.webp`: caminhada em perfil 3/4 real para a direita (espelhada automaticamente para a esquerda com `facing = -1`).
-    - `clip_walk_back.webp`: caminhada de costas subindo em direção à árvore sagrada.
-    - `clip_wave.webp`: sorriso de olhos fechados, braço erguendo e aceno caloroso.
-    - `clip_dance.webp`: dança/giro estilo Tree of Savior com saia plissada abrindo e cabelo esvoaçante.
-- **Observatório Celeste — Praça Aberta 3/4 Tree of Savior Reiluminada 1:1 (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**:
-  - `diorama_day.png`, `diorama_sunset.png`, `diorama_night.png`, `diorama_rain.png` (100% sem bordas e consistentes via Qwen 2.1).
-- **Prévias & GIFs Validados**: `m12_dir_clips_sheet.png`, `m12_locomotion_storyboard.png` e `m12_locomotion_demo.gif` (enviados ao Telegram).
+## 2. Assets Locais (fora do Git)
+- **Modelos 3D Anime VRM (`assets/generated/vrm/`)** — CC0 / amostras oficiais Pixiv & VRM Consortium:
+  - `Victoria_Rubin.vrm` (padrão, VRM 0.x, 54 ossos humanoides, 13 expressões faciais, 25 cadeias SpringBone — visual fantasia estilo *Tree of Savior*).
+  - `AvatarSample_A.vrm` (VRM 0.x, 54 ossos, cardigã creme e meias escuras).
+  - `vroid_sample.vrm` (VRM 1.0, 54 ossos, 14 expressões, 22 SpringBones, 14 `VRMC_node_constraint`).
+  - `seed_san.vrm` (VRM 1.0 oficial).
+  - Qualquer `.vrm` ou `.glb` customizado (VRoid Studio, Booth, etc.) pode ser carregado em 1 clique via **📂 Carregar .VRM** na Central de Controle.
+- **Cenário 2.5D Reiluminado 1:1 (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**:
+  - Praça aberta estilo Tree of Savior (`day`, `sunset`, `night`, `rain`) sem bordas via Qwen Image 2.1 Edit.
+- **Clipes 2D Opcionais da Mira (`assets/generated/personas/mira/clip_*.webp`)**:
+  - 6 clipes RGBA Wan 2.2 (`idle`, `walk`, `walk_side`, `walk_back`, `wave`, `dance`) preservados para o modo opcional `"world_sprite"`.
+- **Prévias & GIFs Validados**: `m13_vrm3d_showcase.png`, `m13_vrm3d_storyboard.png` e `m13_vrm3d_360_demo.gif` (enviados ao Telegram).
 
 ---
 
-## 3. Bugs Encontrados e Resolvidos (Milestones 6–12)
-1. **Filtro de consolidação em `core/episodic.py`**: Ajustado filtro em `preferences()` para `n >= 0.2`.
-2. **Retângulo semitransparente em volta do sprite RGBA (`render/avatar.py`)**: Corrigido via buffer `QPixmap` transparente com cache.
-3. **Glifos virando caixas em offscreen (`render/particles.py`)**: Substituídos por formas vetoriais `QPainterPath`.
-4. **Erro `numpy._ArrayMemoryError` em `pymatting` (`comfy/workflows.py`)**: `alpha_matting=False` mantendo `model="isnet-anime"` e `post_processing=True`.
-5. **Efeito "marionete 2D" (Milestone 11)**: Substituído como renderizador primário por clipes RGBA quadro-a-quadro reais via Wan 2.2 `WanFirstLastFrameToVideo`.
-6. **Caminhada lateral "olhando para a câmera" e HUD grande em janelas menores (Milestone 12)**: Resolvido com turnaround direcional fiel via Qwen 2.1 (`pose_side`/`pose_back`) + clipes Wan 2.2 (`clip_walk_side`/`clip_walk_back`), seleção 4-vias compensada para 16:9 (`abs(vx_vis) >= abs(vy_vis) * 1.35`), espelhamento exclusivo nos clipes direcionais (sem inverter a presilha frontal), cadência vertical sincronizada ao passo e escala responsiva no HUD ambiental (`scene.py`).
+## 3. Bugs Encontrados e Resolvidos (Milestone 13)
+1. **Estrutura de `VRMC_springBone` em VRM 1.0 (`vrm_loader.py`)**: `sp["joints"]` pode conter dicts diretamente em vez de índices inteiros — suporte unificado para ambos os formatos.
+2. **Mangas rígidas em modelos VRM 1.0 com twist bones (`vrm_loader.py`, `vrm_animator.py`)**: Implementado suporte completo a `VRMC_node_constraint` (`aim`, `roll`, `rotation`) com propagação recursiva para nós filhos (`_propagate`), eliminando completamente mangas levantadas na T-pose.
+3. **Diferença de orientação VRM 0.x (`-Z`) vs VRM 1.0 (`+Z`) (`vrm_animator.py`)**: Adicionado fator `xz_sign = 1.0 if model.is_vrm1 else -1.0` + rotação raiz `+180°` para VRM 0.x, garantindo animações 100% idênticas em ambos os padrões.
+4. **Projeção exata da sola dos pés (`vrm_renderer.py`, `avatar.py`)**: Calculada a coordenada normalizada exata `last_foot_v` de `(0, min_y, 0)` pela matriz `mvp`, travando os saltos no chão sem variação de escala ao erguer os braços.
 
 ---
 
 ## 4. Como Executar
 - **Modo Wallpaper Dinâmico (atrás dos ícones)**: `.\start_iawallpaper.ps1` ou `.\venv\Scripts\python.exe main.py`
 - **Modo Preview + Central de Controle**: `.\start_iawallpaper.ps1 -Preview -Studio`
-- **Gerar Caminhadas Direcionais (Qwen + Wan 2.2)**: `.\venv\Scripts\python.exe tools\generate_pack.py --persona mira --style directional`
-- **Gerar Showcase ou GIF Animado**: `.\venv\Scripts\python.exe tools\render_showcase.py --persona mira --scene sky_sanctuary --mode gif --out demo.gif`
+- **Renderizar Showcase ou GIF 3D VRM**: `.\venv\Scripts\python.exe tools\render_showcase.py --style vrm_3d --vrm Victoria_Rubin.vrm --mode gif --out demo3d.gif`
 - **Suíte de Testes**: `$env:QT_QPA_PLATFORM="offscreen"; .\venv\Scripts\python.exe -m pytest -v`
 - **Git / GitHub**: Remote via SSH (`git@github.com:maxstiro/IAWallpaper.git`, branch `main`).

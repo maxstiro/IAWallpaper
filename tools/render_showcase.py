@@ -110,8 +110,14 @@ def render_strip(persona_id: str, names: list[str], out_path: Path) -> Path:
     return out_path
 
 
-def render_world_showcase(persona_id: str, scene_id: str, out_path: Path) -> Path:
-    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (RO / Tree of Savior / Pokémon NDS)."""
+def render_world_showcase(
+    persona_id: str,
+    scene_id: str,
+    out_path: Path,
+    render_style: str = "vrm_3d",
+    vrm_name: str = "",
+) -> Path:
+    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (Motor 3D VRM ou Clipes 2D Wan 2.2)."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -119,12 +125,15 @@ def render_world_showcase(persona_id: str, scene_id: str, out_path: Path) -> Pat
 
     paths = Paths(base_dir=ROOT)
     persona = load_persona(persona_id, personas_dir=paths.personas_dir)
+    vrm_p = paths.resolve_vrm_model(vrm_name) if render_style == "vrm_3d" else None
     canvas = WallpaperCanvas(
         persona,
         sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
         scene_dirs=[paths.scene_assets(scene_id), paths.scene_generated_assets(scene_id)],
-        render_style="world_sprite",
+        render_style=render_style,
+        vrm_path=vrm_p,
     )
+    canvas.avatar.vrm_dynamic_recolor = False  # preserva as cores nativas do VRM no showcase
 
     shots = [
         (10.5, "clear", "overlook", "idle", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada na praca do observatorio!"),
@@ -255,8 +264,17 @@ def render_rig_parts_sheet(persona_id: str, out_path: Path) -> Path:
     return out_path
 
 
-def render_animated_gif(persona_id: str, scene_id: str, out_path: Path, width: int = 800, height: int = 450, fps: int = 12) -> Path:
-    """Renderiza GIF animado de ~4.5s demonstrando caminhada esquelética real, aceno, alongamento e sentar."""
+def render_animated_gif(
+    persona_id: str,
+    scene_id: str,
+    out_path: Path,
+    width: int = 800,
+    height: int = 450,
+    fps: int = 12,
+    render_style: str = "vrm_3d",
+    vrm_name: str = "",
+) -> Path:
+    """Renderiza GIF animado de 8s demonstrando caminhada 360°, subida de costas, aceno e dança giratória."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -264,29 +282,31 @@ def render_animated_gif(persona_id: str, scene_id: str, out_path: Path, width: i
 
     paths = Paths(base_dir=ROOT)
     persona = load_persona(persona_id, personas_dir=paths.personas_dir)
+    vrm_p = paths.resolve_vrm_model(vrm_name) if render_style == "vrm_3d" else None
     canvas = WallpaperCanvas(
         persona,
         sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
         scene_dirs=[paths.scene_assets(scene_id), paths.scene_generated_assets(scene_id)],
-        render_style="world_sprite",
+        render_style=render_style,
+        vrm_path=vrm_p,
     )
+    canvas.avatar.vrm_dynamic_recolor = False
 
-    canvas.circadian = compute_circadian(17.8)  # Golden hour cinematográfico no terraço!
+    canvas.circadian = compute_circadian(17.8)  # Golden hour cinematográfico na praça!
     canvas.weather = WeatherState(condition="clear", intensity=0.0, temperature_c=23.0, wind_speed=8.0)
     canvas.emotion = EmotionState(mood="happy", label="Radiante", valence=0.88, arousal=0.6, blush=0.35)
     canvas.asleep = False
-    canvas.affinity = 74.0
+    canvas.affinity = 78.0
     canvas.activity = "IDLE"
 
-    # Demonstração completa de locomoção & orientação 4-vias (Direita -> Costas subindo -> Esquerda -> Parar & Acenar!)
+    # Demonstração completa: Direita -> Subindo de Costas -> Esquerda -> Aceno -> Dança 360° Tree of Savior!
     canvas.avatar.pos_x = 0.36
     canvas.avatar.pos_y = 0.90
     canvas.avatar.walk_to(0.68, 0.89, arrive_action="idle")
-    canvas.scene.set_whisper("Caminhando para a direita em perfil 3/4...", 1.0)
+    canvas.scene.set_whisper("Passeando em 3D pela praca (giro 360°)...", 1.0)
     canvas.render_to_image(width, height)
     for _ in range(20):
         canvas.step_animation(0.05)
-    # Reposiciona início limpo após crossfade do fundo
     canvas.avatar.pos_x = 0.36
     canvas.avatar.pos_y = 0.90
     canvas.avatar.walk_to(0.68, 0.89, arrive_action="idle")
@@ -294,27 +314,28 @@ def render_animated_gif(persona_id: str, scene_id: str, out_path: Path, width: i
 
     frames: list[Image.Image] = []
     dt = 1.0 / fps
-    total_frames = int(fps * 7.5)  # 90 frames = 7.5s (direita -> costas -> esquerda -> aceno!)
+    total_frames = int(fps * 8.0)  # 96 frames = 8 segundos fluidos
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_frame = out_path.parent / "_gif_frame.png"
 
     for i in range(total_frames):
-        if i == int(fps * 2.1):
-            # Vira de costas e sobe em direção à árvore sagrada (clip_walk_back!)
-            canvas.avatar.walk_to(canvas.avatar.pos_x - 0.04, 0.72, arrive_action="idle")
-            canvas.scene.set_whisper("Subindo ate a arvore sagrada (de costas)...", 1.0)
-        elif i == int(fps * 3.8):
-            # Volta caminhando para a esquerda em perfil 3/4 espelhado (facing = -1!)
-            canvas.avatar.walk_to(0.36, 0.82, arrive_action="wave")
-            canvas.scene.set_whisper("Voltando para a esquerda em perfil...", 1.0)
-        elif i == int(fps * 5.6):
-            # Chega, vira de frente e acena com anel mágico!
+        if i == int(fps * 1.9):
+            canvas.avatar.walk_to(canvas.avatar.pos_x - 0.05, 0.72, arrive_action="idle")
+            canvas.scene.set_whisper("Subindo os degraus ate a arvore sagrada...", 1.0)
+        elif i == int(fps * 3.4):
+            canvas.avatar.walk_to(0.42, 0.85, arrive_action="wave")
+            canvas.scene.set_whisper("Voltando para o centro da praca...", 1.0)
+        elif i == int(fps * 5.0):
             canvas.avatar.target_x = canvas.avatar.pos_x
             canvas.avatar.target_y = canvas.avatar.pos_y
             canvas.avatar.trigger_action("wave")
-            canvas.avatar.show_emote("heart", duration=2.4)
-            canvas.scene.set_whisper("Pronto! Orientacao 4-vias estilo RO / ToS!", 1.0)
+            canvas.avatar.show_emote("heart", duration=1.8)
+            canvas.scene.set_whisper("Oi! Expressao facial & aceno em tempo real!", 1.0)
+        elif i == int(fps * 6.4):
+            canvas.avatar.trigger_action("dance")
+            canvas.avatar.show_emote("sparkle", duration=2.0)
+            canvas.scene.set_whisper("Giro 360° estilo Tree of Savior!", 1.0)
 
         # Sub-steps de 25ms para física de mola ultra suave
         sub = 3
@@ -342,15 +363,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--persona", default="mira")
     parser.add_argument("--scene", default="sky_sanctuary")
+    parser.add_argument("--style", choices=("vrm_3d", "world_sprite"), default="vrm_3d")
+    parser.add_argument("--vrm", default="", help="Nome/caminho de modelo .vrm específico (vazio = padrão).")
     parser.add_argument("--mode", choices=("world", "scenes", "expressions", "outfits", "sprites", "rig_parts", "gif"), default="world")
     parser.add_argument("--out", default="showcase.png")
     args = parser.parse_args()
     if args.mode == "world":
-        out = render_world_showcase(args.persona, args.scene, Path(args.out))
+        out = render_world_showcase(args.persona, args.scene, Path(args.out), render_style=args.style, vrm_name=args.vrm)
     elif args.mode == "rig_parts":
         out = render_rig_parts_sheet(args.persona, Path(args.out))
     elif args.mode == "gif":
-        out = render_animated_gif(args.persona, args.scene, Path(args.out))
+        out = render_animated_gif(args.persona, args.scene, Path(args.out), render_style=args.style, vrm_name=args.vrm)
     elif args.mode == "sprites":
         out = render_strip(args.persona, ["rig_base", "sprite_idle", "sprite_walk1", "sprite_walk2", "sprite_sit", "sprite_happy"], Path(args.out))
     elif args.mode == "expressions":

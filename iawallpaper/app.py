@@ -132,7 +132,9 @@ class IAWallpaperApp:
                 self.paths.scene_generated_assets(self.settings.scene_id),
             ],
             render_style=self.settings.render_style,
+            vrm_path=self.paths.resolve_vrm_model(self.settings.vrm_model),
         )
+        self.canvas.avatar.vrm_dynamic_recolor = self.settings.vrm_dynamic_recolor
         self.canvas.setWindowTitle(f"IAWallpaper — {self.persona.name}")
         self.canvas.caress_tick.connect(self._on_canvas_caress)
         self.canvas.avatar_poked.connect(self._on_canvas_poke)
@@ -141,7 +143,11 @@ class IAWallpaperApp:
         self.canvas.cursor_approaching.connect(self._on_cursor_approaching)
 
         # Janelas de controle & monitor neural
-        self.control_center = ControlCenterWindow(self.settings, personas_dir=self.paths.personas_dir)
+        self.control_center = ControlCenterWindow(
+            self.settings,
+            personas_dir=self.paths.personas_dir,
+            vrm_models=self.paths.list_vrm_models(),
+        )
         self._connect_control_center()
         self._update_asset_coverage()
         self.neural_monitor = NeuralMonitorWindow()
@@ -245,6 +251,7 @@ class IAWallpaperApp:
         self.canvas.avatar_scale = self.settings.avatar_scale
         self.canvas.avatar_x_ratio = self.settings.avatar_x_ratio
         self.canvas.avatar.render_style = self.settings.render_style
+        self.canvas.avatar.vrm_dynamic_recolor = self.settings.vrm_dynamic_recolor
         self.t_frame.setInterval(16 if self.settings.fps_cap >= 60 else 33)
 
     def _apply_window_mode(self, mode: str) -> None:
@@ -300,6 +307,9 @@ class IAWallpaperApp:
                     self.paths.scene_generated_assets(s.scene_id),
                 ]
             )
+
+        if s.vrm_model != old.vrm_model or (s.render_style == "vrm_3d" and not self.canvas.avatar.has_vrm_3d()):
+            self.canvas.avatar.set_vrm_model(self.paths.resolve_vrm_model(s.vrm_model))
 
         if s.mode != old.mode:
             self._apply_window_mode(s.mode)

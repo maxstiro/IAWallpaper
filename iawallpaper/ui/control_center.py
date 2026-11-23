@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -93,13 +94,14 @@ class ControlCenterWindow(QWidget):
     clear_generated_requested = Signal()
     clear_memory_requested = Signal()
 
-    def __init__(self, settings: Settings, personas_dir: Path | None = None, parent=None):
+    def __init__(self, settings: Settings, personas_dir: Path | None = None, vrm_models: list[Path] | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("IAWallpaper — Central de Controle")
-        self.resize(720, 600)
+        self.resize(720, 620)
         self.setStyleSheet(DARK_STUDIO_QSS)
         self._settings = settings.sanitized()
         self._personas_dir = personas_dir
+        self._vrm_models: list[Path] = list(vrm_models or [])
         self._building = True
 
         root = QVBoxLayout(self)
@@ -231,9 +233,22 @@ class ControlCenterWindow(QWidget):
         persona_row.addWidget(btn_new_persona)
 
         self.cb_render_style = QComboBox()
-        self.cb_render_style.addItem("Mundo Vivo 2.5D — Sprite Caminhando (RO / ToS / Pokémon)", "world_sprite")
-        self.cb_render_style.addItem("Retrato Visual Novel (Busto em Destaque)", "portrait")
+        self.cb_render_style.addItem("Motor 3D Cel-Shaded (VRM · Giro 360° estilo Tree of Savior)", "vrm_3d")
+        self.cb_render_style.addItem("Clipes 2D Animados (Wan 2.2 · Arte ComfyUI)", "world_sprite")
+        self.cb_render_style.addItem("Retrato Visual Novel (Busto 2.5D)", "portrait")
         self.cb_render_style.currentIndexChanged.connect(self._emit_settings)
+
+        vrm_row = QHBoxLayout()
+        self.cb_vrm = QComboBox()
+        self._populate_vrm_models()
+        self.cb_vrm.currentIndexChanged.connect(self._emit_settings)
+        btn_import_vrm = QPushButton("📂 Carregar .VRM")
+        btn_import_vrm.clicked.connect(self._browse_vrm_file)
+        vrm_row.addWidget(self.cb_vrm, 1)
+        vrm_row.addWidget(btn_import_vrm)
+
+        self.chk_vrm_recolor = QCheckBox("Adaptar cores do modelo 3D dinamicamente ao traje e persona")
+        self.chk_vrm_recolor.stateChanged.connect(self._emit_settings)
 
         self.cb_outfit = QComboBox()
         for label, key in [
@@ -260,7 +275,9 @@ class ControlCenterWindow(QWidget):
         self.chk_whispers.stateChanged.connect(self._emit_settings)
 
         f.addRow("Personagem:", persona_row)
-        f.addRow("Estilo do Avatar:", self.cb_render_style)
+        f.addRow("Motor Visual:", self.cb_render_style)
+        f.addRow("Modelo 3D (.vrm):", vrm_row)
+        f.addRow("", self.chk_vrm_recolor)
         f.addRow("Traje:", self.cb_outfit)
         f.addRow("Escala do Avatar:", self.sl_avatar_scale)
         f.addRow("Posição Horizontal:", self.sl_avatar_x)
@@ -441,6 +458,10 @@ class ControlCenterWindow(QWidget):
 
         self._set_combo(self.cb_persona, s.persona_id)
         self._set_combo(self.cb_render_style, s.render_style)
+        if s.vrm_model and self.cb_vrm.findData(s.vrm_model) < 0:
+            self.cb_vrm.addItem(Path(s.vrm_model).name, s.vrm_model)
+        self._set_combo(self.cb_vrm, s.vrm_model)
+        self.chk_vrm_recolor.setChecked(s.vrm_dynamic_recolor)
         self._set_combo(self.cb_outfit, s.outfit_override or "")
         self.sl_avatar_scale.setValue(int(round(s.avatar_scale * 100)))
         self.sl_avatar_x.setValue(int(round(s.avatar_x_ratio * 100)))
@@ -479,7 +500,9 @@ class ControlCenterWindow(QWidget):
             persona_id=self.cb_persona.currentData() or "mira",
             scene_id=self.cb_scene.currentData() or "sky_sanctuary",
             mode=self.cb_mode.currentData() or "wallpaper",
-            render_style=self.cb_render_style.currentData() or "world_sprite",
+            render_style=self.cb_render_style.currentData() or "vrm_3d",
+            vrm_model=self.cb_vrm.currentData() or "",
+            vrm_dynamic_recolor=self.chk_vrm_recolor.isChecked(),
             fps_cap=int(self.cb_fps.currentData() or 60),
             auto_pause_fullscreen=self.chk_autopause.isChecked(),
             parallax_strength=self.sl_parallax.value() / 10.0,
@@ -499,6 +522,30 @@ class ControlCenterWindow(QWidget):
         ).sanitized()
         self._settings = s
         self.settings_changed.emit(s)
+
+    def _populate_vrm_models(self) -> None:
+        self.cb_vrm.blockSignals(True)
+        self.cb_vrm.clear()
+        self.cb_vrm.addItem("Automático (Melhor modelo .VRM disponível)", "")
+        for fp in self._vrm_models:
+            self.cb_vrm.addItem(fp.name, fp.name)
+        self.cb_vrm.blockSignals(False)
+
+    def _browse_vrm_file(self) -> None:
+        fname, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar Modelo 3D Anime (.vrm / .glb)",
+            "",
+            "Modelos VRM/glTF (*.vrm *.glb);;Todos os arquivos (*.*)",
+        )
+        if not fname:
+            return
+        p = Path(fname)
+        if self.cb_vrm.findData(str(p)) < 0:
+            self.cb_vrm.addItem(f"★ {p.name}", str(p))
+        self._set_combo(self.cb_vrm, str(p))
+        self._set_combo(self.cb_render_style, "vrm_3d")
+        self._emit_settings()
 
     def _populate_personas(self) -> None:
         curr = self.cb_persona.currentData() if self.cb_persona.count() else self._settings.persona_id

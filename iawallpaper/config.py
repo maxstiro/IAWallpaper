@@ -7,7 +7,7 @@ from .mathutil import clamp, valor_real
 from .store import read_json, write_json
 
 VALID_MODES = ("wallpaper", "preview")
-VALID_RENDER_STYLES = ("world_sprite", "portrait")
+VALID_RENDER_STYLES = ("vrm_3d", "world_sprite", "portrait")
 VALID_WEATHER_MODES = ("auto", "clear", "cloudy", "rain", "storm", "snow", "fog")
 VALID_OUTFITS = (None, "casual", "cozy", "rainy", "focus", "nightwear", "starlight")
 
@@ -17,7 +17,9 @@ class Settings:
     persona_id: str = "mira"
     scene_id: str = "sky_sanctuary"
     mode: str = "wallpaper"
-    render_style: str = "world_sprite"
+    render_style: str = "vrm_3d"
+    vrm_model: str = ""
+    vrm_dynamic_recolor: bool = True
     fps_cap: int = 60
     auto_pause_fullscreen: bool = True
     parallax_strength: float = 1.0
@@ -40,7 +42,7 @@ class Settings:
     def sanitized(self) -> "Settings":
         """Retorna uma cópia validada dentro dos domínios seguros."""
         mode = self.mode if self.mode in VALID_MODES else "wallpaper"
-        render_style = self.render_style if self.render_style in VALID_RENDER_STYLES else "world_sprite"
+        render_style = self.render_style if self.render_style in VALID_RENDER_STYLES else "vrm_3d"
         weather_mode = self.weather_mode if self.weather_mode in VALID_WEATHER_MODES else "auto"
         outfit = self.outfit_override if self.outfit_override in VALID_OUTFITS else None
         fps_cap = 30 if int(self.fps_cap) <= 30 else 60
@@ -63,6 +65,8 @@ class Settings:
             scene_id=str(self.scene_id or "sky_sanctuary").strip().lower(),
             mode=mode,
             render_style=render_style,
+            vrm_model=str(self.vrm_model or "").strip(),
+            vrm_dynamic_recolor=bool(self.vrm_dynamic_recolor),
             fps_cap=fps_cap,
             auto_pause_fullscreen=bool(self.auto_pause_fullscreen),
             parallax_strength=clamp(float(self.parallax_strength), 0.0, 2.0),

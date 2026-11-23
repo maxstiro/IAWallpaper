@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-22 (Milestone 12 — Locomoção & Orientação 4-Vias Real via Qwen 2.1 Turnaround + Wan 2.2 Direcional)
+> **Última atualização**: 2026-11-22 (Milestone 13 — Motor 3D Cel-Shaded VRM 0.x/1.0 em GPU ModernGL + Modo 2D Wan 2.2 Opcional)
 
 ---
 
@@ -43,7 +43,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 | **Plataforma** | `iawallpaper/plataforma/` | `desktop_host.py`, `windows.py` | não | sim |
 | **Sense** | `iawallpaper/sense/` | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | não | não |
 | **Comfy** | `iawallpaper/comfy/` | `presets.py`, `bridge.py`, `workflows.py` | não | não |
-| **Render** | `iawallpaper/render/` | `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
+| **Render** | `iawallpaper/render/` | `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
 | **Mind** | `iawallpaper/mind/` | `director.py` | não | não |
 | **UI** | `iawallpaper/ui/` | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | sim | não |
 | **App** | `iawallpaper/app.py`, `main.py` | Orquestração principal, trava de instância única, ciclos 16ms/100ms/500ms/15m/30s, launcher `start_iawallpaper.ps1` | sim | sim |
@@ -73,3 +73,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 - **Milestone 12** (2026-11-22): **Locomoção & Orientação 4-Vias Real (Estilo Ragnarok Online / Tree of Savior) via Qwen 2.1 Turnaround + Wan 2.2 Direcional**:
   - **Turnaround Fiel 1:1 (`build_qwen_turnaround_workflow`, `generate_directional_walks_sync`)**: Rotaciona a mesma personagem (`rig_base.png`) via Qwen Image 2.1 Edit para perfil 3/4 direita (`pose_side.png`) e costas 3/4 (`pose_back.png`) preservando 100% do cabelo, presilha, vestido e saltos, e anima ambos em loop infinito via Wan 2.2 (`clip_walk_side.webp`, `clip_walk_back.webp` — 25 frames RGBA cada).
   - **Motor Direcional 4-Vias & HUD Responsivo (`render/avatar.py`, `render/scene.py`)**: Seleciona automaticamente `side` (direita/esquerda com espelhamento apenas em caminhada direcional para preservar a assimetria da pose frontal), `back` (subindo para o fundo da praça) e `front` (descendo para a câmera) com limiar angular calibrado para 16:9 (`1.35`), velocidade/cadência de passo acoplada à profundidade 2.5D (zero patinação) e card HUD ambiental responsivo. Validado com **29/29 testes verdes**, folha direcional e GIF de 7.5s no Telegram.
+- **Milestone 13** (2026-11-22): **Motor 3D Cel-Shaded em Tempo Real (VRM 0.x/1.0 + ModernGL OpenGL 3.3 GPU) sobre o Cenário 2.5D do ComfyUI** *(arquitetura definitiva estilo Tree of Savior, mantendo o modo 2D Wan 2.2 opcional)*:
+  - **Carregador Universal (`render/vrm_loader.py`)**: Lê modelos `.vrm` (VRM 1.0 `VRMC_vrm` + VRM 0.x `VRM`) e `.glb` com accessors esparsos, morph targets, `VRMC_springBone` e `VRMC_node_constraint` (`aim`/`roll`/`rotation`) + classificação semântica de materiais (`hair`, `eye`, `tops`, `bottoms`, `shoes`, `skin`, `face`).
+  - **Animador Humanoide 360° Universal (`render/vrm_animator.py`)**: Um único motor de animação dirige qualquer personagem VRM sem gerar vídeo por movimento — giro contínuo 360° alinhado ao vetor de caminhada 2.5D, ciclo bípede natural, aceno, dança giratória 360° estilo Tree of Savior, alongamento, sentar, dormir, expressões faciais guiadas pela rede LIF (`happy`, `relaxed`, `angry`, `sad`, `blink`), rastreamento de cursor (`look-at`) e física de mola secundária nos cabelos/roupas.
+  - **Renderizador GPU MToon (`render/vrm_renderer.py`, `avatar.py`, `control_center.py`, `app.py`)**: Skinning 100% na GPU via textura float `RGBA32F` (ossos ilimitados), MSAA 4x (>300 FPS na RX 9060 XT), rampa anime MToon + rim-light sincronizado ao ciclo dia/noite/clima, contorno sutil *inverted-hull*, projeção exata dos pés no solo (`last_foot_v`), reflexo 3D animado na chuva, seletor de motor visual (`vrm_3d` / `world_sprite` / `portrait`) e botão **📂 Carregar .VRM** na Central de Controle. Validado com **30/30 testes verdes**, showcase 4 horários e GIF 3D de 8s no Telegram.

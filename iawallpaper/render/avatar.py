@@ -31,6 +31,7 @@ from PySide6.QtGui import (
 
 from ..core.emotion import EmotionState
 from ..core.persona import Persona
+from ..log import log
 from ..mathutil import clamp, lerp, smoothstep
 from .atmosphere import AtmospherePalette
 from .rig_cutter import AutoRiggedCharacter, RigPart, build_rig_from_apose
@@ -77,12 +78,27 @@ _SKELETAL_Z_ORDER: tuple[tuple[str, str], ...] = (
 class AvatarRig:
     """Personagem waifu madura e articulada habitando o cenário 2.5D do wallpaper."""
 
-    def __init__(self, persona: Persona, sprite_dirs: list[Path] | Path | None = None, render_style: str = "world_sprite"):
+    def __init__(
+        self,
+        persona: Persona,
+        sprite_dirs: list[Path] | Path | None = None,
+        render_style: str = "world_sprite",
+        vrm_path: Path | None = None,
+    ):
         self.persona = persona
         self.sprite_dirs = self._normalize_dirs(sprite_dirs)
-        self.render_style: str = render_style  # "world_sprite" | "portrait"
+        self.render_style: str = render_style  # "vrm_3d" | "world_sprite" | "portrait"
         self.outfit: str = "casual"
-        self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | admire_view | music_sway | sleep
+        self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | dance | admire_view | music_sway | sleep
+
+        # Motor 3D Cel-Shaded (VRM 0.x / 1.0 + ModernGL GPU)
+        self.vrm_path: Path | None = None
+        self.vrm_dynamic_recolor: bool = True
+        self._vrm_model = None
+        self._vrm_animator = None
+        self._vrm_renderer = None
+        self._move_dx: float = 0.0
+        self._move_dy: float = 0.0
 
         # Esqueleto real de 18 ossos + rig recortado + banco de clipes RGBA animados quadro-a-quadro (Wan 2.2)
         self.skeleton = CharacterSkeleton()
@@ -145,6 +161,39 @@ class AvatarRig:
         self._prev_sprite: QPixmap | None = None
         self._sprite_fade_t: float = 1.0
         self.reload_sprites()
+        if vrm_path is not None:
+            self.set_vrm_model(vrm_path)
+
+    def set_vrm_model(self, path: Path | None) -> bool:
+        """Carrega (ou descarrega) um modelo 3D `.vrm` / `.glb` para o motor cel-shaded em GPU."""
+        if self._vrm_renderer is not None:
+            self._vrm_renderer.release()
+        self._vrm_model = None
+        self._vrm_animator = None
+        self._vrm_renderer = None
+        self.vrm_path = None
+        if path is None or not Path(path).is_file():
+            return False
+        try:
+            from .vrm_animator import VrmAnimator
+            from .vrm_loader import load_vrm
+            from .vrm_renderer import VrmRenderer
+
+            model = load_vrm(Path(path))
+            animator = VrmAnimator(model)
+            renderer = VrmRenderer(model, width=512, height=640, samples=4)
+            self._vrm_model = model
+            self._vrm_animator = animator
+            self._vrm_renderer = renderer
+            self.vrm_path = Path(path)
+            log(f"[vrm] Modelo 3D carregado: {self.vrm_path.name} ({len(model.humanoid_bones)} ossos, {len(model.expressions)} expressões)")
+            return True
+        except Exception as err:
+            log(f"[vrm] Falha ao carregar {path}: {err}")
+            return False
+
+    def has_vrm_3d(self) -> bool:
+        return self._vrm_renderer is not None and self._vrm_animator is not None
 
     @staticmethod
     def _normalize_dirs(dirs: list[Path] | Path | None) -> list[Path]:
@@ -329,6 +378,7 @@ class AvatarRig:
             self._last_raining = raining
 
         prev_x = self.pos_x
+        prev_y = self.pos_y
         dx = self.target_x - self.pos_x
         dy = self.target_y - self.pos_y
         dist = math.hypot(dx, dy)
@@ -342,6 +392,8 @@ class AvatarRig:
             step_dist = min(dist, self.walk_speed * depth_mul * speed_mul * dt)
             self.pos_x += (dx / dist) * step_dist
             self.pos_y += (dy / dist) * step_dist
+            self._move_dx = dx / dist
+            self._move_dy = dy / dist
 
             # Orientação direcional real estilo Ragnarok Online / Tree of Savior (compensando proporção 16:9)
             # Horizontal dentro de ±36° -> perfil ("side"); mais vertical para cima -> costas ("back"); para baixo -> frente ("front")
@@ -370,6 +422,8 @@ class AvatarRig:
                 self.action = self._arrive_action
                 self.action_timer = 0.0
             self.move_dir = "front"
+            self._move_dx = 0.0
+            self._move_dy = 0.0
             if asleep:
                 self.action = "sleep"
             elif self.action in ("stretch", "wave", "dance") and self.action_timer > 4.2:
@@ -423,7 +477,26 @@ class AvatarRig:
             else:
                 self.blink_amount = max(0.0, self.blink_amount - dt * 8.0)
 
-        # Atualiza o esqueleto real de 18 ossos (coordenadas locais no referencial do facing)
+        # Atualiza o motor 3D VRM (giro 360°, expressões faciais LIF, piscar, look-at e SpringBones!)
+        if self._vrm_animator is not None:
+            self._vrm_animator.update(
+                dt=dt,
+                action=self.action,
+                walk_phase=self.walk_phase,
+                action_timer=self.action_timer,
+                emotion=emotion,
+                blink_amount=self.blink_amount,
+                look_x=self.look_x,
+                look_y=self.look_y,
+                move_dx=self._move_dx,
+                move_dy=self._move_dy,
+                wind_speed=self._last_wind,
+                asleep=asleep,
+                raining=self._last_raining,
+                caressing=caressing,
+            )
+
+        # Atualiza o esqueleto real de 18 ossos (fallback 2D)
         self.skeleton.update(
             dt=dt,
             action=self.action,
@@ -475,53 +548,123 @@ class AvatarRig:
         is_walking = self.action == "walk"
         breath = math.sin(self.time * (1.35 if asleep else 2.25))
 
-        # Prioridade 1: Clipes RGBA animados quadro-a-quadro (Wan 2.2 FirstLastFrameToVideo — estilo Tree of Savior / RO!)
-        clip_key = self._resolve_clip_key("sleepy" if asleep else emotion.mood, asleep)
-        if clip_key is not None:
-            if clip_key != self._current_clip_key:
-                if self._current_clip_key is not None and self._current_clip_key in self._clips:
-                    self._prev_clip_frame = self._clips[self._current_clip_key].frame_at(self._clip_time)
-                    self._clip_fade_t = 0.0
-                self._current_clip_key = clip_key
-                self._clip_time = 0.0
+        # Prioridade 0: Motor 3D Cel-Shaded em GPU (VRM 0.x/1.0 — 360° real, expressões faciais e trajes dinâmicos!)
+        if self.render_style == "vrm_3d" and self._vrm_renderer is not None and self._vrm_animator is not None:
             lift = max(0.0, -self.bounce_y)
             self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
             self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
             draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
-            self._paint_animated_clip(
-                painter, self._clips[clip_key], foot_x, foot_y, draw_y, u, atmosphere, raining
-            )
-        elif self._rig is not None:
-            lift = max(0.0, -self.bounce_y)
-            self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
-            draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
-            self._paint_skeletal_rig(
-                painter, self._rig, self.skeleton.bones, foot_x, foot_y, draw_y, u, emotion, atmosphere, asleep, raining
-            )
+            self._paint_vrm_3d(painter, foot_x, foot_y, draw_y, u, atmosphere, raining, sun_x_norm)
         else:
-            stride_hop = abs(math.sin(self.walk_phase)) * 8.5 * u if is_walking else 0.0
-            music_bob = abs(math.sin(self.time * 5.2)) * 5.5 * u if self.action == "music_sway" else 0.0
-            lift = stride_hop + music_bob + max(0.0, -self.bounce_y)
-            self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
-            draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
-
-            sprite_key = self._resolve_world_sprite_key("sleepy" if asleep else emotion.mood, asleep)
-            if sprite_key is not None:
-                if sprite_key != self._current_sprite_key:
-                    if self._current_sprite_key is not None and self._current_sprite_key in self._sprites:
-                        self._prev_sprite = self._sprites[self._current_sprite_key]
-                        self._sprite_fade_t = 0.0
-                    self._current_sprite_key = sprite_key
-                self._paint_multiband_ai_sprite(
-                    painter, self._sprites[sprite_key], foot_x, foot_y, draw_y, u, breath, is_walking, emotion, atmosphere, wind, raining
+            # Prioridade 1: Clipes RGBA animados quadro-a-quadro (Wan 2.2 FirstLastFrameToVideo)
+            clip_key = self._resolve_clip_key("sleepy" if asleep else emotion.mood, asleep)
+            if clip_key is not None:
+                if clip_key != self._current_clip_key:
+                    if self._current_clip_key is not None and self._current_clip_key in self._clips:
+                        self._prev_clip_frame = self._clips[self._current_clip_key].frame_at(self._clip_time)
+                        self._clip_fade_t = 0.0
+                    self._current_clip_key = clip_key
+                    self._clip_time = 0.0
+                lift = max(0.0, -self.bounce_y)
+                self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+                self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
+                draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
+                self._paint_animated_clip(
+                    painter, self._clips[clip_key], foot_x, foot_y, draw_y, u, atmosphere, raining
+                )
+            elif self._rig is not None:
+                lift = max(0.0, -self.bounce_y)
+                self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+                draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
+                self._paint_skeletal_rig(
+                    painter, self._rig, self.skeleton.bones, foot_x, foot_y, draw_y, u, emotion, atmosphere, asleep, raining
                 )
             else:
-                self._paint_skeletal_procedural(
-                    painter, self.skeleton.bones, foot_x, draw_y, u, emotion, atmosphere, asleep, raining
-                )
+                stride_hop = abs(math.sin(self.walk_phase)) * 8.5 * u if is_walking else 0.0
+                music_bob = abs(math.sin(self.time * 5.2)) * 5.5 * u if self.action == "music_sway" else 0.0
+                lift = stride_hop + music_bob + max(0.0, -self.bounce_y)
+                self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+                draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
+
+                sprite_key = self._resolve_world_sprite_key("sleepy" if asleep else emotion.mood, asleep)
+                if sprite_key is not None:
+                    if sprite_key != self._current_sprite_key:
+                        if self._current_sprite_key is not None and self._current_sprite_key in self._sprites:
+                            self._prev_sprite = self._sprites[self._current_sprite_key]
+                            self._sprite_fade_t = 0.0
+                        self._current_sprite_key = sprite_key
+                    self._paint_multiband_ai_sprite(
+                        painter, self._sprites[sprite_key], foot_x, foot_y, draw_y, u, breath, is_walking, emotion, atmosphere, wind, raining
+                    )
+                else:
+                    self._paint_skeletal_procedural(
+                        painter, self.skeleton.bones, foot_x, draw_y, u, emotion, atmosphere, asleep, raining
+                    )
 
         if self.emote_kind:
             self._paint_ro_emote_balloon(painter, self.head_rect.center().x(), self.head_rect.top() - 8 * u, u)
+
+    def _paint_vrm_3d(
+        self,
+        painter: QPainter,
+        foot_x: float,
+        foot_y: float,
+        draw_y: float,
+        u: float,
+        atmosphere: AtmospherePalette,
+        raining: bool,
+        sun_x_norm: float,
+    ) -> None:
+        """Renderiza o avatar 3D cel-shaded MToon em GPU com sola dos pés projetada exatamente em `draw_y`."""
+        pm = self._vrm_renderer.render_pixmap(
+            animator=self._vrm_animator,
+            atmosphere=atmosphere,
+            persona=self.persona,
+            outfit_key=self.outfit,
+            sun_x_norm=sun_x_norm,
+            dynamic_recolor=self.vrm_dynamic_recolor,
+        )
+        if pm.isNull():
+            return
+
+        # Altura total do FBO projetada na escala Tree of Savior (~370px de altura corporal útil a 1080p)
+        frame_h = 465.0 * u
+        frame_w = frame_h * (pm.width() / max(pm.height(), 1))
+        foot_v = self._vrm_renderer.last_foot_v
+        top_offset = -frame_h * foot_v
+
+        # Reflexo 3D animado no piso molhado durante a chuva!
+        if raining:
+            painter.save()
+            painter.translate(foot_x, foot_y + 2 * u)
+            painter.scale(1.0, -0.32)
+            painter.setOpacity(0.18)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            painter.drawPixmap(QRectF(-frame_w * 0.5, top_offset, frame_w, frame_h), pm, QRectF(pm.rect()))
+            painter.restore()
+
+        painter.save()
+        if self.caress_glow > 0.05:
+            rim_r, rim_g, rim_b = atmosphere.rim_light
+            aura = QRadialGradient(QPointF(foot_x, draw_y - frame_h * 0.42), frame_h * 0.42)
+            aura.setColorAt(0.0, QColor(rim_r, rim_g, rim_b, int(92 * self.caress_glow)))
+            aura.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(aura)
+            painter.drawEllipse(QPointF(foot_x, draw_y - frame_h * 0.42), frame_h * 0.34, frame_h * 0.42)
+
+        painter.translate(foot_x, draw_y)
+        painter.rotate(self.tilt_deg)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        painter.drawPixmap(QRectF(-frame_w * 0.5, top_offset, frame_w, frame_h), pm, QRectF(pm.rect()))
+        painter.restore()
+
+        body_h = frame_h * 0.78
+        if raining and self.action not in ("sleep", "sit_work"):
+            self._paint_umbrella(painter, foot_x + 14 * u, draw_y - body_h * 1.04, u, atmosphere)
+
+        self.body_rect = QRectF(foot_x - frame_w * 0.28, draw_y - body_h, frame_w * 0.56, body_h)
+        self.head_rect = QRectF(foot_x - frame_w * 0.22, draw_y - body_h * 1.02, frame_w * 0.44, body_h * 0.26)
 
     def _resolve_clip_key(self, mood: str, asleep: bool) -> str | None:
         if not self._clips:

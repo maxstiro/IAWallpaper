@@ -315,3 +315,34 @@ def test_directional_walk_facing_selects_side_back_front(tmp_path):
     canvas.render_to_image(480, 270)
     assert canvas.avatar.move_dir == "front"
     assert canvas.avatar._current_clip_key == "clip_walk"
+
+
+def test_vrm_3d_engine_loads_animates_360_and_renders():
+    _ensure_qapp()
+    from iawallpaper.paths import Paths
+
+    paths = Paths()
+    vrm_file = paths.resolve_vrm_model()
+    if vrm_file is None:
+        return  # Ambiente CI sem arquivo .vrm local (fallback permanece coberto pelos demais testes)
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, render_style="vrm_3d", vrm_path=vrm_file)
+    assert canvas.avatar.has_vrm_3d()
+
+    # Caminha para a direita -> yaw gira para ~+90°
+    canvas.avatar.pos_x, canvas.avatar.pos_y = 0.35, 0.88
+    canvas.avatar.walk_to(0.75, 0.88)
+    for _ in range(20):
+        canvas.step_animation(0.05)
+    assert 40.0 < canvas.avatar._vrm_animator.yaw_deg < 140.0
+
+    # Acena com humor feliz -> expressão facial 'happy' ativa e frame RGBA renderizado sem erros
+    canvas.emotion = EmotionState(mood="happy", label="Radiante", valence=0.9)
+    canvas.avatar.trigger_action("wave")
+    for _ in range(12):
+        canvas.step_animation(0.05)
+    assert canvas.avatar._vrm_animator.expr_weights.get("happy", 0.0) > 0.4
+    img = canvas.render_to_image(640, 360)
+    assert not img.isNull()
+    assert not canvas.avatar.head_rect.isEmpty()
