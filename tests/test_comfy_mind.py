@@ -9,6 +9,7 @@ from iawallpaper.comfy.workflows import (
     build_avatar_workflow,
     build_diorama_scene_workflow,
     build_qwen_relight_scene_workflow,
+    build_qwen_turnaround_workflow,
     build_scene_workflow,
     build_wan_sprite_clip_workflow,
     build_world_sprite_workflow,
@@ -79,6 +80,11 @@ def test_comfy_workflow_builders():
     assert wan["14"]["class_type"] == "Image Rembg (Remove Background)"
     assert wan["14"]["inputs"]["alpha_matting"] is False
     assert wan["15"]["class_type"] == "SaveAnimatedWEBP"
+
+    turn = build_qwen_turnaround_workflow("iawallpaper_turn_base_mira.png", direction="side", seed=5)
+    assert turn["4"]["class_type"] == "TextEncodeQwenImage21"
+    assert "side-right" in turn["4"]["inputs"]["prompt"]
+    assert turn["8"]["class_type"] == "Image Rembg (Remove Background)"
 
     top = find_comfy_preset("RawSexyGlowingGemPencil")
     if top is not None:

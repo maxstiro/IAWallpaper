@@ -100,7 +100,8 @@ class AvatarRig:
         self.target_y: float = 0.78
         self._arrive_action: str = "idle"
         self.facing: int = 1                   # -1 esquerda, +1 direita
-        self.walk_speed: float = 0.14
+        self.move_dir: str = "front"           # "side" | "back" | "front" (orientação 4-vias estilo RO/ToS!)
+        self.walk_speed: float = 0.115
         self.walk_phase: float = 0.0
         self._step_emit_accum: float = 0.0
         self.pending_footstep: tuple[float, float] | None = None
@@ -331,29 +332,50 @@ class AvatarRig:
         dx = self.target_x - self.pos_x
         dy = self.target_y - self.pos_y
         dist = math.hypot(dx, dy)
+        clip_speed_mul = 1.0
         if dist > 0.008 and not caressing:
             self.action = "walk"
-            speed_mul = clamp(dist / 0.06, 0.35, 1.0)
-            step_dist = min(dist, self.walk_speed * speed_mul * dt)
+            # Desaceleração suave ao chegar no destino + escala de perspectiva (passos menores ao fundo!)
+            depth_mul = WorldStage.depth_scale(self.pos_y)
+            speed_mul = clamp(dist / 0.055, 0.38, 1.0)
+            clip_speed_mul = clamp(0.75 + 0.35 * speed_mul, 0.72, 1.12)
+            step_dist = min(dist, self.walk_speed * depth_mul * speed_mul * dt)
             self.pos_x += (dx / dist) * step_dist
             self.pos_y += (dy / dist) * step_dist
-            if abs(dx) > 0.004:
-                self.facing = 1 if dx > 0 else -1
+
+            # Orientação direcional real estilo Ragnarok Online / Tree of Savior (compensando proporção 16:9)
+            # Horizontal dentro de ±36° -> perfil ("side"); mais vertical para cima -> costas ("back"); para baixo -> frente ("front")
+            vx_vis = dx * 1.77
+            vy_vis = dy
+            if abs(vx_vis) >= abs(vy_vis) * 1.35:
+                self.move_dir = "side"
+                if abs(dx) > 0.002:
+                    self.facing = 1 if dx > 0 else -1
+            elif dy < 0.0:
+                self.move_dir = "back"
+                if abs(dx) > 0.004:
+                    self.facing = 1 if dx > 0 else -1
+            else:
+                self.move_dir = "front"
+                if abs(dx) > 0.004:
+                    self.facing = 1 if dx > 0 else -1
+
             self.walk_phase += dt * (9.5 * speed_mul + 2.2)
             self._step_emit_accum += dt
-            if self._step_emit_accum >= 0.32:
+            if self._step_emit_accum >= 0.34:
                 self._step_emit_accum = 0.0
                 self.pending_footstep = (self.pos_x, self.pos_y)
         else:
             if self.action == "walk":
                 self.action = self._arrive_action
                 self.action_timer = 0.0
+            self.move_dir = "front"
             if asleep:
                 self.action = "sleep"
-            elif self.action in ("stretch", "wave") and self.action_timer > 4.2:
+            elif self.action in ("stretch", "wave", "dance") and self.action_timer > 4.2:
                 self.action = "idle"
                 self.action_timer = 0.0
-            if abs(self.look_x) > 0.42 and self.action not in ("sleep", "sit_work"):
+            if not self._clips and abs(self.look_x) > 0.42 and self.action not in ("sleep", "sit_work"):
                 self.facing = 1 if self.look_x > 0 else -1
 
         vel_x = (self.pos_x - prev_x) / max(dt, 1e-4)
@@ -375,7 +397,7 @@ class AvatarRig:
             if self._sprite_fade_t >= 1.0:
                 self._prev_sprite = None
 
-        self._clip_time += dt
+        self._clip_time += dt * clip_speed_mul
         if self._clip_fade_t < 1.0:
             self._clip_fade_t = min(1.0, self._clip_fade_t + dt / 0.22)
             if self._clip_fade_t >= 1.0:
@@ -508,7 +530,12 @@ class AvatarRig:
         if asleep or self.action == "sleep":
             candidates.extend(["clip_sleep", "clip_sit", "clip_idle", "clip_wave"])
         elif self.action == "walk":
-            candidates.extend(["clip_walk", "clip_idle", "clip_wave"])
+            if self.move_dir == "side":
+                candidates.extend(["clip_walk_side", "clip_walk", "clip_idle", "clip_wave"])
+            elif self.move_dir == "back":
+                candidates.extend(["clip_walk_back", "clip_walk_side", "clip_walk", "clip_idle"])
+            else:
+                candidates.extend(["clip_walk", "clip_walk_side", "clip_idle", "clip_wave"])
         elif self.action in ("dance", "music_sway", "stretch"):
             candidates.extend(["clip_dance", "clip_wave", "clip_idle"])
         elif self.action == "wave":
@@ -583,7 +610,12 @@ class AvatarRig:
         target_h = 345.0 * u
         aspect = frame.width() / max(frame.height(), 1)
         target_w = target_h * aspect
-        sx = -1.0 if self.facing < 0 else 1.0
+        # Espelha horizontalmente APENAS nos clipes direcionais (perfil/costas) — preserva assimetria do cabelo/presilha de frente!
+        is_directional = clip.name in ("clip_walk_side", "clip_walk_back")
+        sx = (-1.0 if self.facing < 0 else 1.0) if is_directional else 1.0
+        # Cadência vertical sutil sincronizada ao passo durante caminhada (elimina sensação de deslizar)
+        step_bob = abs(math.sin(self._clip_time * math.pi * 2.0)) * 3.5 * u if self.action == "walk" else 0.0
+        draw_y = draw_y - step_bob
 
         # 1. Reflexo animado no piso molhado quando está chovendo!
         if raining:

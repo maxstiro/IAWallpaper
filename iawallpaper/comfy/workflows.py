@@ -99,9 +99,22 @@ WAN_CLIP_PROMPTS: dict[str, str] = {
     ),
     "walk": (
         "2D anime game character sprite animation on a pure solid white background, static locked camera, "
-        "the stylish mature anime woman walks gracefully in a smooth rhythmic stepping cycle, alternating legs stepping naturally "
+        "the stylish mature anime woman walks forward toward the viewer in a smooth rhythmic stepping cycle, alternating legs stepping naturally "
         "with gentle hip sway, arms swinging smoothly, glowing hair and pleated mini-dress flowing naturally with each step, "
-        "smooth 2D RPG walking loop animation, clean solid white background."
+        "smooth 2D RPG front walking loop animation, clean solid white background."
+    ),
+    "walk_side": (
+        "2D anime RPG game character walk cycle animation on a pure solid white background, static locked camera, "
+        "strictly 3/4 side view facing right, the stylish mature anime woman walks steadily to the right in place in a clear continuous "
+        "walking stride cycle, left and right legs alternating forward and backward with knees bending naturally and high heels stepping, "
+        "arms swinging smoothly in opposition to legs, glowing blue-purple hair and pleated mini-dress flowing back with forward momentum, "
+        "head looking forward to the right, seamless looping 2D RPG side-profile walk animation, clean solid white background."
+    ),
+    "walk_back": (
+        "2D anime RPG game character walk cycle animation on a pure solid white background, static locked camera, "
+        "strictly 3/4 back view facing away from the viewer, the stylish mature anime woman walks away from the camera in a smooth continuous "
+        "rhythmic walking stride cycle, left and right heels lifting and stepping alternately, hips swaying naturally, arms swinging gently, "
+        "long glowing blue-purple hair and pleated mini-dress swaying smoothly from behind, seamless looping 2D RPG back walk animation, clean solid white background."
     ),
     "wave": (
         "2D anime game character sprite animation on a pure solid white background, static locked camera, "
@@ -114,6 +127,22 @@ WAN_CLIP_PROMPTS: dict[str, str] = {
         "the stylish mature anime woman performs a playful graceful Tree of Savior style rhythmic sway and gentle twirl, "
         "pleated mini-dress flaring and glowing hair flowing dynamically, arms opening gracefully with a joyful radiant smile, "
         "then returning smoothly to her standing pose, smooth 2D RPG emote animation, clean solid white background."
+    ),
+}
+
+QWEN_TURNAROUND_INSTRUCTIONS: dict[str, str] = {
+    "side": (
+        "anime-style Illustration, rotate the exact same mature anime woman from <image1> into a full-body 3/4 side-right walking pose "
+        "facing to the right and looking to the right, mid-stride stepping gracefully to the right with one leg forward and one leg back, "
+        "arms swinging naturally at her sides. Keep her exact same face, glowing blue-purple wavy hair, star hairclip, off-shoulder cream knitted "
+        "pleated mini-dress with waist ribbon, white thigh-high stockings with garters, white high heels, proportions, and anime art style "
+        "completely unchanged. Full body with complete shoes visible, centered on a pure solid white background with no floor shadow."
+    ),
+    "back": (
+        "anime-style Illustration, rotate the exact same mature anime woman from <image1> into a full-body 3/4 back view walking away from the viewer, "
+        "facing away from the camera mid-stride with one heel stepping forward and one back. Show the back of her glowing blue-purple wavy hair, "
+        "star hairclip, off-shoulder cream knitted pleated mini-dress, white thigh-high stockings, and white high heels, keeping her exact same outfit, "
+        "colors, proportions, and anime art style completely unchanged. Full body with complete shoes visible, centered on a pure solid white background with no floor shadow."
     ),
 }
 
@@ -649,6 +678,79 @@ def build_apose_rig_workflow(
         graph,
         decoded_node="7",
         prefix=f"IAWallpaper_rig_{persona.id}_apose",
+        use_rembg=use_rembg,
+        rembg_model=rembg_model,
+    )
+    return graph
+
+
+def build_qwen_turnaround_workflow(
+    base_uploaded_sprite: str,
+    direction: str = "side",
+    persona_id: str = "mira",
+    seed: int | None = None,
+    steps: int = 12,
+    cfg: float = 1.5,
+    unet_name: str = "NoctQ_V3_turbo_int8_convrot.safetensors",
+    clip_name: str = "qwen3vl_8b_int8_convrot.safetensors",
+    vae_name: str = "qwen_image_2.1_vae_bf16.safetensors",
+    anime_lora: str | None = r"qwen\qwen-anime-Illustration-1.safetensors",
+    use_rembg: bool = True,
+    rembg_model: str = "isnet-anime",
+) -> dict:
+    """Rotaciona a MESMA personagem (`rig_base.png`) para perfil 3/4 direita (`side`) ou costas (`back`) via Qwen Image 2.1."""
+    instruction = QWEN_TURNAROUND_INSTRUCTIONS.get(direction, QWEN_TURNAROUND_INSTRUCTIONS["side"])
+    neg = (
+        "photorealistic, real photo, facing_viewer, front_view, symmetrical_front, different outfit, different hair color, "
+        "cropped_feet, cropped_head, floor_shadow, scenery, complex_background, 2girls, turnaround_sheet, multiple_views, text, watermark"
+    )
+    actual_seed = int(seed if seed is not None else random.randint(1, 2**31 - 1))
+
+    graph: dict = {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": unet_name, "weight_dtype": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": clip_name, "type": "qwen_image", "device": "default"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": vae_name}},
+        "10": {"class_type": "LoadImage", "inputs": {"image": base_uploaded_sprite}},
+    }
+    model_src = ["1", 0]
+    if anime_lora:
+        graph["11"] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {"model": ["1", 0], "lora_name": anime_lora, "strength_model": 0.72},
+        }
+        model_src = ["11", 0]
+
+    graph["4"] = {
+        "class_type": "TextEncodeQwenImage21",
+        "inputs": {
+            "clip": ["2", 0],
+            "vae": ["3", 0],
+            "prompt": instruction,
+            "negative_prompt": neg,
+            "resolution": 1024,
+            "image_1": ["10", 0],
+        },
+    }
+    graph["5"] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "model": model_src,
+            "seed": actual_seed,
+            "steps": int(steps),
+            "cfg": float(cfg),
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "positive": ["4", 0],
+            "negative": ["4", 1],
+            "latent_image": ["4", 2],
+            "denoise": 1.0,
+        },
+    }
+    graph["6"] = {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["3", 0]}}
+    _attach_rembg_and_save(
+        graph,
+        decoded_node="6",
+        prefix=f"IAWallpaper_turn_{persona_id}_{direction}",
         use_rembg=use_rembg,
         rembg_model=rembg_model,
     )

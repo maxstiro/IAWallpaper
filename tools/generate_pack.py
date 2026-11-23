@@ -17,7 +17,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Gera pack completo consistente de persona + cenário via ComfyUI local.")
     parser.add_argument("--persona", default="mira", help="ID da persona (ex: mira, nyx ou personalizada).")
     parser.add_argument("--scene", default="sky_sanctuary", help="ID do cenário (sky_sanctuary, cyber_loft, sakura_hill).")
-    parser.add_argument("--style", choices=("world", "clips", "portrait"), default="world", help="world = base + cenários 2.5D; clips = clipes animados Wan 2.2 RGBA; portrait = bustos.")
+    parser.add_argument("--style", choices=("world", "clips", "directional", "portrait"), default="world", help="world = base + cenários 2.5D; clips = clipes Wan 2.2; directional = walk side/back; portrait = bustos.")
     parser.add_argument("--preset", default="RawSexyGlowingGemPencil(TOP)", help="Nome do preset do ComfyUI Studio (read-only).")
     parser.add_argument("--actions", default="idle,walk,wave,dance", help="Lista de ações para --style clips (separadas por vírgula).")
     parser.add_argument("--url", default="http://127.0.0.1:8188", help="URL da API HTTP do ComfyUI.")
@@ -27,7 +27,14 @@ def main() -> int:
     paths = Paths(base_dir=ROOT)
     persona = load_persona(args.persona, personas_dir=paths.personas_dir)
     bridge = ComfyBridge(args.url)
-    if args.style == "clips":
+    if args.style == "directional":
+        created = bridge.generate_directional_walks_sync(
+            persona=persona,
+            persona_dest_dir=paths.persona_generated_assets(persona.id),
+            skip_existing=not args.force,
+            on_progress=lambda cur, tot, lbl: print(lbl, flush=True),
+        )
+    elif args.style == "clips":
         acts = tuple(a.strip() for a in args.actions.split(",") if a.strip())
         created = bridge.generate_wan_clips_sync(
             persona=persona,

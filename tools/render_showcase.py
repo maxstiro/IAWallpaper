@@ -278,40 +278,43 @@ def render_animated_gif(persona_id: str, scene_id: str, out_path: Path, width: i
     canvas.affinity = 74.0
     canvas.activity = "IDLE"
 
-    # Inicia caminhando pelas pedras da praça aberta estilo Tree of Savior / Ragnarok Online
-    canvas.avatar.pos_x = 0.42
+    # Demonstração completa de locomoção & orientação 4-vias (Direita -> Costas subindo -> Esquerda -> Parar & Acenar!)
+    canvas.avatar.pos_x = 0.36
     canvas.avatar.pos_y = 0.90
-    canvas.avatar.walk_to(0.64, 0.84, arrive_action="wave")
-    canvas.scene.set_whisper("Passeando pela praca ao por do sol...", 1.0)
+    canvas.avatar.walk_to(0.68, 0.89, arrive_action="idle")
+    canvas.scene.set_whisper("Caminhando para a direita em perfil 3/4...", 1.0)
     canvas.render_to_image(width, height)
     for _ in range(20):
         canvas.step_animation(0.05)
     # Reposiciona início limpo após crossfade do fundo
-    canvas.avatar.pos_x = 0.42
+    canvas.avatar.pos_x = 0.36
     canvas.avatar.pos_y = 0.90
-    canvas.avatar.walk_to(0.64, 0.84, arrive_action="wave")
+    canvas.avatar.walk_to(0.68, 0.89, arrive_action="idle")
     canvas.avatar._clip_time = 0.0
 
     frames: list[Image.Image] = []
     dt = 1.0 / fps
-    total_frames = int(fps * 6.0)  # 72 frames = 6 segundos fluidos (walk -> wave -> dance!)
+    total_frames = int(fps * 7.5)  # 90 frames = 7.5s (direita -> costas -> esquerda -> aceno!)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_frame = out_path.parent / "_gif_frame.png"
 
     for i in range(total_frames):
-        if i == int(fps * 2.0):
-            canvas.avatar.pos_x = 0.64
-            canvas.avatar.pos_y = 0.84
-            canvas.avatar.target_x = 0.64
-            canvas.avatar.target_y = 0.84
+        if i == int(fps * 2.1):
+            # Vira de costas e sobe em direção à árvore sagrada (clip_walk_back!)
+            canvas.avatar.walk_to(canvas.avatar.pos_x - 0.04, 0.72, arrive_action="idle")
+            canvas.scene.set_whisper("Subindo ate a arvore sagrada (de costas)...", 1.0)
+        elif i == int(fps * 3.8):
+            # Volta caminhando para a esquerda em perfil 3/4 espelhado (facing = -1!)
+            canvas.avatar.walk_to(0.36, 0.82, arrive_action="wave")
+            canvas.scene.set_whisper("Voltando para a esquerda em perfil...", 1.0)
+        elif i == int(fps * 5.6):
+            # Chega, vira de frente e acena com anel mágico!
+            canvas.avatar.target_x = canvas.avatar.pos_x
+            canvas.avatar.target_y = canvas.avatar.pos_y
             canvas.avatar.trigger_action("wave")
-            canvas.avatar.show_emote("heart", duration=2.2)
-            canvas.scene.set_whisper("Oi! Agora com animacao fluida quadro-a-quadro!", 1.0)
-        elif i == int(fps * 4.0):
-            canvas.avatar.trigger_action("dance")
-            canvas.avatar.show_emote("sparkle", duration=2.2)
-            canvas.scene.set_whisper("Dancando na brisa estilo Tree of Savior!", 1.0)
+            canvas.avatar.show_emote("heart", duration=2.4)
+            canvas.scene.set_whisper("Pronto! Orientacao 4-vias estilo RO / ToS!", 1.0)
 
         # Sub-steps de 25ms para física de mola ultra suave
         sub = 3

@@ -26,6 +26,7 @@ from .workflows import (
     build_avatar_workflow,
     build_diorama_scene_workflow,
     build_qwen_relight_scene_workflow,
+    build_qwen_turnaround_workflow,
     build_scene_workflow,
     build_wan_sprite_clip_workflow,
     build_world_sprite_workflow,
@@ -558,6 +559,79 @@ class ComfyBridge:
 
         if on_progress:
             on_progress(total, total, f"✅ {len(created)} clipes animados RGBA concluídos!")
+        return created
+
+    def generate_directional_walks_sync(
+        self,
+        persona: Persona,
+        persona_dest_dir: Path,
+        directions: tuple[str, ...] = ("side", "back"),
+        poses_only: bool = False,
+        width: int = 416,
+        height: int = 640,
+        length: int = 25,
+        fps: float = 12.0,
+        skip_existing: bool = True,
+        on_progress=None,
+    ) -> list[Path]:
+        """Gera turnaround direcional (side/back) via Qwen 2.1 + clipes de caminhada direcional via Wan 2.2."""
+        st = self.probe()
+        if not st.online or not st.has_qwen_relight:
+            raise RuntimeError("ComfyUI offline ou Qwen 2.1 indisponível para turnaround direcional.")
+
+        persona_dest_dir.mkdir(parents=True, exist_ok=True)
+        base_src = persona_dest_dir / "rig_base.png"
+        if not base_src.exists():
+            base_src = persona_dest_dir / "sprite_idle.png"
+        if not base_src.exists():
+            raise FileNotFoundError(f"rig_base.png não encontrado em {persona_dest_dir}")
+
+        created: list[Path] = []
+        uploaded_base = self.upload_image_on_white(base_src, f"iawallpaper_turn_base_{persona.id}.png")
+
+        # 1. Poses direcionais via Qwen 2.1 (100% mesma roupa/cabelo/rosto!)
+        for idx, direction in enumerate(directions, start=1):
+            pose_path = persona_dest_dir / f"pose_{direction}.png"
+            if not (skip_existing and pose_path.exists()):
+                if on_progress:
+                    on_progress(idx, len(directions), f"Gerando pose direcional Qwen 2.1: {direction}...")
+                g = build_qwen_turnaround_workflow(
+                    base_uploaded_sprite=uploaded_base,
+                    direction=direction,
+                    persona_id=persona.id,
+                    seed=persona.seed + 700 + idx * 19,
+                    steps=12,
+                    cfg=1.5,
+                    use_rembg=st.has_rembg,
+                )
+                created.append(self.run_workflow_and_save(g, pose_path, timeout=240.0))
+
+        if poses_only or not st.has_wan_i2v:
+            return created
+
+        # 2. Clipes animados de caminhada direcional via Wan 2.2 FirstLastFrameToVideo!
+        for idx, direction in enumerate(directions, start=1):
+            pose_path = persona_dest_dir / f"pose_{direction}.png"
+            clip_path = persona_dest_dir / f"clip_walk_{direction}.webp"
+            if not pose_path.exists() or (skip_existing and clip_path.exists()):
+                continue
+            if on_progress:
+                on_progress(idx, len(directions), f"Animando caminhada direcional Wan 2.2: walk_{direction}...")
+            up_pose = self.upload_image_fitted_on_white(
+                pose_path, f"iawallpaper_wan_pose_{direction}_{persona.id}.png", tw=width, th=height
+            )
+            g = build_wan_sprite_clip_workflow(
+                base_uploaded_image=up_pose,
+                action_key=f"walk_{direction}",
+                persona_id=persona.id,
+                width=width,
+                height=height,
+                length=length,
+                fps=fps,
+                seed=persona.seed + 850 + idx * 41,
+                steps=6,
+            )
+            created.append(self.run_workflow_and_save(g, clip_path, timeout=600.0))
         return created
 
     def generate_world_pack_async(

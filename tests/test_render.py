@@ -267,3 +267,51 @@ def test_animated_sprite_clip_webp_playback_and_crossfade(tmp_path):
     assert canvas.avatar._clip_fade_t == 1.0
     out = canvas.render_to_image(480, 270)
     assert not out.isNull()
+
+
+def test_directional_walk_facing_selects_side_back_front(tmp_path):
+    _ensure_qapp()
+    from PIL import Image, ImageDraw
+
+    cdir = tmp_path / "dir_clips"
+    cdir.mkdir()
+    for clip_name in ("clip_idle.webp", "clip_walk.webp", "clip_walk_side.webp", "clip_walk_back.webp"):
+        im = Image.new("RGBA", (96, 140), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rectangle([28, 20, 68, 130], fill=(160, 190, 255, 255))
+        im.save(cdir / clip_name, save_all=True, append_images=[im.copy()], duration=83, loop=0)
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, sprite_dirs=[cdir], render_style="world_sprite")
+
+    # 1. Caminhando para a direita -> move_dir == "side", facing == +1, usa clip_walk_side
+    canvas.avatar.pos_x, canvas.avatar.pos_y = 0.35, 0.88
+    canvas.avatar.walk_to(0.70, 0.88)
+    canvas.step_animation(0.05)
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar.move_dir == "side"
+    assert canvas.avatar.facing == 1
+    assert canvas.avatar._current_clip_key == "clip_walk_side"
+
+    # 2. Caminhando para a esquerda -> move_dir == "side", facing == -1
+    canvas.avatar.walk_to(0.28, 0.88)
+    canvas.step_animation(0.05)
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar.move_dir == "side"
+    assert canvas.avatar.facing == -1
+    assert canvas.avatar._current_clip_key == "clip_walk_side"
+
+    # 3. Caminhando para o fundo (em direção à árvore) -> move_dir == "back", usa clip_walk_back
+    canvas.avatar.pos_x, canvas.avatar.pos_y = 0.54, 0.90
+    canvas.avatar.walk_to(0.54, 0.71)
+    canvas.step_animation(0.05)
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar.move_dir == "back"
+    assert canvas.avatar._current_clip_key == "clip_walk_back"
+
+    # 4. Caminhando para frente (em direção à câmera) -> move_dir == "front", usa clip_walk
+    canvas.avatar.pos_x, canvas.avatar.pos_y = 0.54, 0.72
+    canvas.avatar.walk_to(0.54, 0.92)
+    canvas.step_animation(0.05)
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar.move_dir == "front"
+    assert canvas.avatar._current_clip_key == "clip_walk"

@@ -2,7 +2,14 @@
 
 from .bridge import ComfyBridge, ComfyStatus
 from .presets import ComfyPreset, LoraSpec, find_comfy_preset, load_comfy_presets
-from .workflows import SCENE_PRESETS, build_apose_rig_workflow, build_avatar_workflow, build_scene_workflow, build_wan_sprite_clip_workflow
+from .workflows import (
+    SCENE_PRESETS,
+    build_apose_rig_workflow,
+    build_avatar_workflow,
+    build_qwen_turnaround_workflow,
+    build_scene_workflow,
+    build_wan_sprite_clip_workflow,
+)
 
 __all__ = [
     "ComfyBridge",
@@ -14,6 +21,7 @@ __all__ = [
     "SCENE_PRESETS",
     "build_apose_rig_workflow",
     "build_avatar_workflow",
+    "build_qwen_turnaround_workflow",
     "build_scene_workflow",
     "build_wan_sprite_clip_workflow",
 ]

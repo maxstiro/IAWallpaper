@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-22 (Milestone 11 — Animação Fluida Quadro-a-Quadro Wan 2.2 + Praça Aberta Tree of Savior / Ragnarok Online)
+> **Última atualização**: 2026-11-22 (Milestone 12 — Locomoção & Orientação 4-Vias Real via Qwen 2.1 Turnaround + Wan 2.2 Direcional)
 
 ---
 
@@ -70,3 +70,6 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 - **Milestone 11** (2026-11-22): **Animação Fluida Quadro-a-Quadro via Wan 2.2 `WanFirstLastFrameToVideo` + Praça Aberta Estilo Tree of Savior / Ragnarok Online**:
   - **Motor de Clipes RGBA (`render/sprite_clip.py`, `render/avatar.py`)**: Elimina definitivamente o aspecto de marionete 2D ao reproduzir clipes `.webp`/`.gif` RGBA transparentes quadro-a-quadro em loop infinito perfeito (`clip_idle`, `clip_walk`, `clip_wave`, `clip_dance`), com recorte de linha de pés unificada entre frames (zero flutuação/jitter), crossfade suave (0.22s) entre ações, anel mágico giratório no chão estilo Ragnarok Online / Tree of Savior, reflexo animado no piso molhado e 0% de uso de GPU durante a reprodução no desktop.
   - **Pipeline ComfyUI Wan 2.2 + Qwen 2.1 (`comfy/workflows.py`, `bridge.py`, `tools/generate_pack.py`)**: Adicionado `build_wan_sprite_clip_workflow` (`Wan2.2_Remix_NSFW_i2v_14b_high/low_lighting_fp8` + `WanFirstLastFrameToVideo` travando `start_image == end_image` + `isnet-anime` RemBG + `SaveAnimatedWEBP`) e nova praça aberta 3/4 com árvore sagrada, lanternas e piso de pedras reiluminada 1:1 sem bordas para Manhã, Pôr do Sol, Chuva e Noite. Validado visualmente (folha dos 4 clipes + mosaico 4 horários + GIF animado de 6s enviado no Telegram) com **28/28 testes verdes**.
+- **Milestone 12** (2026-11-22): **Locomoção & Orientação 4-Vias Real (Estilo Ragnarok Online / Tree of Savior) via Qwen 2.1 Turnaround + Wan 2.2 Direcional**:
+  - **Turnaround Fiel 1:1 (`build_qwen_turnaround_workflow`, `generate_directional_walks_sync`)**: Rotaciona a mesma personagem (`rig_base.png`) via Qwen Image 2.1 Edit para perfil 3/4 direita (`pose_side.png`) e costas 3/4 (`pose_back.png`) preservando 100% do cabelo, presilha, vestido e saltos, e anima ambos em loop infinito via Wan 2.2 (`clip_walk_side.webp`, `clip_walk_back.webp` — 25 frames RGBA cada).
+  - **Motor Direcional 4-Vias & HUD Responsivo (`render/avatar.py`, `render/scene.py`)**: Seleciona automaticamente `side` (direita/esquerda com espelhamento apenas em caminhada direcional para preservar a assimetria da pose frontal), `back` (subindo para o fundo da praça) e `front` (descendo para a câmera) com limiar angular calibrado para 16:9 (`1.35`), velocidade/cadência de passo acoplada à profundidade 2.5D (zero patinação) e card HUD ambiental responsivo. Validado com **29/29 testes verdes**, folha direcional e GIF de 7.5s no Telegram.

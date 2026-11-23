@@ -469,28 +469,29 @@ class SceneCompositor:
         affinity: float,
         activity: str,
     ) -> None:
-        """Card glassmórfico discreto no canto inferior esquerdo (acima da barra de tarefas)."""
+        """Card glassmórfico discreto no canto inferior esquerdo (escala responsiva para nunca cobrir a personagem)."""
         hh = int(circadian.hour) % 24
         mm = int((circadian.hour - int(circadian.hour)) * 60.0)
-        card_w, card_h = 360, 78
-        rect = QRectF(28, h - card_h - 68, card_w, card_h)
+        sc = clamp(h / 1080.0, 0.56, 1.0)
+        card_w, card_h = 355.0 * sc, 74.0 * sc
+        rect = QRectF(24.0 * sc, h - card_h - 54.0 * sc, card_w, card_h)
 
         painter.setBrush(QColor(12, 16, 30, 152))
         painter.setPen(QPen(QColor(255, 255, 255, 42), 1.0))
-        painter.drawRoundedRect(rect, 14, 14)
+        painter.drawRoundedRect(rect, 14.0 * sc, 14.0 * sc)
 
-        f_clock = QFont("Segoe UI", 17)
+        f_clock = QFont("Segoe UI", max(10, int(17 * sc)))
         f_clock.setBold(True)
         painter.setFont(f_clock)
         painter.setPen(QColor(245, 248, 255, 240))
-        painter.drawText(rect.adjusted(16, 8, -16, -34), Qt.AlignLeft | Qt.AlignVCenter, f"{hh:02d}:{mm:02d}")
+        painter.drawText(rect.adjusted(14 * sc, 7 * sc, -14 * sc, -32 * sc), Qt.AlignLeft | Qt.AlignVCenter, f"{hh:02d}:{mm:02d}")
 
-        f_sub = QFont("Segoe UI", 9)
+        f_sub = QFont("Segoe UI", max(7, int(9 * sc)))
         painter.setFont(f_sub)
         painter.setPen(QColor(202, 218, 245, 220))
         line1 = f"{circadian.label_pt} · {weather.label_pt} ({weather.temperature_c:.0f}°C)"
-        painter.drawText(rect.adjusted(98, 10, -14, -36), Qt.AlignLeft | Qt.AlignVCenter, line1)
+        painter.drawText(rect.adjusted(96 * sc, 9 * sc, -12 * sc, -34 * sc), Qt.AlignLeft | Qt.AlignVCenter, line1)
 
         line2 = f"{persona_name} · {emotion.label} · Afinidade {affinity:.0f}% · {activity}"
         painter.setPen(QColor(168, 205, 255, 215))
-        painter.drawText(rect.adjusted(16, 44, -14, -8), Qt.AlignLeft | Qt.AlignVCenter, line2)
+        painter.drawText(rect.adjusted(14 * sc, 40 * sc, -12 * sc, -6 * sc), Qt.AlignLeft | Qt.AlignVCenter, line2)
