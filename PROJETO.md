@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-22 (Milestone 9 — Ancoragem Aterrada, Animação Multi-Banda 2.5D, Dinâmica do Local, Preset TOP & Reiluminação Qwen 2.1)
+> **Última atualização**: 2026-11-22 (Milestone 10 — Esqueleto Real 2D de 18 Ossos, AutoRigger Spine2D & Terraço Eye-Level 1:1)
 
 ---
 
@@ -42,8 +42,8 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 | **Core** | `iawallpaper/core/` | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | não | não |
 | **Plataforma** | `iawallpaper/plataforma/` | `desktop_host.py`, `windows.py` | não | sim |
 | **Sense** | `iawallpaper/sense/` | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | não | não |
-| **Comfy** | `iawallpaper/comfy/` | `bridge.py`, `workflows.py` | não | não |
-| **Render** | `iawallpaper/render/` | `atmosphere.py`, `particles.py`, `avatar.py`, `scene.py`, `canvas.py` | sim | não |
+| **Comfy** | `iawallpaper/comfy/` | `presets.py`, `bridge.py`, `workflows.py` | não | não |
+| **Render** | `iawallpaper/render/` | `skeleton.py`, `rig_cutter.py`, `world_stage.py`, `atmosphere.py`, `particles.py`, `avatar.py`, `scene.py`, `canvas.py` | sim | não |
 | **Mind** | `iawallpaper/mind/` | `director.py` | não | não |
 | **UI** | `iawallpaper/ui/` | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | sim | não |
 | **App** | `iawallpaper/app.py`, `main.py` | Orquestração principal, trava de instância única, ciclos 16ms/100ms/500ms/15m/30s, launcher `start_iawallpaper.ps1` | sim | sim |
@@ -63,3 +63,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
   - **Ancoragem Real & Animação Multi-Banda (`render/avatar.py`)**: `trim_sprite_pixmap()` remove margens transparentes sob os pés para encostar exatamente na sola dos sapatos; sombra dupla (oclusão de contato + sombra direcional oposta ao sol/lua) + reflexo no piso molhado na chuva; deformação esquelética 2.5D em 3 bandas anatômicas sobrepostas (pernas fixas no chão, quadril/tronco respirando/balançando, busto/cabeça acompanhando cursor) + ações `stretch`, `wave`, `admire_view`, `music_sway`, `sit_work` e `sleep`.
   - **Dinâmica Própria dos Locais (`render/world_stage.py`, `render/scene.py`)**: Raios solares volumétricos (*god rays*), caustics/reflexos cintilantes no piso, névoa deslizante, luzes de lanternas pulsando à noite, pássaros/borboletas diurnos e anel luminoso interativo no clique do chão.
   - **Leitor Read-Only de Presets `(TOP)` & Reiluminação 1:1 Qwen 2.1 (`comfy/presets.py`, `workflows.py`, `bridge.py`, `control_center.py`)**: Lê `approved_combos.json` (read-only) permitindo escolher qualquer preset do ComfyUI Studio (padrão `RawSexyGlowingGemPencil(TOP)` com `arthemyComics_v80` + 5 LoRAs para waifu adulta, madura e glamorosa) e reilumina o **mesmo cenário base** (`diorama_day.png`) em `sunset`, `night` e `rain` via **Qwen Image 2.1 Edit** (`NoctQ_V3_turbo_int8_convrot` + `qwen3vl_8b_int8_convrot` + `qwen-anime-Illustration-1`) preservando 100% da arquitetura. Validado visualmente com **25/25 testes verdes**.
+- **Milestone 10** (2026-11-22): **Esqueleto Real 2D de 18 Ossos (`CharacterSkeleton`), AutoRigger Spine2D (`rig_cutter.py`) & Cenário Eye-Level em Escala Humana 1:1**:
+  - **Motor Esquelético FK (`render/skeleton.py`)**: Hierarquia anatômica real de 18 ossos com convenção articular humana (joelhos dobrando apenas para trás na caminhada, coxas/canelas dobrando à frente ao sentar, braços erguidos no aceno e alongamento, guarda-chuva ancorado na mão direita `forearm_r.end`), física de mola para cabelo/saia e auto-aterramento matemático (`max(foot_y) == 0.0`).
+  - **AutoRigger Guiado por Silhueta (`render/rig_cutter.py`)**: Recorta automaticamente um sprite frontal A-pose (`rig_base.png`) em 10 peças RGBA (`head`, `torso`, `upper_arm_l/r`, `forearm_l/r`, `thigh_l/r`, `shin_l/r`) usando detecção exata de axilas (*armpit gap detection*), juntas circulares sobrepostas e calibração 1:1 de `RigProportions`.
+  - **Workflows A-Pose & Terraço Eye-Level 1:1 (`comfy/workflows.py`, `bridge.py`, `world_stage.py`, `director.py`)**: Novo `build_apose_rig_workflow` com preset `(TOP)` + cenário *eye-level* em escala humana (passarela de pedra com corrimãos laterais reiluminada 1:1 via Qwen Image 2.1 para dia/pôr do sol/chuva/noite) + novos modos diagnósticos `--mode rig_parts` e `--mode gif` em `tools/render_showcase.py`. Validado com **27/27 testes verdes**, inspeção visual das 10 peças + showcase + GIF animado no Telegram.

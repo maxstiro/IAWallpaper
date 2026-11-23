@@ -32,19 +32,19 @@ class WorldHotspot:
     label_pt: str
 
 
-# Todos os hotspots ficam ancorados estritamente no piso caminhável inferior (sem flutuar sobre grades/céu)
+# Todos os hotspots ficam ancorados estritamente na passarela de pedra central do terraço eye-level (escala 1:1, longe do HUD)
 DEFAULT_HOTSPOTS: dict[str, WorldHotspot] = {
-    "desk":       WorldHotspot("desk",       0.37, 0.89, "sit_work",    "Cantinho de Estudo"),
-    "music_spot": WorldHotspot("music_spot", 0.47, 0.87, "music_sway",  "Cantinho Musical"),
-    "overlook":   WorldHotspot("overlook",   0.56, 0.84, "admire_view", "Mirante da Praça"),
-    "lantern":    WorldHotspot("lantern",    0.66, 0.86, "stretch",     "Luz da Lanterna"),
-    "cushion":    WorldHotspot("cushion",    0.77, 0.90, "sleep",       "Tapete & Almofada"),
-    "garden_l":   WorldHotspot("garden_l",   0.35, 0.93, "idle",        "Terraço Oeste"),
-    "garden_r":   WorldHotspot("garden_r",   0.81, 0.93, "idle",        "Terraço Leste"),
+    "desk":       WorldHotspot("desk",       0.47, 0.90, "sit_work",    "Cantinho de Estudo"),
+    "music_spot": WorldHotspot("music_spot", 0.49, 0.91, "music_sway",  "Cantinho Musical"),
+    "overlook":   WorldHotspot("overlook",   0.52, 0.88, "wave",        "Mirante do Terraço"),
+    "lantern":    WorldHotspot("lantern",    0.58, 0.90, "stretch",     "Luz da Lanterna"),
+    "cushion":    WorldHotspot("cushion",    0.63, 0.91, "sleep",       "Tapete & Almofada"),
+    "garden_l":   WorldHotspot("garden_l",   0.38, 0.92, "idle",        "Passarela Oeste"),
+    "garden_r":   WorldHotspot("garden_r",   0.65, 0.92, "idle",        "Passarela Leste"),
 }
 
-WALK_MIN_X, WALK_MAX_X = 0.28, 0.88
-WALK_MIN_Y, WALK_MAX_Y = 0.81, 0.95
+WALK_MIN_X, WALK_MAX_X = 0.33, 0.69
+WALK_MIN_Y, WALK_MAX_Y = 0.84, 0.95
 
 
 @dataclass

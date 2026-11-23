@@ -50,35 +50,41 @@ WORLD_SPRITE_ACTIONS: dict[str, str] = {
 
 DIORAMA_SCENE_PRESETS: dict[str, str] = {
     "sky_sanctuary": (
-        "anime_scenery, tree_of_savior_style, ragnarok_online_style, hand_painted_2.5d_rpg_background, "
-        "wide_flat_open_cobblestone_terrace_floor_filling_bottom_40_percent, elegant_stone_balustrade_midground, "
-        "lush_trees_and_flowerbeds_on_edges, serene_lake_and_distant_observatory_valley_horizon, "
-        "eye_level_slight_high_angle_stage_view, masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
+        "anime_scenery, tree_of_savior_style, hand_painted_anime_background, "
+        "(eye_level_camera:1.35), (straight-on_horizontal_view:1.30), human_scale_architecture, "
+        "wide_flat_horizontal_stone_terrace_floor_across_bottom_30_percent, "
+        "waist_high_ornate_stone_balcony_railing_spanning_horizontally_midground, "
+        "warm_terrace_lantern_posts_on_far_edges, lush_blossoming_trees_framing_left_and_right_edges, "
+        "expansive_serene_sky_distant_mountains_and_shimmering_lake_vista_behind_railing, "
+        "masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
     ),
     "cyber_loft": (
-        "anime_scenery, 2.5d_rpg_stylish_rooftop_lounge, hand_painted_anime_background, "
-        "wide_flat_wooden_deck_floor_filling_bottom_40_percent, glass_railing_midground, "
-        "neon_cyberpunk_cityscape_horizon, potted_plants_on_edges, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
+        "anime_scenery, hand_painted_anime_background, (eye_level_camera:1.35), (straight-on_horizontal_view:1.30), "
+        "wide_flat_horizontal_wooden_rooftop_terrace_floor_across_bottom_30_percent, "
+        "waist_high_glass_balcony_railing_midground, neon_cyberpunk_cityscape_horizon_behind_railing, "
+        "cozy_potted_plants_and_warm_lights_on_edges, human_scale_architecture, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
     ),
     "sakura_hill": (
-        "anime_scenery, tree_of_savior_style, ragnarok_online_style, hand_painted_2.5d_rpg_background, "
-        "wide_flat_stone_shrine_courtyard_filling_bottom_40_percent, blooming_cherry_blossom_trees_framing_sides, "
-        "low_stone_railing, coastal_town_below, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
+        "anime_scenery, tree_of_savior_style, hand_painted_anime_background, "
+        "(eye_level_camera:1.35), (straight-on_horizontal_view:1.30), human_scale_architecture, "
+        "wide_flat_horizontal_stone_shrine_terrace_floor_across_bottom_30_percent, "
+        "waist_high_low_stone_railing_midground, blooming_cherry_blossom_trees_framing_left_and_right_edges, "
+        "coastal_town_and_ocean_horizon_behind_railing, masterpiece, best_quality, no_humans, wide_angle, wallpaper"
     ),
 }
 
 QWEN_RELIGHT_INSTRUCTIONS: dict[str, str] = {
     "sunset": (
-        "Keep the exact same architecture, stone balustrade, flat cobblestone terrace floor, trees, and camera angle from <image1> completely unchanged. "
-        "Transform only the sky, lighting, and atmosphere into a breathtaking warm golden-hour sunset with rich amber and violet clouds, warm golden sunlight casting long soft shadows across the terrace stones, and glowing sunset reflections."
+        "Keep the exact same stone balcony railing, flat horizontal stone terrace floor, trees, lantern posts, and eye-level camera angle from <image1> completely unchanged. "
+        "Transform only the sky, lighting, and atmosphere into a breathtaking warm golden-hour sunset with rich amber and violet clouds, warm golden sunlight casting soft shadows across the terrace floor, and glowing sunset reflections."
     ),
     "night": (
-        "Keep the exact same architecture, stone balustrade, flat cobblestone terrace floor, trees, and camera angle from <image1> completely unchanged. "
-        "Transform only the sky, lighting, and atmosphere into a serene deep starry night with a glowing crescent moon, warm amber lanterns glowing softly along the terrace railing, cool moonlight illuminating the cobblestones, and twinkling distant city lights."
+        "Keep the exact same stone balcony railing, flat horizontal stone terrace floor, trees, lantern posts, and eye-level camera angle from <image1> completely unchanged. "
+        "Transform only the sky, lighting, and atmosphere into a serene deep starry night with a glowing crescent moon, warm amber lanterns glowing softly along the balcony railing, cool moonlight illuminating the terrace floor, and twinkling distant lights."
     ),
     "rain": (
-        "Keep the exact same architecture, stone balustrade, flat cobblestone terrace floor, trees, and camera angle from <image1> completely unchanged. "
-        "Transform only the weather and lighting into a cozy overcast rainy afternoon with wet glossy reflective cobblestones, shallow rain puddles reflecting soft lantern light, gentle falling rain mist, and atmospheric cool blue-grey sky."
+        "Keep the exact same stone balcony railing, flat horizontal stone terrace floor, trees, lantern posts, and eye-level camera angle from <image1> completely unchanged. "
+        "Transform only the weather and lighting into a cozy overcast rainy afternoon with wet glossy reflective stone terrace floor, shallow rain puddles reflecting soft warm lantern light, gentle falling rain mist, and atmospheric cool blue-grey sky."
     ),
 }
 
@@ -350,7 +356,9 @@ def build_diorama_scene_workflow(
     time_tags = TIME_VARIANT_PROMPTS.get(variant, TIME_VARIANT_PROMPTS["day"])
     positive = f"{base}, {time_tags}"
     negative = (
-        f"{DEFAULT_NEGATIVE}, 1girl, 1boy, person, people, character, crowd, traveler, adventurer, "
+        f"{DEFAULT_NEGATIVE}, (bird's-eye_view:1.5), (top-down:1.5), (high_angle:1.4), (aerial_view:1.5), "
+        "(isometric:1.4), miniature, diorama_toy, stairs, bridge, cliff_edge_without_floor, "
+        "1girl, 1boy, person, people, character, crowd, traveler, adventurer, "
         "cloaked_figure, hooded_figure, npc, silhouette, statue_person, ui, hud, minimap, health_bar"
     )
     actual_seed = int(seed if seed is not None else random.randint(1, 2**31 - 1))
@@ -529,6 +537,86 @@ def build_world_sprite_workflow(
         graph,
         decoded_node="7",
         prefix=f"IAWallpaper_sprite_{persona.id}_{action_key}",
+        use_rembg=use_rembg,
+        rembg_model=rembg_model,
+    )
+    return graph
+
+
+def build_apose_rig_workflow(
+    checkpoint: str,
+    persona: Persona,
+    outfit_key: str = "casual",
+    loras: tuple[LoraSpec, ...] | list[LoraSpec] | None = None,
+    seed: int | None = None,
+    width: int = 832,
+    height: int = 1216,
+    steps: int = 26,
+    cfg: float = 5.5,
+    use_pag: bool = True,
+    use_rembg: bool = True,
+    rembg_model: str = "isnet-anime",
+) -> dict:
+    """Gera sprite frontal simétrico em A-pose (braços afastados do tronco, pernas separadas) para AutoRigger Spine2D.
+
+    Usa o preset `(TOP)` do ComfyUI Studio (Checkpoint + LoRAs) + `isnet-anime` RemBG para gerar
+    uma waifu madura, estilosa e nítida pronta para recorte automático nas 10 peças do esqueleto.
+    """
+    outfit = persona.outfits.get(outfit_key) or persona.outfits["casual"]
+    outfit_tags = outfit.get("prompt", "stylish_fitted_off-shoulder_mini_dress, thighhighs, elegant_heels")
+    char_tags = persona.comfy_character_tags.replace("upper_body", "full_body")
+    positive = (
+        f"1girl, solo, (mature_female:1.25), (curvaceous:1.18), (glamorous_anime_style:1.15), "
+        f"tall_slender_waist, wide_hips, (front_view:1.35), (straight-on:1.30), (a-pose:1.35), "
+        f"standing_straight, (arms_slightly_away_from_body:1.32), open_hands, (legs_slightly_apart:1.25), "
+        f"symmetrical_standing_pose, (full_body:1.40), complete_shoes_visible, facing_viewer, looking_at_viewer, "
+        f"warm_alluring_smile, stylish_fitted_off-shoulder_mini_dress, thighhighs, elegant_heels, "
+        f"{char_tags}, {outfit_tags}, luminous_shading, crisp_outline, "
+        f"(simple_background:1.30), (solid_white_background:1.40)"
+    )
+    negative = (
+        f"{DEFAULT_NEGATIVE}, (chibi:1.6), (loli:1.6), (child:1.6), short_stature, flat_chest, "
+        "hand_on_hip, crossed_arms, crossed_legs, arms_behind_back, hands_together, sitting, crouching, "
+        "side_view, profile, back_view, turned_around, dynamic_angle, dutch_angle, "
+        "upper_body, portrait, cowboy_shot, cropped_feet, cropped_legs, out_of_frame, "
+        "complex_background, scenery, floor_shadow, cast_shadow, "
+        "sprite_sheet, character_sheet, reference_sheet, multiple_views, turnaround, 2girls, multiple_girls"
+    )
+    actual_seed = int(seed if seed is not None else persona.seed + 1024)
+
+    graph: dict = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": checkpoint}},
+    }
+    model_src, clip_src = _apply_lora_chain(graph, ["1", 0], ["1", 1], loras, start_id=20)
+
+    graph["2"] = {"class_type": "CLIPTextEncode", "inputs": {"text": positive, "clip": clip_src}}
+    graph["3"] = {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": clip_src}}
+    graph["4"] = {"class_type": "EmptyLatentImage", "inputs": {"width": int(width), "height": int(height), "batch_size": 1}}
+
+    if use_pag:
+        graph["5"] = {"class_type": "PerturbedAttentionGuidance", "inputs": {"model": model_src, "scale": 2.8}}
+        model_src = ["5", 0]
+
+    graph["6"] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "model": model_src,
+            "seed": actual_seed,
+            "steps": int(steps),
+            "cfg": float(cfg),
+            "sampler_name": "dpmpp_2m",
+            "scheduler": "karras",
+            "positive": ["2", 0],
+            "negative": ["3", 0],
+            "latent_image": ["4", 0],
+            "denoise": 1.0,
+        },
+    }
+    graph["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
+    _attach_rembg_and_save(
+        graph,
+        decoded_node="7",
+        prefix=f"IAWallpaper_rig_{persona.id}_apose",
         use_rembg=use_rembg,
         rembg_model=rembg_model,
     )

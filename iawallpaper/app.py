@@ -431,6 +431,8 @@ class IAWallpaperApp:
         if out.target_hotspot and out.target_hotspot in self.canvas.scene.stage.hotspots:
             hs = self.canvas.scene.stage.hotspots[out.target_hotspot]
             self.canvas.avatar.walk_to(hs.x, hs.y, arrive_action=hs.arrive_action)
+        elif out.pose_action and self.canvas.avatar.action not in ("walk", "sleep"):
+            self.canvas.avatar.trigger_action(out.pose_action)
         if out.emote:
             self.canvas.avatar.show_emote(out.emote)
 

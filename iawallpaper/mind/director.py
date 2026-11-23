@@ -24,6 +24,7 @@ class DirectorOutputs:
     burst_fx: str | None = None        # "heart" | "sparkle" | "note" | "zzz" | None
     target_hotspot: str | None = None  # "desk" | "cushion" | "music_spot" | "lantern" | "overlook" | "garden_l" | "garden_r"
     emote: str | None = None           # balão RO/Pokémon: "heart" | "exclamation" | "music" | "question" | "zzz" | "sparkle" | "pout"
+    pose_action: str | None = None     # ação esquelética expressiva: "wave" | "stretch" | None
 
 
 class BehaviorDirector:
@@ -56,6 +57,7 @@ class BehaviorDirector:
         self._current_hotspot: str = "overlook"
         self._pending_fx: str | None = None
         self._pending_emote: str | None = None
+        self._pending_pose: str | None = None
         self._rng = random.Random(persona.seed + 303)
 
     def set_persona(self, persona: Persona) -> None:
@@ -129,6 +131,7 @@ class BehaviorDirector:
         self.show_whisper(self._pick_whisper("greet"), duration=7.0, now=t)
         self._pending_fx = "sparkle"
         self._pending_emote = "heart"
+        self._pending_pose = "wave"
 
     def choose_contextual_outfit(
         self,
@@ -202,6 +205,8 @@ class BehaviorDirector:
         target_hotspot: str | None = None
         emote = self._pending_emote
         self._pending_emote = None
+        pose_action = self._pending_pose
+        self._pending_pose = None
 
         if self.asleep:
             desired = "cushion"
@@ -265,6 +270,7 @@ class BehaviorDirector:
                     burst = "sparkle"
                 elif action == "pose_wave":
                     burst = "heart" if self.drives.affinity >= 35.0 else "sparkle"
+                    pose_action = "wave" if self._rng.random() < 0.65 else "stretch"
 
         # 5. Alpha suave da bolha de sussurro
         alpha = 0.0
@@ -283,4 +289,5 @@ class BehaviorDirector:
             burst_fx=burst,
             target_hotspot=target_hotspot,
             emote=emote,
+            pose_action=pose_action,
         )

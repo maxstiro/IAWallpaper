@@ -144,3 +144,80 @@ def test_trim_sprite_pixmap_removes_bottom_padding():
     # Altura deve terminar exatamente em y=79 (sem os 40px transparentes abaixo dos pés!)
     assert trimmed.height() <= 63
     assert trimmed.width() <= 46
+
+
+def test_character_skeleton_poses_and_ground_pinning():
+    from iawallpaper.render.skeleton import CharacterSkeleton
+
+    skel = CharacterSkeleton()
+
+    # 1. Caminhada: auto-aterramento exato em y == 0.0 e joelhos dobrando para trás
+    max_shin_bend = 0.0
+    for step in range(40):
+        bones = skel.update(dt=0.05, action="walk", walk_phase=step * 0.35, action_timer=step * 0.05)
+        lowest_foot = max(bones["shin_l"].end_y, bones["shin_r"].end_y)
+        assert abs(lowest_foot) < 1e-5
+        max_shin_bend = max(max_shin_bend, abs(skel.pose.shin_l), abs(skel.pose.shin_r))
+    assert max_shin_bend > 18.0
+
+    # 2. Aceno: mão direita sobe acima da linha do peito/pescoço
+    for step in range(30):
+        bones = skel.update(dt=0.05, action="wave", walk_phase=0.0, action_timer=step * 0.05)
+    assert bones["forearm_r"].end_y < bones["neck"].y
+
+    # 3. Sentada trabalhando: coxas dobram fortemente para frente
+    for step in range(30):
+        skel.update(dt=0.05, action="sit_work", walk_phase=0.0, action_timer=step * 0.05)
+    assert skel.pose.thigh_l > 45.0
+    assert skel.pose.shin_l < -45.0
+
+
+def test_auto_rigger_cuts_synthetic_apose_and_renders(tmp_path):
+    _ensure_qapp()
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
+    from iawallpaper.render.rig_cutter import build_rig_from_apose
+
+    # Desenha uma silhueta sintética limpa em A-pose (cabeça, tronco, braços afastados, pernas separadas)
+    img = QImage(240, 420, QImage.Format_RGBA8888)
+    img.fill(QColor(0, 0, 0, 0))
+    p = QPainter(img)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(235, 200, 220, 255))
+    # Cabeça + pescoço
+    p.drawEllipse(QPointF(120, 46), 24, 28)
+    p.drawRect(112, 70, 16, 22)
+    # Tronco
+    p.drawRoundedRect(92, 92, 56, 118, 12, 12)
+    # Braços afastados em A-pose (com vão transparente claro entre braço e cintura!)
+    p.setPen(QPen(QColor(235, 200, 220, 255), 16, Qt.SolidLine, Qt.RoundCap))
+    p.drawLine(QPointF(92, 102), QPointF(42, 222))
+    p.drawLine(QPointF(148, 102), QPointF(198, 222))
+    # Pernas separadas até os pés (y=404)
+    p.setPen(QPen(QColor(180, 160, 230, 255), 22, Qt.SolidLine, Qt.RoundCap))
+    p.drawLine(QPointF(104, 208), QPointF(96, 404))
+    p.drawLine(QPointF(136, 208), QPointF(144, 404))
+    p.end()
+
+    rig = build_rig_from_apose(QPixmap.fromImage(img))
+    assert rig is not None
+    expected = {"head", "torso", "upper_arm_l", "forearm_l", "upper_arm_r", "forearm_r", "thigh_l", "shin_l", "thigh_r", "shin_r"}
+    assert expected.issubset(set(rig.parts.keys()))
+
+    # Salva como rig_base.png e valida renderização esquelética completa no WallpaperCanvas
+    sdir = tmp_path / "rig_persona"
+    sdir.mkdir()
+    img.save(str(sdir / "rig_base.png"))
+
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, sprite_dirs=[sdir], render_style="world_sprite")
+    assert canvas.avatar.has_skeletal_rig()
+
+    for act in ("walk", "wave", "stretch", "sit_work"):
+        canvas.avatar.trigger_action(act)
+        canvas.weather = WeatherState(condition="rain" if act == "walk" else "clear", intensity=0.8)
+        for _ in range(10):
+            canvas.step_animation(0.04)
+        frame = canvas.render_to_image(640, 360)
+        assert not frame.isNull()
+        assert not canvas.avatar.head_rect.isEmpty()

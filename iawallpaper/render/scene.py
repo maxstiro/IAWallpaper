@@ -241,8 +241,10 @@ class SceneCompositor:
                     music_active=activity == "MUSIC",
                 )
             elif avatar.action == "sit_work":
-                sx, sy = self.stage.screen_pos(avatar.pos_x, avatar.pos_y + 0.025, width, height, self.parallax_x, self.parallax_y)
-                self.stage._draw_study_desk(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0) * 0.88, atmo, True)
+                sx, sy = self.stage.screen_pos(
+                    avatar.pos_x + avatar.facing * 0.055, avatar.pos_y + 0.012, width, height, self.parallax_x, self.parallax_y
+                )
+                self.stage._draw_study_desk(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0) * 0.95, atmo, True)
 
         # Partículas climáticas e reações afetivas em primeiro plano
         particles.paint_weather(painter)

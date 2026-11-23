@@ -20,6 +20,7 @@ from .workflows import (
     PACK_OUTFITS,
     PACK_SCENE_VARIANTS,
     WORLD_SPRITE_ACTIONS,
+    build_apose_rig_workflow,
     build_avatar_variant_img2img_workflow,
     build_avatar_workflow,
     build_diorama_scene_workflow,
@@ -379,9 +380,11 @@ class ComfyBridge:
         on_progress=None,
         on_asset=None,
     ) -> list[Path]:
-        """Gera pack 2.5D coerente:
-        1. Usa preset (TOP) do ComfyUI Studio (Checkpoint + LoRAs) para waifu madura/estilosa full-body.
-        2. Gera 1 cenário base (`diorama_day.png`) e reilumina O MESMO local para sunset/night/rain via Qwen Image 2.1!
+        """Gera pack 2.5D coerente com esqueleto articulado real:
+        1. Usa preset (TOP) do ComfyUI Studio (Checkpoint + LoRAs) para gerar 1 base A-pose (`rig_base.png`)
+           recortada automaticamente em 10 peças articuladas pelo AutoRigger.
+        2. Gera 1 terraço eye-level 1:1 em escala humana (`diorama_day.png`) e reilumina O MESMO local
+           para sunset/night/rain via Qwen Image 2.1 Edit!
         """
         st = self.probe()
         if not st.online or not st.checkpoint:
@@ -396,17 +399,11 @@ class ComfyBridge:
         scene_dest_dir.mkdir(parents=True, exist_ok=True)
 
         jobs: list[tuple[str, str, Path]] = []
-        base_idle = persona_dest_dir / "sprite_idle.png"
-        if not (skip_existing and base_idle.exists()):
-            jobs.append(("sprite_base", "idle", base_idle))
-        for act in actions:
-            if act == "idle":
-                continue
-            p = persona_dest_dir / f"sprite_{act}.png"
-            if not (skip_existing and p.exists()):
-                jobs.append(("sprite_action", act, p))
+        rig_base = persona_dest_dir / "rig_base.png"
+        if not (skip_existing and rig_base.exists()):
+            jobs.append(("rig_apose", "apose", rig_base))
 
-        # Cenário base (day) primeiro, depois relight coerente do MESMO local para sunset/night/rain!
+        # Cenário base eye-level (day) primeiro, depois relight coerente do MESMO local para sunset/night/rain!
         base_day = scene_dest_dir / "diorama_day.png"
         if not (skip_existing and base_day.exists()):
             jobs.append(("diorama_base", "day", base_day))
@@ -424,36 +421,19 @@ class ComfyBridge:
             return []
 
         created: list[Path] = []
-        uploaded_idle: str | None = None
         uploaded_day: str | None = None
 
         for idx, (kind, key, out_path) in enumerate(jobs, start=1):
             if on_progress:
                 on_progress(idx, total, f"[{idx}/{total}] Gerando {kind}: {key}...")
 
-            if kind == "sprite_base":
-                graph = build_world_sprite_workflow(
+            if kind == "rig_apose":
+                graph = build_apose_rig_workflow(
                     checkpoint=sprite_ckpt,
                     persona=persona,
-                    action_key="idle",
                     loras=sprite_loras,
-                    seed=persona.seed + 909,
-                    steps=24,
-                    use_pag=st.has_pag,
-                    use_rembg=st.has_rembg,
-                )
-            elif kind == "sprite_action":
-                if uploaded_idle is None and base_idle.exists():
-                    uploaded_idle = self.upload_image_on_white(base_idle, f"iawallpaper_sprite_idle_{persona.id}.png")
-                graph = build_world_sprite_workflow(
-                    checkpoint=sprite_ckpt,
-                    persona=persona,
-                    action_key=key,
-                    loras=sprite_loras,
-                    base_uploaded_image=uploaded_idle,
-                    denoise=0.52 if key in ("walk1", "walk2", "happy") else 0.58,
-                    seed=persona.seed + 909 + idx * 23,
-                    steps=22,
+                    seed=persona.seed + 1024,
+                    steps=26,
                     use_pag=st.has_pag,
                     use_rembg=st.has_rembg,
                 )
@@ -462,19 +442,19 @@ class ComfyBridge:
                     checkpoint=st.checkpoint,
                     scene_id=scene_id,
                     variant="day",
-                    seed=202901,
-                    steps=22,
+                    seed=203011,
+                    steps=24,
                     use_pag=st.has_pag,
                 )
             else:
-                # Reiluminação 1:1 da MESMA arquitetura via Qwen Image 2.1!
+                # Reiluminação 1:1 da MESMA arquitetura eye-level via Qwen Image 2.1!
                 if uploaded_day is None and base_day.exists():
                     uploaded_day = self.upload_image_raw(base_day, f"iawallpaper_diorama_day_{scene_id}.png")
                 if st.has_qwen_relight and uploaded_day is not None:
                     graph = build_qwen_relight_scene_workflow(
                         base_uploaded_scene=uploaded_day,
                         variant=key,
-                        seed=202901 + idx * 17,
+                        seed=203011 + idx * 17,
                         steps=10,
                         cfg=1.5,
                     )
@@ -483,8 +463,8 @@ class ComfyBridge:
                         checkpoint=st.checkpoint,
                         scene_id=scene_id,
                         variant=key,
-                        seed=202901,
-                        steps=20,
+                        seed=203011,
+                        steps=22,
                         use_pag=st.has_pag,
                     )
 
