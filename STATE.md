@@ -36,3 +36,10 @@
 - **Renderizar Showcase ou GIF Dungeon Squad Pixel-Art 3D**: `.\venv\Scripts\python.exe tools\render_showcase.py --persona mira --scene sky_sanctuary --style vrm_3d --vrm dungeon_squad --mode gif --out demo_ds.gif`
 - **Suíte de Testes**: `$env:QT_QPA_PLATFORM="offscreen"; .\venv\Scripts\python.exe -m pytest -v`
 - **Git / GitHub**: Remote via SSH (`git@github.com:maxstiro/IAWallpaper.git`, branch `main`).
+
+---
+
+## 4. Próxima Sessão Planejada (Milestone 16 — Ordem Aprovada pelo Usuário)
+1. **Aparência Geral**: refinar o estilo geral HD pixel-art 3D (malha, proporções, sombreamento, roupas/acessórios e silhueta).
+2. **Identidade do Avatar**: consolidar rosto, cabelo, paleta e assinatura visual única da personagem.
+3. **Ritmo & Movimentos**: lapidar cadência, *timing* de respiração/idle, física secundária e animações 360°.
