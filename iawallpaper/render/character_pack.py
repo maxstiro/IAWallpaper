@@ -88,7 +88,17 @@ class ClipMeta:
     loop: bool = True
 
 
-# Escala de altura relativa ao corpo em pé (mantém o tamanho da cabeça 1:1 quando sentada/deitada após recorte tight do clipe!)
+# Clipes de postura/transição cujo `height_scale` deve acompanhar exatamente a proporção de recorte (`clip.height / ref_stand_h`)
+_PROPORTIONAL_HEIGHT_KEYS: frozenset[str] = frozenset({
+    "sit_floor_SE",
+    "sit_chair_SE",
+    "lie_SE",
+    "trans_sit_floor",
+    "trans_sit_chair",
+    "trans_lie",
+})
+
+# Fallback caso um pack sintético (ex: teste unitário) tenha todos os clipes com altura idêntica
 CLIP_HEIGHT_SCALE: dict[str, float] = {
     "sit_floor_SE": 0.78,
     "sit_chair_SE": 0.90,
@@ -127,9 +137,40 @@ class CharacterPack:
     def available_keys(self) -> set[str]:
         return set(self.clips.keys())
 
+    def _ref_standing_height(self) -> float:
+        """Altura de recorte de referência (em pixels) da personagem em pé na câmera 448×640 do pack."""
+        # Prioriza clipes assados na mesma câmera do CharacterPipeline (garante emenda 0.0px em trans_sit/trans_lie!)
+        samples = [
+            float(self.clips[k].height)
+            for k in ("trans_sit_floor", "wave_SE", "interact_SE", "walk_S", "walk_SE", "walk_N", "spin_SE")
+            if k in self.clips and self.clips[k].height > 0
+        ]
+        if samples:
+            samples.sort()
+            return samples[len(samples) // 2]
+        for k in ("idle_SE", "idle"):
+            if k in self.clips and self.clips[k].height > 0:
+                return float(self.clips[k].height)
+        return 0.0
+
+    def _height_scale_for(self, key: str, clip: SpriteClip) -> float:
+        """Calcula escala vertical pixel-exata para posturas/transições (0.0px de pulo de zoom nas emendas!)."""
+        if key not in _PROPORTIONAL_HEIGHT_KEYS:
+            return 1.0
+        ref_h = self._ref_standing_height()
+        if ref_h > 0.0 and clip.height > 0:
+            ratio = clip.height / ref_h
+            # Só usa fallback fixo se o clipe tiver exatamente a mesma altura artificial (ex: sprite sintético de teste)
+            if abs(ratio - 1.0) > 0.015 or key in ("trans_sit_floor", "trans_sit_chair"):
+                return max(0.55, min(1.08, ratio))
+        return CLIP_HEIGHT_SCALE.get(key, 1.0)
+
     def resolve_transition(self, src_action: str, dst_action: str, compass_dir: str = "SE") -> ResolvedClip | None:
         """Retorna o clipe de transição (normal ou reverso!) se existir no pack."""
-        spec = POSE_TRANSITIONS.get((src_action, dst_action))
+        standing = ("idle", "walk", "run", "wave", "interact", "spin", "dance", "stretch")
+        norm_src = "idle" if src_action in standing else src_action
+        norm_dst = "idle" if dst_action in standing else dst_action
+        spec = POSE_TRANSITIONS.get((src_action, dst_action)) or POSE_TRANSITIONS.get((norm_src, norm_dst))
         if spec is None:
             return None
         tkey, is_rev = spec
@@ -145,7 +186,7 @@ class CharacterPack:
             speed_mul=1.0,
             stride_ratio=0.0,
             loop=False,
-            height_scale=CLIP_HEIGHT_SCALE.get(tkey, 1.0),
+            height_scale=self._height_scale_for(tkey, clip),
         )
 
     def resolve_action(self, action: str, compass_dir: str = "SE") -> ResolvedClip | None:
@@ -240,7 +281,7 @@ class CharacterPack:
                     speed_mul=1.0,
                     stride_ratio=0.0,
                     loop=True,
-                    height_scale=CLIP_HEIGHT_SCALE.get(cand, 1.0),
+                    height_scale=self._height_scale_for(cand, c),
                 )
 
         # Último fallback: primeiro clipe disponível

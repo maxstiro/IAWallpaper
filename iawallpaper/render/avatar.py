@@ -103,6 +103,10 @@ class AvatarRig:
         self._trans_time: float = 0.0
         self._pending_action: str | None = None
         self._prev_clip_flip: bool = False
+        self._prev_clip_h: float = 0.0
+        self._last_drawn_frame: QPixmap | None = None
+        self._last_drawn_flip: bool = False
+        self._last_drawn_h: float = 0.0
         self._current_pack_sig: tuple[str, bool, bool] | None = None
 
         # Motor 2.5D Live2D / Spine2D em GPU (Arte 2D pura deformada em malha elástica contínua!)
@@ -807,17 +811,27 @@ class AvatarRig:
                     keep_stride_phase = False
                     if self._current_pack_sig is not None:
                         prev_k, prev_flip, prev_rev = self._current_pack_sig
-                        prev_c = self._char_pack.clips.get(prev_k)
                         keep_stride_phase = (
                             self._trans_resolved is None
                             and prev_k.startswith(("walk_", "run_"))
                             and resolved.key.startswith(("walk_", "run_"))
                         )
-                        if prev_c is not None:
-                            self._prev_clip_frame = prev_c.frame_at(self._clip_time, reverse=prev_rev)
-                            self._prev_clip_flip = prev_flip
+                        is_seam_trans = prev_k.startswith("trans_") or resolved.key.startswith("trans_")
+                        if self._last_drawn_frame is not None and not self._last_drawn_frame.isNull():
+                            # Usa o EXATO último frame desenhado na tela (nunca um frame errado de `_clip_time`!)
+                            self._prev_clip_frame = self._last_drawn_frame
+                            self._prev_clip_flip = self._last_drawn_flip
+                            self._prev_clip_h = self._last_drawn_h
                             self._clip_fade_t = 0.0
-                            self._clip_fade_dur = 0.11 if keep_stride_phase else 0.20
+                            self._clip_fade_dur = 0.06 if is_seam_trans else (0.11 if keep_stride_phase else 0.16)
+                        else:
+                            prev_c = self._char_pack.clips.get(prev_k)
+                            if prev_c is not None:
+                                self._prev_clip_frame = prev_c.frame_at(self._clip_time, reverse=prev_rev)
+                                self._prev_clip_flip = prev_flip
+                                self._prev_clip_h = 0.0
+                                self._clip_fade_t = 0.0
+                                self._clip_fade_dur = 0.14
                     self._current_pack_sig = sig
                     if self._trans_resolved is None and not keep_stride_phase:
                         self._clip_time = 0.0
@@ -1135,12 +1149,13 @@ class AvatarRig:
         if self._prev_clip_frame is not None and self._clip_fade_t < 1.0:
             ease = smoothstep(0.0, 1.0, self._clip_fade_t)
             prev_t = self._get_tinted_sprite(self._prev_clip_frame, atmosphere)
-            prev_w = target_h * (prev_t.width() / max(prev_t.height(), 1))
+            prev_h = self._prev_clip_h if self._prev_clip_h > 1.0 else target_h
+            prev_w = prev_h * (prev_t.width() / max(prev_t.height(), 1))
             prev_sx = -1.0 if self._prev_clip_flip else 1.0
             painter.save()
             painter.scale(prev_sx, 1.0)
             painter.setOpacity(1.0 - ease)
-            painter.drawPixmap(QRectF(-prev_w * 0.5, -target_h, prev_w, target_h), prev_t, QRectF(prev_t.rect()))
+            painter.drawPixmap(QRectF(-prev_w * 0.5, -prev_h, prev_w, prev_h), prev_t, QRectF(prev_t.rect()))
             painter.restore()
 
             painter.save()
@@ -1153,6 +1168,11 @@ class AvatarRig:
             painter.scale(sx, 1.0)
             painter.drawPixmap(dst, tinted_curr, QRectF(tinted_curr.rect()))
         painter.restore()
+
+        # Memoriza o frame exato desenhado para crossfade 100% livre de flickering na próxima emenda!
+        self._last_drawn_frame = frame
+        self._last_drawn_flip = resolved.flip_x
+        self._last_drawn_h = target_h
 
         if raining and self.action not in ("sleep", "lie", "sit_work"):
             self._paint_umbrella(painter, foot_x + (18 * u * sx), draw_y - target_h * 1.02, u, atmosphere)
