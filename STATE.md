@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-23 (Milestone 16 · Etapa 1b — Estilização Comic-Ink HD estilo Rapscallion × Dungeon Squad × Tree of Savior: Traço Nanquim Sobel 960×1200, Proporções ~4.5 Cabeças Curvilíneas & Olhar Expressivo)
+> **Última atualização**: 2026-11-23 (Milestone 16 · Etapa 1c — Proporções Ultra-Curvilíneas ~4.1 Cabeças, Postura Pin-Up 3/4 & Caminhada Expressiva inspiradas nas refs Civitai `96444929`/`141744777`/`57115673`/`96078865`)
 
 ---
 
@@ -29,7 +29,7 @@
   3. `androide_rosa` (**Airi — Androide Rosa**): cabelo rosa-pastel longo, olhos safira, roupa de baixo rosa-pérola.
   4. `vampira_negra` (**Lilith — Vampira**): rabo lateral preto-esmeralda, sardas sutis, olhos jade, roupa de baixo preta/carmesim.
 - **Cenário Padrão — Observatório Celeste (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**: Praça aberta ensolarada estilo Tree of Savior reiluminada 1:1 via Qwen 2.1 (`day`, `sunset`, `night`, `rain`).
-- **Prévias & GIFs Validados**: `m16_elfa_comic_turnaround.png`, `m16_comic_sky_showcase.png`, `m16_comic_sky_demo.gif` e `m16_four_girls_base.png` (enviados ao Telegram).
+- **Prévias & GIFs Validados**: `m16_elfa_pinup_sheet.png`, `m16_pinup_sky_showcase.png`, `m16_pinup_sky_demo.gif` e `m16_four_girls_base.png` (enviados ao Telegram).
 
 ---
 

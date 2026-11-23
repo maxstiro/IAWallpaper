@@ -44,126 +44,127 @@ class GirlArchetype:
     elf_ears: bool = False
     freckles: bool = False
     use_long_hair_graft: bool = True
-    # Escultura anatômica estilizada (Rapscallion × Dungeon Squad — adeus proporções Barbie!)
-    head_scale: float = 1.24
-    bust_boost: float = 1.72
-    waist_pinch: float = 0.84
-    hip_boost: float = 1.38
-    thigh_boost: float = 1.44
-    calf_boost: float = 1.24
-    arm_boost: float = 1.14
-    leg_compact: float = 0.77
-    torso_compact: float = 0.93
+    # Escultura anatômica ultra-curvilínea estilo Dungeon Squad × Rapscallion × refs Civitai (~4.1 cabeças!)
+    head_scale: float = 1.26
+    bust_boost: float = 2.45
+    waist_pinch: float = 0.80
+    hip_boost: float = 1.62
+    thigh_boost: float = 1.72
+    calf_boost: float = 1.32
+    arm_boost: float = 1.16
+    leg_compact: float = 0.71
+    torso_compact: float = 0.88
 
 
 GIRL_ARCHETYPES: dict[str, GirlArchetype] = {
     "elfa_loira": GirlArchetype(
         id="elfa_loira",
         label="Lyra — Elfa Loira",
-        skin_rgb=(232, 166, 126),
-        skin_shade=(0.74, 0.44, 0.36),
+        skin_rgb=(234, 170, 132),
+        skin_shade=(0.72, 0.42, 0.36),
         blush_rgb=(228, 76, 66),
         blush_strength=0.72,
-        lip_rgb=(218, 98, 88),
-        hair_rgb=(248, 220, 142),
-        hair_shade=(0.72, 0.52, 0.30),
-        eye_rgb=(36, 206, 92),
-        brow_rgb=(142, 92, 46),
-        underwear_rgb=(250, 244, 236),
-        underwear_trim_rgb=(126, 76, 56),
+        lip_rgb=(218, 96, 88),
+        hair_rgb=(248, 220, 140),
+        hair_shade=(0.70, 0.50, 0.28),
+        eye_rgb=(36, 210, 94),
+        brow_rgb=(138, 88, 44),
+        # Lingerie minimalista marrom-espresso com renda creme (alto contraste que valoriza a pele dourada!)
+        underwear_rgb=(68, 40, 34),
+        underwear_trim_rgb=(246, 236, 224),
         elf_ears=True,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.24,
-        bust_boost=1.78,
-        waist_pinch=0.84,
-        hip_boost=1.38,
-        thigh_boost=1.46,
-        calf_boost=1.24,
+        head_scale=1.26,
+        bust_boost=2.12,
+        waist_pinch=0.80,
+        hip_boost=1.56,
+        thigh_boost=1.58,
+        calf_boost=1.26,
         arm_boost=1.14,
-        leg_compact=0.77,
-        torso_compact=0.92,
+        leg_compact=0.73,
+        torso_compact=0.89,
     ),
     "humana_ruiva": GirlArchetype(
         id="humana_ruiva",
         label="Freya — Humana Ruiva",
         skin_rgb=(248, 212, 192),
-        skin_shade=(0.80, 0.54, 0.50),
+        skin_shade=(0.78, 0.52, 0.48),
         blush_rgb=(236, 88, 86),
         blush_strength=0.68,
         lip_rgb=(224, 102, 100),
-        hair_rgb=(214, 92, 42),
-        hair_shade=(0.60, 0.26, 0.18),
-        eye_rgb=(112, 174, 62),
-        brow_rgb=(132, 52, 26),
-        underwear_rgb=(36, 30, 42),
-        underwear_trim_rgb=(234, 186, 88),
+        hair_rgb=(214, 90, 40),
+        hair_shade=(0.58, 0.24, 0.16),
+        eye_rgb=(112, 178, 62),
+        brow_rgb=(132, 50, 24),
+        underwear_rgb=(34, 28, 40),
+        underwear_trim_rgb=(236, 188, 88),
         elf_ears=False,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.24,
-        bust_boost=1.70,
-        waist_pinch=0.84,
-        hip_boost=1.36,
-        thigh_boost=1.42,
-        calf_boost=1.22,
-        arm_boost=1.12,
-        leg_compact=0.78,
-        torso_compact=0.93,
+        head_scale=1.26,
+        bust_boost=2.40,
+        waist_pinch=0.80,
+        hip_boost=1.60,
+        thigh_boost=1.70,
+        calf_boost=1.30,
+        arm_boost=1.14,
+        leg_compact=0.72,
+        torso_compact=0.88,
     ),
     "androide_rosa": GirlArchetype(
         id="androide_rosa",
         label="Airi — Androide Rosa",
         skin_rgb=(252, 224, 214),
-        skin_shade=(0.84, 0.62, 0.66),
+        skin_shade=(0.82, 0.60, 0.66),
         blush_rgb=(244, 110, 148),
         blush_strength=0.62,
         lip_rgb=(242, 118, 142),
-        hair_rgb=(252, 162, 196),
-        hair_shade=(0.74, 0.42, 0.60),
-        eye_rgb=(64, 162, 252),
-        brow_rgb=(196, 92, 128),
-        underwear_rgb=(252, 204, 224),
-        underwear_trim_rgb=(198, 96, 142),
+        hair_rgb=(252, 160, 196),
+        hair_shade=(0.72, 0.40, 0.58),
+        eye_rgb=(60, 162, 254),
+        brow_rgb=(194, 90, 126),
+        underwear_rgb=(244, 152, 192),
+        underwear_trim_rgb=(255, 242, 248),
         elf_ears=False,
         freckles=False,
         use_long_hair_graft=True,
-        head_scale=1.24,
-        bust_boost=1.74,
-        waist_pinch=0.83,
-        hip_boost=1.34,
-        thigh_boost=1.40,
-        calf_boost=1.20,
-        arm_boost=1.10,
-        leg_compact=0.78,
-        torso_compact=0.93,
+        head_scale=1.26,
+        bust_boost=2.45,
+        waist_pinch=0.79,
+        hip_boost=1.58,
+        thigh_boost=1.68,
+        calf_boost=1.28,
+        arm_boost=1.12,
+        leg_compact=0.72,
+        torso_compact=0.88,
     ),
     "vampira_negra": GirlArchetype(
         id="vampira_negra",
         label="Lilith — Vampira",
         skin_rgb=(244, 212, 198),
-        skin_shade=(0.78, 0.54, 0.56),
+        skin_shade=(0.76, 0.52, 0.56),
         blush_rgb=(224, 92, 88),
         blush_strength=0.56,
         lip_rgb=(208, 94, 98),
-        hair_rgb=(36, 46, 44),
-        hair_shade=(0.20, 0.24, 0.30),
-        eye_rgb=(68, 164, 132),
+        hair_rgb=(34, 44, 42),
+        hair_shade=(0.18, 0.22, 0.28),
+        eye_rgb=(66, 166, 134),
         brow_rgb=(36, 32, 34),
-        underwear_rgb=(30, 28, 36),
-        underwear_trim_rgb=(196, 52, 86),
+        underwear_rgb=(28, 24, 34),
+        underwear_trim_rgb=(204, 48, 86),
         elf_ears=False,
         freckles=True,
         use_long_hair_graft=False,
-        head_scale=1.24,
-        bust_boost=1.72,
-        waist_pinch=0.84,
-        hip_boost=1.40,
-        thigh_boost=1.46,
-        calf_boost=1.24,
-        arm_boost=1.12,
-        leg_compact=0.77,
-        torso_compact=0.92,
+        head_scale=1.26,
+        bust_boost=2.42,
+        waist_pinch=0.80,
+        hip_boost=1.64,
+        thigh_boost=1.74,
+        calf_boost=1.32,
+        arm_boost=1.14,
+        leg_compact=0.71,
+        torso_compact=0.88,
     ),
 }
 
@@ -588,47 +589,48 @@ def _sculpt_body_vertices(model: VrmModel, arch: GirlArchetype) -> None:
         x, y, z = p[:, 0], p[:, 1], p[:, 2]
         zf = z * z_fwd  # positivo = frente do corpo!
 
-        # 1. Busto bem mais cheio, arredondado e pesado (assinatura Rapscallion × Dungeon Squad!)
+        # 1. Busto volumoso, redondo e natural em perfil e frente (refs 96078865 / 141744777 / 96444929!)
         if arch.bust_boost > 0.01:
             amp = 0.044 * arch.bust_boost
-            front_mask = np.clip((zf - 0.005) / 0.045, 0.0, 1.0)
-            arm_mask = np.clip((0.158 - np.abs(x)) / 0.036, 0.0, 1.0)
+            front_mask = np.clip((zf - 0.004) / 0.044, 0.0, 1.0)
+            arm_mask = np.clip((0.165 - np.abs(x)) / 0.040, 0.0, 1.0)
             for sign in (-1.0, 1.0):
-                dx = (x - sign * 0.062) / 0.074
-                dy = (y - y_chest) / 0.078
+                dx = (x - sign * 0.064) / 0.082
+                dy = (y - (y_chest - 0.006)) / 0.088
                 g = np.exp(-(dx * dx + dy * dy)) * front_mask * arm_mask
                 p[:, 2] += g * (amp * z_fwd)
                 p[:, 0] += g * (sign * amp * 0.28)
-                p[:, 1] -= g * (amp * 0.26)
+                p[:, 1] -= g * (amp * 0.24)
 
-        # 2. Cintura ampulheta feminina suave
-        waist_w = np.exp(-((y - y_waist) / 0.080) ** 2) * np.clip((0.155 - np.abs(x)) / 0.038, 0.0, 1.0)
+        # 2. Cintura bem fina contrastando com busto e quadris (ampulheta shortstack!)
+        waist_w = np.exp(-((y - y_waist) / 0.078) ** 2) * np.clip((0.155 - np.abs(x)) / 0.038, 0.0, 1.0)
         p[:, 0] *= (1.0 - (1.0 - arch.waist_pinch) * waist_w)
         p[:, 2] *= (1.0 - (1.0 - arch.waist_pinch) * 0.55 * waist_w)
 
-        # 3. Quadris redondos suaves, glúteos cheios, coxas grossas e panturrilhas macias (curva contínua sem quina!)
+        # 3. Quadris amplos, glúteos redondos suaves e coxas grossas com afinamento natural no joelho (ref 96078865!)
         y_calf = h_ref * 0.24
-        hip_w = np.exp(-((y - y_hips) / 0.165) ** 2)
-        thigh_w = np.exp(-((y - (y_thigh - 0.04)) / 0.190) ** 2)
-        calf_w = np.exp(-((y - y_calf) / 0.135) ** 2) * np.clip((y - 0.09) / 0.09, 0.0, 1.0)
+        y_knee = h_ref * 0.39
+        knee_taper = np.clip((y - y_knee) / 0.14, 0.0, 1.0)  # afina suavemente chegando no joelho para dobrar limpo!
+        hip_w = np.exp(-((y - (y_hips - 0.01)) / 0.155) ** 2)
+        thigh_w = np.exp(-((y - (y_thigh + 0.01)) / 0.155) ** 2) * (0.25 + 0.75 * knee_taper)
+        calf_w = np.exp(-((y - y_calf) / 0.130) ** 2) * np.clip((y - 0.09) / 0.09, 0.0, 1.0)
 
-        # Curva única contínua sem descontinuidade no encontro quadril -> coxa!
-        hip_x_gain = (arch.hip_boost - 1.0) * 0.72 * hip_w
-        thigh_x_gain = (arch.thigh_boost - 1.0) * 0.56 * thigh_w
-        calf_x_gain = (arch.calf_boost - 1.0) * 0.65 * calf_w
+        hip_x_gain = (arch.hip_boost - 1.0) * 0.68 * hip_w
+        thigh_x_gain = (arch.thigh_boost - 1.0) * 0.60 * thigh_w
+        calf_x_gain = (arch.calf_boost - 1.0) * 0.62 * calf_w
 
-        # Expansão suave em torno da linha central da perna para coxas/panturrilhas manterem vão natural
-        below_crotch = np.clip((y_hips - 0.02 - y) / 0.18, 0.0, 1.0)
-        leg_cx = np.sign(x) * 0.088
-        # Parte superior (quadril): expande em torno de x=0; parte inferior (coxa/panturrilha): expande em torno de leg_cx
+        below_crotch = np.clip((y_hips - 0.01 - y) / 0.17, 0.0, 1.0)
+        leg_cx = np.sign(x) * 0.095
         x_hip = x * (1.0 + hip_x_gain)
         x_leg = leg_cx + (x_hip - leg_cx) * (1.0 + thigh_x_gain * below_crotch + calf_x_gain * below_crotch)
         p[:, 0] = x_leg
 
-        # Profundidade Z suave (quadris, coxas arredondadas, panturrilhas e glúteos cheios!)
-        p[:, 2] *= (1.0 + (arch.hip_boost - 1.0) * 0.74 * hip_w + (arch.thigh_boost - 1.0) * 0.58 * thigh_w + (arch.calf_boost - 1.0) * 0.65 * calf_w)
-        back_mask = np.clip((-zf - 0.010) / 0.050, 0.0, 1.0)
-        p[:, 2] -= hip_w * back_mask * (0.042 * z_fwd) * (arch.hip_boost - 1.0) / 0.36
+        # Profundidade Z suave e redonda (glúteos pêssego + coxa superior cheia afinando limpa no joelho!)
+        p[:, 2] *= (1.0 + (arch.hip_boost - 1.0) * 0.68 * hip_w + (arch.thigh_boost - 1.0) * 0.50 * thigh_w + (arch.calf_boost - 1.0) * 0.55 * calf_w)
+        back_mask = np.clip((-zf - 0.008) / 0.048, 0.0, 1.0)
+        p[:, 2] -= hip_w * back_mask * (0.056 * z_fwd) * (arch.hip_boost - 1.0) / 0.56
+        front_thigh_mask = np.clip((zf - 0.006) / 0.045, 0.0, 1.0) * below_crotch * knee_taper
+        p[:, 2] += thigh_w * front_thigh_mask * (0.016 * z_fwd)
 
         # 4. Braços levemente mais macios/encorpados para harmonizar com o busto e quadris (|x| > 0.16)
         in_arms = np.clip((np.abs(x) - 0.16) / 0.06, 0.0, 1.0) * np.clip((y - (y_waist + 0.05)) / 0.12, 0.0, 1.0)

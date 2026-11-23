@@ -237,26 +237,33 @@ class VrmAnimator:
             s = math.sin(ph)
             c = math.cos(ph)
 
-            # Caminhada bípede feminina natural 3D (joelhos dobram SOMENTE para trás: rx > 0!)
-            hips_off = (s * 0.018, abs(c) * 0.026 - 0.015, 0.0)
-            e["hips"] = (3.5, s * 6.5, -s * 3.2)
-            e["spine"] = (3.0, -s * 4.5, s * 2.0)
-            e["chest"] = (2.0, -s * 5.0, s * 1.5)
-            e["head"] = (-4.0, s * 3.0 + look_x * 12.0, -s * 1.5)
+            # Caminhada confiante estilo ref 96078865 (desfile elegante): tronco erguido, rebolado suave,
+            # passos graciosos e braços relaxados ao lado do corpo com leve dobra natural nos cotovelos!
+            hips_off = (s * 0.020, abs(c) * 0.032 - 0.016, 0.0)
+            e["hips"] = (4.5, s * 11.5, -s * 6.5)
+            e["spine"] = (-5.0, -s * 7.5, s * 4.0)
+            e["chest"] = (-3.5 + abs(c) * 2.2, -s * 5.0, s * 2.0)
+            e["upperChest"] = (abs(c) * 1.8 - 0.8, 0.0, 0.0)
+            e["neck"] = (3.0, s * 2.5, -s * 1.5)
+            e["head"] = (-1.5, s * 3.5 + look_x * 12.0, -s * 2.0)
 
-            e["leftUpperLeg"] = (-s * 28.0, 0.0, 1.5)
-            e["leftLowerLeg"] = (max(0.0, -c) * 44.0 + 4.0, 0.0, 0.0)
-            e["leftFoot"] = (-max(0.0, s) * 12.0 + max(0.0, -c) * 10.0, 0.0, 0.0)
+            e["leftUpperLeg"] = (-s * 29.0 - 2.0, 2.5, 2.5)
+            e["leftLowerLeg"] = (max(0.0, -c) * 42.0 + 6.0, 0.0, 0.0)
+            e["leftFoot"] = (-max(0.0, s) * 10.0 + max(0.0, -c) * 16.0, 0.0, 0.0)
 
-            e["rightUpperLeg"] = (s * 28.0, 0.0, -1.5)
-            e["rightLowerLeg"] = (max(0.0, c) * 44.0 + 4.0, 0.0, 0.0)
-            e["rightFoot"] = (-max(0.0, -s) * 12.0 + max(0.0, c) * 10.0, 0.0, 0.0)
+            e["rightUpperLeg"] = (s * 29.0 - 2.0, -2.5, -2.5)
+            e["rightLowerLeg"] = (max(0.0, c) * 42.0 + 6.0, 0.0, 0.0)
+            e["rightFoot"] = (-max(0.0, -s) * 10.0 + max(0.0, c) * 16.0, 0.0, 0.0)
 
-            # Braços em oposição natural às pernas
-            e["leftUpperArm"] = (4.0, s * 22.0 - 4.0, -68.0)
-            e["leftLowerArm"] = (0.0, -16.0 - max(0.0, -s) * 18.0, 0.0)
-            e["rightUpperArm"] = (4.0, s * 22.0 + 4.0, 68.0)
-            e["rightLowerArm"] = (0.0, 16.0 + max(0.0, s) * 18.0, 0.0)
+            # Braços balançando soltos e femininos ao lado do corpo (cotovelos levemente flexionados ~16°-28°!)
+            e["leftShoulder"] = (0.0, 0.0, -4.0)
+            e["leftUpperArm"] = (4.0, s * 18.0 - 3.0, -68.0)
+            e["leftLowerArm"] = (0.0, -14.0 - max(0.0, -s) * 16.0, -4.0)
+            e["leftHand"] = (0.0, 0.0, 8.0)
+            e["rightShoulder"] = (0.0, 0.0, 4.0)
+            e["rightUpperArm"] = (4.0, s * 18.0 + 3.0, 68.0)
+            e["rightLowerArm"] = (0.0, 14.0 + max(0.0, s) * 16.0, 4.0)
+            e["rightHand"] = (0.0, 0.0, -8.0)
         elif action == "wave":
             w = math.sin(t * 8.0)
             sway = math.sin(t * 2.4)
@@ -348,22 +355,36 @@ class VrmAnimator:
                 e["rightLowerArm"] = (0.0, 42.0 - ds_breath * 4.0, -16.0)
                 e["rightHand"] = (0.0, 0.0, -14.0)
             else:
-                # Postura estilizada confiante (Dungeon Squad × Rapscallion): base levemente aberta exibindo curvas,
-                # contrapposto natural e braços soltos com graça!
-                e["leftUpperLeg"] = (-4.0, 7.0, 11.5 + sway * 1.2)
-                e["leftLowerLeg"] = (7.0, 0.0, -3.0)
-                e["leftFoot"] = (-3.0, 0.0, -7.0)
-                e["rightUpperLeg"] = (3.0, -7.0, -11.5 + sway * 1.2)
-                e["rightLowerLeg"] = (5.0, 0.0, 3.0)
-                e["rightFoot"] = (-2.0, 0.0, 7.0)
-                e["leftShoulder"] = (0.0, 0.0, -3.0)
-                e["leftUpperArm"] = (6.0, -10.0 - sway * 3.0, -60.0)
-                e["leftLowerArm"] = (0.0, -18.0 + breath * 2.5, -6.0)
-                e["leftHand"] = (0.0, 0.0, 10.0)
-                e["rightShoulder"] = (0.0, 0.0, 3.0)
-                e["rightUpperArm"] = (6.0, 10.0 + sway * 3.0, 60.0)
-                e["rightLowerArm"] = (0.0, 18.0 - breath * 2.5, 6.0)
-                e["rightHand"] = (0.0, 0.0, -10.0)
+                # Postura Pin-Up / Dungeon Squad viva (refs 96444929 & 141744777):
+                # Corpo em 3/4 com curva em S marcante, quadril jogado de lado, mão esquerda apoiada na cintura,
+                # braço direito gracioso aberto/gesticulando, perna direita relaxada à frente e respiração com bounce!
+                hips_off = (0.022 + sway * 0.015, -0.028 + ds_breath * 0.012, 0.0)
+                e["hips"] = (6.0, 22.0 + sway * 5.0, -8.5 - sway * 2.5)
+                e["spine"] = (-7.5 + ds_breath * 2.2, -10.0 - sway * 3.0, 6.5 + sway * 2.0)
+                e["chest"] = (-5.5 + ds_breath * 3.2, -6.0 + sway * 2.0, 2.5)
+                e["upperChest"] = (-2.0 + ds_breath * 2.4, -2.0, 0.0)
+                e["neck"] = (3.5 + look_y * 4.0, -6.0 + look_x * 6.0, -2.5)
+                e["head"] = (
+                    4.0 + look_y * 6.5 + (6.0 if caressing else 0.0),
+                    -14.0 + look_x * 14.0 + math.sin(t * 1.4) * 3.0,
+                    -6.5 + sway * 2.5 + (6.0 if caressing else 0.0),
+                )
+                # Perna esquerda firme sustentando o quadril + perna direita avançada com joelho relaxado (ref 96444929!)
+                e["leftUpperLeg"] = (-4.0, 8.0, 8.0 + sway * 1.2)
+                e["leftLowerLeg"] = (9.0, 0.0, -2.0)
+                e["leftFoot"] = (-4.0, 0.0, -6.0)
+                e["rightUpperLeg"] = (-16.0, -14.0, -13.0 + sway * 1.4)
+                e["rightLowerLeg"] = (24.0, 0.0, 4.0)
+                e["rightFoot"] = (10.0, 0.0, 8.0)
+                # Mão direita apoiada estilosa no quadril/cintura + braço esquerdo aberto convidativo com palma virada!
+                e["rightShoulder"] = (0.0, 0.0, 8.0 - ds_breath * 1.5)
+                e["rightUpperArm"] = (14.0, -18.0, 44.0 - ds_breath * 2.0)
+                e["rightLowerArm"] = (0.0, 74.0, 32.0)
+                e["rightHand"] = (0.0, 0.0, -24.0)
+                e["leftShoulder"] = (0.0, 0.0, -4.0 + ds_breath * 2.0)
+                e["leftUpperArm"] = (-8.0, -18.0 - sway * 4.0, -46.0 + ds_breath * 3.0)
+                e["leftLowerArm"] = (0.0, -44.0 + ds_breath * 4.5, 16.0)
+                e["leftHand"] = (12.0, 0.0, 22.0)
 
         # Sobrepõe braço direito segurando guarda-chuva na chuva (em pé/caminhada)
         if raining and action not in ("sleep", "sit_work", "sit_relax"):
