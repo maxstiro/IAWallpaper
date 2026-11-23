@@ -15,11 +15,11 @@ VALID_OUTFITS = (None, "casual", "cozy", "rainy", "focus", "nightwear", "starlig
 @dataclass
 class Settings:
     persona_id: str = "mira"
-    scene_id: str = "sky_sanctuary"
+    scene_id: str = "dark_sanctuary"
     mode: str = "wallpaper"
     render_style: str = "vrm_3d"
-    vrm_model: str = ""
-    vrm_dynamic_recolor: bool = True
+    vrm_model: str = "Darkness_Shibu.vrm"
+    vrm_dynamic_recolor: bool = False
     fps_cap: int = 60
     auto_pause_fullscreen: bool = True
     parallax_strength: float = 1.0

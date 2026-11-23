@@ -95,6 +95,9 @@ uniform vec3 u_rim_color;
 uniform float u_rim_strength;
 uniform vec3 u_cam_pos;
 uniform int u_is_face;
+uniform int u_is_eye;
+uniform int u_is_hair;
+uniform int u_dark_fantasy;   // 1 = alto contraste estilo Dungeon Squad (outline forte, brilho especular, olhos luminosos)
 
 out vec4 f_color;
 
@@ -116,21 +119,50 @@ void main() {
     }
     vec3 L = normalize(u_light_dir);
     vec3 V = normalize(u_cam_pos - v_world_pos);
+    vec3 H = normalize(L + V);
 
     float ndotl = dot(N, L);
-    // Rampa anime MToon nítida e equilibrada (sem estourar o branco de roupas/pele!)
-    float toon = (u_is_face == 1)
-        ? smoothstep(-0.30, 0.22, ndotl) * 0.38 + 0.62
-        : smoothstep(-0.08, 0.14, ndotl);
-
-    vec3 lit = albedo * (u_light_color * 0.86 + u_ambient_color * 0.16);
-    vec3 shaded = albedo * u_shade_color * (u_ambient_color * 0.68 + vec3(0.18));
+    float toon;
+    vec3 lit;
+    vec3 shaded;
+    if (u_dark_fantasy == 1) {
+        // Cel-shading nítido de alto contraste estilo Dungeon Squad (sombras roxo-obsidiana ricas + pele/roupa vibrantes)
+        toon = (u_is_face == 1)
+            ? smoothstep(-0.22, 0.14, ndotl) * 0.42 + 0.58
+            : smoothstep(-0.04, 0.08, ndotl);
+        vec3 deep_shade = mix(u_shade_color, vec3(0.46, 0.36, 0.62), 0.55);
+        lit = albedo * (u_light_color * 0.96 + u_ambient_color * 0.14);
+        shaded = albedo * deep_shade * (u_ambient_color * 0.62 + vec3(0.16));
+    } else {
+        toon = (u_is_face == 1)
+            ? smoothstep(-0.30, 0.22, ndotl) * 0.38 + 0.62
+            : smoothstep(-0.08, 0.14, ndotl);
+        lit = albedo * (u_light_color * 0.86 + u_ambient_color * 0.16);
+        shaded = albedo * u_shade_color * (u_ambient_color * 0.68 + vec3(0.18));
+    }
     vec3 col = mix(shaded, lit, toon);
 
-    // Rim-light Fresnel sincronizado ao pôr do sol / luar / clima do cenário
-    float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.2);
-    float rim_mask = (u_is_face == 1) ? 0.22 : 0.72;
+    // Brilho especular anime em cabelo e tecidos (assinatura visual de arte coreana Dungeon Squad)
+    if (u_dark_fantasy == 1 && u_is_face == 0) {
+        float spec_pow = (u_is_hair == 1) ? 20.0 : 32.0;
+        float spec = smoothstep(0.42, 0.72, pow(max(dot(N, H), 0.0), spec_pow));
+        col += mix(u_light_color, u_rim_color, 0.45) * spec * ((u_is_hair == 1) ? 0.26 : 0.14);
+    }
+
+    // Olhos emissivos luminosos para destacar o olhar sedutor no escuro (Dungeon Squad!)
+    if (u_is_eye == 1 && u_dark_fantasy == 1) {
+        col = mix(col, albedo * 1.28 + u_rim_color * 0.14, 0.65);
+    }
+
+    // Rim-light Fresnel arcano marcante na silhueta
+    float fresnel = pow(1.0 - max(dot(N, V), 0.0), (u_dark_fantasy == 1) ? 2.6 : 3.2);
+    float rim_mask = (u_is_face == 1) ? 0.24 : ((u_dark_fantasy == 1) ? 1.05 : 0.72);
     col += u_rim_color * fresnel * u_rim_strength * rim_mask;
+
+    // Leve aumento de contraste cinematográfico no modo dark fantasy
+    if (u_dark_fantasy == 1 && u_is_face == 0) {
+        col = pow(clamp(col, 0.0, 1.0), vec3(1.06));
+    }
 
     col = clamp(col, 0.0, 1.0);
     f_color = vec4(col, (u_alpha_mode == 0) ? 1.0 : alpha);
@@ -372,8 +404,9 @@ class VrmRenderer:
         self.prog["u_light_color"].value = light_col
         self.prog["u_ambient_color"].value = amb_col
         self.prog["u_rim_color"].value = (rr / 255.0, rg / 255.0, rb / 255.0)
-        self.prog["u_rim_strength"].value = 0.38 + ta * 0.35
-        self.prog["u_outline_color"].value = (0.16, 0.12, 0.22)
+        self.prog["u_rim_strength"].value = 0.56 + ta * 0.42
+        self.prog["u_outline_color"].value = (0.07, 0.03, 0.12)
+        self.prog["u_dark_fantasy"].value = 1
 
         role_tints = compute_role_tints(persona, outfit_key, dynamic_recolor=dynamic_recolor)
 
@@ -381,11 +414,11 @@ class VrmRenderer:
         self.ctx.viewport = (0, 0, self.width, self.height)
         self.ctx.clear(0.0, 0.0, 0.0, 0.0, depth=1.0)
 
-        # Passo 1: Contorno sutil anime (inverted-hull apenas em corpo/cabelo/roupas opacos — preserva rosto delicado!)
+        # Passo 1: Contorno nítido estilo Dungeon Squad (inverted-hull dark ink em corpo/cabelo/roupas!)
         self.ctx.enable(moderngl.CULL_FACE)
         self.ctx.front_face = "cw"  # desenha backfaces extrudadas
         self.prog["u_is_outline"].value = 1
-        self.prog["u_outline_extrude"].value = 0.0026
+        self.prog["u_outline_extrude"].value = 0.0042
         for gp in self._sorted_prims:
             mat = self.model.materials[gp.prim.material_index] if 0 <= gp.prim.material_index < len(self.model.materials) else None
             if mat is None or mat.alpha_mode != "OPAQUE" or mat.role in ("face", "eye"):
@@ -414,7 +447,9 @@ class VrmRenderer:
                 self.prog["u_role_tint"].value = role_tints.get(mat.role, (1.0, 1.0, 1.0))
                 self.prog["u_alpha_mode"].value = alpha_code.get(mat.alpha_mode, 0)
                 self.prog["u_alpha_cutoff"].value = mat.alpha_cutoff
-                self.prog["u_is_face"].value = 1 if mat.role in ("face", "eye", "skin") else 0
+                self.prog["u_is_face"].value = 1 if mat.role in ("face", "skin") else 0
+                self.prog["u_is_eye"].value = 1 if mat.role == "eye" else 0
+                self.prog["u_is_hair"].value = 1 if mat.role == "hair" else 0
                 if mat.double_sided:
                     self.ctx.disable(moderngl.CULL_FACE)
                 else:
@@ -428,6 +463,8 @@ class VrmRenderer:
                 self.prog["u_role_tint"].value = (1.0, 1.0, 1.0)
                 self.prog["u_alpha_mode"].value = 0
                 self.prog["u_is_face"].value = 0
+                self.prog["u_is_eye"].value = 0
+                self.prog["u_is_hair"].value = 0
                 self.ctx.depth_mask = True
 
             gp.vao.render(moderngl.TRIANGLES)

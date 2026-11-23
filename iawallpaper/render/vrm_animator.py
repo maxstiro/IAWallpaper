@@ -311,22 +311,29 @@ class VrmAnimator:
             e["rightUpperArm"] = (22.0, 34.0, 56.0)
             e["rightLowerArm"] = (0.0, 56.0 - tap * 6.0, 0.0)
         else:
-            # Idle maduro feminino: contrapposto elegante, respiração suave, cabeça seguindo o cursor
-            sway = math.sin(t * 1.15)
-            hips_off = (sway * 0.014, breath * 0.004, 0.0)
-            e["hips"] = (0.0, sway * 3.5, -sway * 2.5)
-            e["spine"] = (breath * 1.2, -sway * 2.5, sway * 2.2)
-            e["chest"] = (breath * 1.6, sway * 2.0, -sway * 1.2)
-            e["neck"] = (look_y * 5.0, look_x * 8.0, 0.0)
-            e["head"] = (look_y * 7.0 + (6.0 if caressing else 0.0), look_x * 14.0 + math.sin(t * 1.4) * 2.5, sway * 2.5 + (5.0 if caressing else 0.0))
-            e["leftUpperLeg"] = (-3.0, 0.0, 3.0 + sway * 1.5)
-            e["leftLowerLeg"] = (4.0, 0.0, 0.0)
-            e["rightUpperLeg"] = (2.0, 0.0, -3.5 + sway * 1.5)
-            e["rightLowerLeg"] = (3.0, 0.0, 0.0)
-            e["leftUpperArm"] = (6.0, -8.0 - sway * 3.0, -68.0)
-            e["leftLowerArm"] = (0.0, -18.0 + breath * 2.0, -4.0)
-            e["rightUpperArm"] = (8.0, 12.0 + sway * 3.0, 64.0)
-            e["rightLowerArm"] = (0.0, 26.0 - breath * 2.0, 6.0)
+            # Idle confiante e sedutor estilo Dungeon Squad: peso jogado num quadril, mão estilosa na cintura, olhar provocante!
+            sway = math.sin(t * 1.35)
+            hips_off = (0.018 + sway * 0.014, breath * 0.005, 0.0)
+            e["hips"] = (2.0, 9.0 + sway * 4.5, -5.5 - sway * 2.5)
+            e["spine"] = (-3.5 + breath * 1.5, -7.0 - sway * 3.0, 4.5 + sway * 2.0)
+            e["chest"] = (-2.5 + breath * 2.0, -3.5 + sway * 2.5, 2.0)
+            e["neck"] = (look_y * 5.0 - 2.0, look_x * 8.0 - 3.0, -3.0)
+            e["head"] = (
+                look_y * 7.0 + 3.0 + (6.0 if caressing else 0.0),
+                look_x * 14.0 + math.sin(t * 1.4) * 3.0,
+                -5.5 + sway * 2.5 + (6.0 if caressing else 0.0),
+            )
+            e["leftUpperLeg"] = (-6.0, 4.0, 5.5 + sway * 1.5)
+            e["leftLowerLeg"] = (9.0, 0.0, 0.0)
+            e["rightUpperLeg"] = (3.0, -4.0, -4.0 + sway * 1.5)
+            e["rightLowerLeg"] = (4.0, 0.0, 0.0)
+            # Braço esquerdo solto gracioso + braço direito dobrado estiloso próximo à cintura!
+            e["leftUpperArm"] = (6.0, -10.0 - sway * 4.0, -62.0)
+            e["leftLowerArm"] = (0.0, -24.0 + breath * 3.0, -8.0)
+            e["rightShoulder"] = (0.0, 0.0, 6.0)
+            e["rightUpperArm"] = (12.0, 22.0 + sway * 3.0, 48.0)
+            e["rightLowerArm"] = (0.0, 62.0 - breath * 3.0, 24.0)
+            e["rightHand"] = (0.0, 0.0, -18.0)
 
         # Sobrepõe braço direito segurando guarda-chuva na chuva (em pé/caminhada)
         if raining and action not in ("sleep", "sit_work", "sit_relax"):

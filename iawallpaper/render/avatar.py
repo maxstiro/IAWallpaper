@@ -693,44 +693,56 @@ class AvatarRig:
         return next(iter(self._clips.keys()))
 
     def _paint_rpg_ground_aura(self, painter: QPainter, foot_x: float, foot_y: float, u: float, atmo: AtmospherePalette) -> None:
-        """Anel mágico sutil no piso estilo Ragnarok Online / Tree of Savior durante interações, dança ou aceno."""
-        active = self.action in ("wave", "dance", "music_sway", "stretch") or self.caress_glow > 0.1 or bool(self.emote_kind)
-        if not active:
-            return
-        strength = 0.85 if self.action in ("dance", "music_sway") else (0.75 if self.caress_glow > 0.1 else 0.55)
-        pulse = 0.85 + 0.15 * math.sin(self.time * 4.2)
-        rim = QColor(*atmo.rim_light)
-        acc = QColor(*self.persona.accent_color)
+        """Sigilo mágico oculto giratório estilo Dungeon Squad sob os pés (sempre sutil no idle, intenso em skills/aceno/dança!)."""
+        intense = self.action in ("wave", "dance", "music_sway", "stretch") or self.caress_glow > 0.1 or bool(self.emote_kind)
+        strength = 0.92 if self.action in ("dance", "music_sway") else (0.82 if intense else 0.36)
+        pulse = 0.90 + 0.10 * math.sin(self.time * 4.2)
+        # Paleta arcana carmesim-violeta estilo Dungeon Squad
+        c_outer = QColor(235, 58, 128)
+        c_inner = QColor(175, 92, 255)
 
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.translate(foot_x, foot_y + 2 * u)
 
-        # Anel externo suave com brilho no plano 2.5D
-        rx, ry = 66 * u * pulse, 20 * u * pulse
+        # Halo arcano no chão
+        rx, ry = 76 * u * pulse, 23 * u * pulse
         glow = QRadialGradient(QPointF(0, 0), rx)
-        glow.setColorAt(0.0, QColor(acc.red(), acc.green(), acc.blue(), int(42 * strength)))
-        glow.setColorAt(0.7, QColor(rim.red(), rim.green(), rim.blue(), int(78 * strength)))
-        glow.setColorAt(1.0, QColor(rim.red(), rim.green(), rim.blue(), 0))
+        glow.setColorAt(0.0, QColor(c_inner.red(), c_inner.green(), c_inner.blue(), int(55 * strength)))
+        glow.setColorAt(0.65, QColor(c_outer.red(), c_outer.green(), c_outer.blue(), int(85 * strength)))
+        glow.setColorAt(1.0, QColor(c_outer.red(), c_outer.green(), c_outer.blue(), 0))
         painter.setPen(Qt.NoPen)
         painter.setBrush(glow)
         painter.drawEllipse(QPointF(0, 0), rx, ry)
 
-        # Círculo mágico estilizado girando lentamente sob os pés
+        # Anéis rúnicos duplos + hexagrama giratório em perspectiva 2.5D
+        r1x, r1y = 62 * u, 18.5 * u
+        r2x, r2y = 48 * u, 14.5 * u
         painter.setBrush(Qt.NoBrush)
-        painter.setPen(QPen(QColor(225, 245, 255, int(135 * strength)), 1.6 * u))
-        painter.drawEllipse(QPointF(0, 0), 54 * u, 16 * u)
-        painter.setPen(QPen(QColor(acc.red(), acc.green(), acc.blue(), int(115 * strength)), 1.2 * u))
-        painter.drawEllipse(QPointF(0, 0), 42 * u, 12.5 * u)
+        painter.setPen(QPen(QColor(255, 110, 175, int(175 * strength)), 1.8 * u))
+        painter.drawEllipse(QPointF(0, 0), r1x, r1y)
+        painter.setPen(QPen(QColor(195, 125, 255, int(145 * strength)), 1.3 * u))
+        painter.drawEllipse(QPointF(0, 0), r2x, r2y)
 
-        # 6 pontos orbitais luminosos sobre o anel
+        # Hexagrama (dois triângulos sobrepostos girando)
+        rot = self.time * (1.8 if intense else 0.55)
+        painter.setPen(QPen(QColor(255, 150, 210, int(150 * strength)), 1.2 * u))
+        for offset in (0.0, math.pi / 3.0):
+            pts = [
+                QPointF(math.cos(rot + offset + k * (math.tau / 3.0)) * r2x, math.sin(rot + offset + k * (math.tau / 3.0)) * r2y)
+                for k in range(3)
+            ]
+            for k in range(3):
+                painter.drawLine(pts[k], pts[(k + 1) % 3])
+
+        # 6 glifos/brasas arcanas orbitando o círculo externo
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(255, 250, 225, int(190 * strength)))
+        painter.setBrush(QColor(255, 210, 235, int(225 * strength)))
         for i in range(6):
-            ang = self.time * 1.4 + i * (math.tau / 6.0)
-            px = math.cos(ang) * 54 * u
-            py = math.sin(ang) * 16 * u
-            painter.drawEllipse(QPointF(px, py), 2.6 * u, 2.6 * u)
+            ang = -rot * 1.2 + i * (math.tau / 6.0)
+            px = math.cos(ang) * r1x
+            py = math.sin(ang) * r1y
+            painter.drawEllipse(QPointF(px, py), 2.8 * u, 2.2 * u)
         painter.restore()
 
     def _paint_animated_clip(

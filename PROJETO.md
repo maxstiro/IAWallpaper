@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-22 (Milestone 13 — Motor 3D Cel-Shaded VRM 0.x/1.0 em GPU ModernGL + Modo 2D Wan 2.2 Opcional)
+> **Última atualização**: 2026-11-23 (Milestone 14 — Refinamento Dark-Fantasy estilo Dungeon Squad: Shader Alto-Contraste, Olhos Luminosos, Sigilo Rúnico & Santuário Abissal)
 
 ---
 
@@ -77,3 +77,7 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
   - **Carregador Universal (`render/vrm_loader.py`)**: Lê modelos `.vrm` (VRM 1.0 `VRMC_vrm` + VRM 0.x `VRM`) e `.glb` com accessors esparsos, morph targets, `VRMC_springBone` e `VRMC_node_constraint` (`aim`/`roll`/`rotation`) + classificação semântica de materiais (`hair`, `eye`, `tops`, `bottoms`, `shoes`, `skin`, `face`).
   - **Animador Humanoide 360° Universal (`render/vrm_animator.py`)**: Um único motor de animação dirige qualquer personagem VRM sem gerar vídeo por movimento — giro contínuo 360° alinhado ao vetor de caminhada 2.5D, ciclo bípede natural, aceno, dança giratória 360° estilo Tree of Savior, alongamento, sentar, dormir, expressões faciais guiadas pela rede LIF (`happy`, `relaxed`, `angry`, `sad`, `blink`), rastreamento de cursor (`look-at`) e física de mola secundária nos cabelos/roupas.
   - **Renderizador GPU MToon (`render/vrm_renderer.py`, `avatar.py`, `control_center.py`, `app.py`)**: Skinning 100% na GPU via textura float `RGBA32F` (ossos ilimitados), MSAA 4x (>300 FPS na RX 9060 XT), rampa anime MToon + rim-light sincronizado ao ciclo dia/noite/clima, contorno sutil *inverted-hull*, projeção exata dos pés no solo (`last_foot_v`), reflexo 3D animado na chuva, seletor de motor visual (`vrm_3d` / `world_sprite` / `portrait`) e botão **📂 Carregar .VRM** na Central de Controle. Validado com **30/30 testes verdes**, showcase 4 horários e GIF 3D de 8s no Telegram.
+- **Milestone 14** (2026-11-23): **Refinamento Visual Dark-Fantasy estilo *Dungeon Squad* (`vrm_renderer.py`, `vrm_animator.py`, `avatar.py`, `workflows.py`, `config.py`)**:
+  - **Shader MToon Dark-Fantasy de Alto Contraste (`u_dark_fantasy=1`)**: contorno escuro nítido (`0.0042`), sombras profundas roxo-obsidiana, brilho especular anime em cabelo/roupas, olhos emissivos luminosos e *rim-light* arcano vibrante.
+  - **Pose Confiante & Sigilo Rúnico Oculto**: *idle* com peso jogado no quadril e mão na cintura + círculo mágico carmesim-violeta com hexagrama giratório sob os pés (`_paint_rpg_ground_aura`).
+  - **Avatar Gótico Padrão & Cenário *Santuário Abissal* (`dark_sanctuary`)**: `Darkness_Shibu.vrm` como padrão + pátio gótico obsidiano com runas e braseiros reiluminado 1:1 via Qwen Image 2.1 (`day`, `sunset`, `night`, `rain`), mantendo `sky_sanctuary` e o modo 2D Wan 2.2 selecionáveis. Validado com **30/30 testes verdes**, showcase e GIF 3D no Telegram.

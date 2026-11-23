@@ -84,8 +84,8 @@ class Paths:
             for ext in ("*.vrm", "*.glb"):
                 for fp in sorted(folder.glob(ext)):
                     found[fp.name.lower()] = fp
-        # Ordena priorizando os modelos femininos anime estilizados (Victoria_Rubin, AvatarSample_A, vroid_sample)
-        pref = {"victoria_rubin.vrm": 0, "avatarsample_a.vrm": 1, "vroid_sample.vrm": 2, "seed_san.vrm": 9}
+        # Ordena priorizando estética dark-fantasy (Darkness_Shibu estilo Dungeon Squad) seguida das demais VRMs femininas
+        pref = {"darkness_shibu.vrm": 0, "victoria_rubin.vrm": 1, "avatarsample_a.vrm": 2, "vroid_sample.vrm": 3, "seed_san.vrm": 9}
         return sorted(found.values(), key=lambda p: (pref.get(p.name.lower(), 5), p.name.lower()))
 
     def resolve_vrm_model(self, name_or_path: str = "") -> Path | None:

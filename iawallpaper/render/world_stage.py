@@ -34,12 +34,12 @@ class WorldHotspot:
 
 # Hotspots distribuídos pela praça de pedra aberta estilo Tree of Savior / Ragnarok Online (livres do HUD inferior esquerdo!)
 DEFAULT_HOTSPOTS: dict[str, WorldHotspot] = {
-    "desk":       WorldHotspot("desk",       0.46, 0.88, "sit_work",    "Praça de Estudo"),
-    "music_spot": WorldHotspot("music_spot", 0.48, 0.84, "dance",       "Praça da Música"),
-    "overlook":   WorldHotspot("overlook",   0.54, 0.71, "idle",        "Árvore Sagrada"),
-    "lantern":    WorldHotspot("lantern",    0.66, 0.78, "wave",        "Lanternas do Mirante"),
-    "cushion":    WorldHotspot("cushion",    0.74, 0.88, "sleep",       "Recanto das Flores"),
-    "garden_l":   WorldHotspot("garden_l",   0.44, 0.90, "walk",        "Pedras da Praça"),
+    "desk":       WorldHotspot("desk",       0.38, 0.88, "sit_work",    "Altar de Estudo"),
+    "music_spot": WorldHotspot("music_spot", 0.48, 0.86, "dance",       "Sigilo da Música"),
+    "overlook":   WorldHotspot("overlook",   0.33, 0.80, "idle",        "Pátio Oeste"),
+    "lantern":    WorldHotspot("lantern",    0.70, 0.80, "wave",        "Braseiros do Mirante"),
+    "cushion":    WorldHotspot("cushion",    0.74, 0.89, "sleep",       "Recanto Abissal"),
+    "garden_l":   WorldHotspot("garden_l",   0.44, 0.91, "walk",        "Pedras Obsidiana"),
     "garden_r":   WorldHotspot("garden_r",   0.78, 0.88, "idle",        "Terraço Leste"),
 }
 

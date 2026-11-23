@@ -6,6 +6,10 @@ from ..core.persona import Persona
 from .presets import LoraSpec
 
 SCENE_PRESETS: dict[str, dict[str, str]] = {
+    "dark_sanctuary": {
+        "label": "Santuário Abissal (Dungeon Squad)",
+        "base": "dark_fantasy_anime_scenery, gothic_obsidian_altar_courtyard, glowing_crimson_and_violet_runes_carved_in_stone_floor, ancient_gothic_arches_and_flaming_braziers, ominous_cathedral_ruins_horizon, high_contrast_moody_lighting, masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper",
+    },
     "sky_sanctuary": {
         "label": "Observatório Celeste",
         "base": "anime_scenery, floating_sky_observatory_balcony, distant_mountains, serene_lake, makoto_shinkai_style, masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper",
@@ -49,6 +53,13 @@ WORLD_SPRITE_ACTIONS: dict[str, str] = {
 }
 
 DIORAMA_SCENE_PRESETS: dict[str, str] = {
+    "dark_sanctuary": (
+        "dark_fantasy_anime_scenery, dungeon_squad_style, hand_painted_2.5d_rpg_background, full_bleed, borderless, "
+        "(slight_high_angle_3/4_view:1.28), wide_open_cracked_obsidian_cobblestone_courtyard_filling_bottom_55_percent, "
+        "subtle_glowing_crimson_and_violet_magic_runes_inlaid_in_floor_stones, ancient_gothic_stone_pillars_and_flickering_violet_braziers_on_far_edges, "
+        "low_ornate_gothic_iron_balustrade_in_background, dramatic_abyssal_cathedral_spires_and_misty_dark_fantasy_sky_horizon, "
+        "bold_high_contrast_shading, rich_obsidian_and_crimson_palette, masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
+    ),
     "sky_sanctuary": (
         "anime_scenery, (tree_of_savior_style:1.30), (ragnarok_online_style:1.25), hand_painted_anime_background, full_bleed, borderless, "
         "(slight_high_angle_3/4_view:1.25), wide_open_sunlit_cobblestone_plaza_and_lush_green_meadow_filling_bottom_55_percent, "
@@ -73,20 +84,20 @@ DIORAMA_SCENE_PRESETS: dict[str, str] = {
 
 QWEN_RELIGHT_INSTRUCTIONS: dict[str, str] = {
     "day": (
-        "Keep the exact same open cobblestone plaza, sacred tree, flowers, stone lanterns, stone balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
-        "Transform only the sky, lighting, and atmosphere into a bright cheerful sunny late morning with crisp azure blue sky, fluffy sunlit white cumulus clouds, vibrant green leaves, and clean daylight illuminating the cobblestone plaza."
+        "Keep the exact same stone courtyard floor, architecture, pillars, lanterns, braziers, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the sky, lighting, and atmosphere into a dramatic sunlit late morning with crisp light breaking through clouds, vibrant high-contrast anime shading, and clear daylight across the stone courtyard."
     ),
     "sunset": (
-        "Keep the exact same open cobblestone plaza, green meadow, flowers, trees, stone lanterns, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
-        "Transform only the sky, lighting, and atmosphere into a breathtaking warm golden-hour sunset with rich amber and violet clouds, warm golden sunlight casting soft shadows across the plaza stones and grass, and glowing sunset warmth."
+        "Keep the exact same stone courtyard floor, architecture, pillars, lanterns, braziers, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the sky, lighting, and atmosphere into a breathtaking high-contrast crimson-and-amber blood-sunset sky with dramatic violet clouds, fiery glowing braziers, and warm dramatic shadows across the courtyard stones."
     ),
     "night": (
-        "Keep the exact same open cobblestone plaza, green meadow, flowers, trees, stone lanterns, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
-        "Transform only the sky, lighting, and atmosphere into a serene starry night with a glowing crescent moon, warm amber light glowing softly inside the stone lanterns, cool silvery moonlight illuminating the plaza and meadow, and soft fireflies."
+        "Keep the exact same stone courtyard floor, architecture, pillars, lanterns, braziers, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the sky, lighting, and atmosphere into a deep abyssal starry night with a luminous moon, vivid glowing magenta and amber light radiating from braziers and inlaid floor runes, and dramatic moonlight across the dark obsidian stones."
     ),
     "rain": (
-        "Keep the exact same open cobblestone plaza, sacred tree, flowers, stone lanterns, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
-        "Transform only the weather and lighting into a cozy overcast rainy afternoon with wet glossy reflective cobblestone plaza, shallow rain puddles reflecting warm stone lantern light, gentle falling rain mist, and soft cool blue-grey sky."
+        "Keep the exact same stone courtyard floor, architecture, pillars, lanterns, braziers, balustrade, and 3/4 camera angle from <image1> completely unchanged, full-bleed edge to edge with no white border. "
+        "Transform only the weather and lighting into a moody rainy gothic storm with glossy wet reflective obsidian cobblestones, shallow rain puddles reflecting glowing crimson/violet flames and runes, falling rain mist, and dark stormy clouds."
     ),
 }
 
