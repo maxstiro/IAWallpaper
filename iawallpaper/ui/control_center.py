@@ -526,7 +526,10 @@ class ControlCenterWindow(QWidget):
     def _populate_vrm_models(self) -> None:
         self.cb_vrm.blockSignals(True)
         self.cb_vrm.clear()
-        self.cb_vrm.addItem("★ Dungeon Squad 3D Pixel-Art (Nativo · Trajes Dinâmicos)", "dungeon_squad")
+        self.cb_vrm.addItem("★ Lyra — Elfa Loira (Base 3D HD)", "elfa_loira")
+        self.cb_vrm.addItem("★ Freya — Humana Ruiva (Base 3D HD)", "humana_ruiva")
+        self.cb_vrm.addItem("★ Airi — Androide Rosa (Base 3D HD)", "androide_rosa")
+        self.cb_vrm.addItem("★ Lilith — Vampira Cabelos Pretos (Base 3D HD)", "vampira_negra")
         self.cb_vrm.addItem("Automático (Melhor .VRM externo disponível)", "")
         for fp in self._vrm_models:
             self.cb_vrm.addItem(fp.name, fp.name)

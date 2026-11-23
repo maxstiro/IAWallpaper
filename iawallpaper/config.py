@@ -18,7 +18,7 @@ class Settings:
     scene_id: str = "sky_sanctuary"
     mode: str = "wallpaper"
     render_style: str = "vrm_3d"
-    vrm_model: str = "dungeon_squad"
+    vrm_model: str = "elfa_loira"
     vrm_dynamic_recolor: bool = False
     fps_cap: int = 60
     auto_pause_fullscreen: bool = True

@@ -1,18 +1,31 @@
-"""DUNGEON AVATAR — Gerador 3D procedural de waifu estilizada estilo Dungeon Squad (compatível 100% com VrmModel).
+"""DUNGEON AVATAR — Gerador 3D estilizado de alta definição (Tree of Savior × Curvas Maduras).
 
-Constrói em memória (em < 40 ms, sem precisar pré-renderizar vídeos nem depender de arquivos externos) um
-modelo 3D completo com esqueleto humanoide VRM 1.0, skinning suave, SpringBones (rabo-de-cavalo / mechas /
-capa dupla esvoaçante), expressões faciais por morph targets (blink / happy / relaxed / shy / angry) e
-proporções estilizadas icônicas de *Dungeon Squad* (~4.2 cabeças, rosto anime delicado com franja longa e
-olhos grandes luminosos, cintura ampulheta, busto farto esculpido, quadris largos e coxas grossas, botas de
-salto alto, halo celestial dourado giratório, chamas arcanas nas mãos e cajado/espada modular na mão esquerda).
+Constrói em memória (em < 120 ms, 100% compatível com `VrmModel`, `VrmAnimator` e `VrmRenderer`)
+avatares 3D detalhados com:
+- Proporções elegantes (~4.8 cabeças) equilibrando legibilidade facial de *Tree of Savior* com
+  curvas maduras (busto esculpido, cintura fina ampulheta, quadris largos e coxas grossas).
+- Rosto anime 1024×1024 pintado com camadas suaves (olhos em gradiente tipo joia, cílios superiores
+  arqueados, sobrancelhas expressivas, rubor difuso nas bochechas/nariz, sorriso brilhante) +
+  geometria facial esculpida (queixo delicado, nariz anime sutil, orelhas élficas longas em 3D).
+- Cabelo multicamadas ondulado com textura pintada de fios (512×512) + anel de brilho anime e
+  física `SpringBone`.
+- Arquétipos base modulares para as 4 garotas iniciais:
+  1. `elfa_loira` (Lyra — Elfa Loira: orelhas élficas longas, pele bronzeada dourada, olhos esmeralda,
+     cabelos loiros ondulados, corpete marrom com rendas brancas, saia fenda frontal com laço e botas).
+  2. `humana_ruiva` (Freya — Humana Ruiva: pele clara corada, trança lateral ruiva cobre, olhos verde-oliva,
+     corpete preto e filigrana dourada com saia longa).
+  3. `androide_rosa` (Airi — Androide Rosa: cabelo rosa-pastel ondulado com franja assimétrica, olhos safira,
+     choker de renda e traje cyber-idol rosa/branco brilhante).
+  4. `vampira_negra` (Lilith — Vampira Cabelos Pretos: cabelo preto-esmeralda em rabo baixo, sardas sutis,
+     olhos jade/carmesim, camisa branca ajustada e minissaia plissada preta).
 """
 
+from dataclasses import dataclass
 import math
 from typing import Callable
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from ..core.persona import Persona
 from .vrm_loader import (
@@ -25,13 +38,134 @@ from .vrm_loader import (
 )
 
 
+@dataclass(frozen=True)
+class AvatarArchetype:
+    id: str
+    label: str
+    skin_rgb: tuple[int, int, int]
+    skin_shade: tuple[float, float, float]
+    blush_rgb: tuple[int, int, int]
+    hair_rgb: tuple[int, int, int]
+    hair_root_rgb: tuple[int, int, int]
+    hair_tip_rgb: tuple[int, int, int]
+    hair_shade: tuple[float, float, float]
+    eye_rgb: tuple[int, int, int]
+    brow_rgb: tuple[int, int, int]
+    lip_rgb: tuple[int, int, int]
+    suit_rgb: tuple[int, int, int]
+    trim_rgb: tuple[int, int, int]
+    accent_rgb: tuple[int, int, int]
+    boot_rgb: tuple[int, int, int]
+    skirt_rgb: tuple[int, int, int]
+    elf_ears: bool = False
+    freckles: bool = False
+    hair_style: str = "wavy_long"  # wavy_long | side_braid | asym_pink | low_ponytail
+    outfit_style: str = "elf_corset"  # elf_corset | gold_corset | cyber_idol | blouse_skirt
+
+
+ARCHETYPES: dict[str, AvatarArchetype] = {
+    "elfa_loira": AvatarArchetype(
+        id="elfa_loira",
+        label="Lyra — Elfa Loira",
+        skin_rgb=(232, 168, 130),
+        skin_shade=(0.76, 0.48, 0.40),
+        blush_rgb=(228, 86, 74),
+        hair_rgb=(246, 218, 150),
+        hair_root_rgb=(210, 168, 96),
+        hair_tip_rgb=(254, 236, 186),
+        hair_shade=(0.74, 0.56, 0.36),
+        eye_rgb=(42, 188, 92),
+        brow_rgb=(156, 108, 62),
+        lip_rgb=(222, 118, 106),
+        suit_rgb=(84, 50, 38),
+        trim_rgb=(248, 244, 236),
+        accent_rgb=(218, 172, 92),
+        boot_rgb=(76, 46, 36),
+        skirt_rgb=(72, 42, 32),
+        elf_ears=True,
+        freckles=False,
+        hair_style="wavy_long",
+        outfit_style="elf_corset",
+    ),
+    "humana_ruiva": AvatarArchetype(
+        id="humana_ruiva",
+        label="Freya — Humana Ruiva",
+        skin_rgb=(248, 210, 192),
+        skin_shade=(0.82, 0.58, 0.54),
+        blush_rgb=(236, 98, 96),
+        hair_rgb=(208, 96, 52),
+        hair_root_rgb=(146, 54, 28),
+        hair_tip_rgb=(236, 134, 78),
+        hair_shade=(0.66, 0.32, 0.24),
+        eye_rgb=(112, 152, 68),
+        brow_rgb=(146, 62, 36),
+        lip_rgb=(228, 118, 116),
+        suit_rgb=(32, 26, 34),
+        trim_rgb=(234, 188, 92),
+        accent_rgb=(246, 206, 114),
+        boot_rgb=(34, 26, 34),
+        skirt_rgb=(28, 24, 32),
+        elf_ears=False,
+        freckles=False,
+        hair_style="side_braid",
+        outfit_style="gold_corset",
+    ),
+    "androide_rosa": AvatarArchetype(
+        id="androide_rosa",
+        label="Airi — Androide Rosa",
+        skin_rgb=(252, 224, 214),
+        skin_shade=(0.86, 0.66, 0.68),
+        blush_rgb=(244, 118, 152),
+        hair_rgb=(250, 166, 194),
+        hair_root_rgb=(220, 118, 154),
+        hair_tip_rgb=(255, 204, 222),
+        hair_shade=(0.78, 0.48, 0.62),
+        eye_rgb=(68, 156, 246),
+        brow_rgb=(208, 108, 140),
+        lip_rgb=(242, 128, 146),
+        suit_rgb=(248, 198, 216),
+        trim_rgb=(255, 244, 250),
+        accent_rgb=(110, 222, 255),
+        boot_rgb=(244, 236, 246),
+        skirt_rgb=(242, 178, 204),
+        elf_ears=False,
+        freckles=False,
+        hair_style="asym_pink",
+        outfit_style="cyber_idol",
+    ),
+    "vampira_negra": AvatarArchetype(
+        id="vampira_negra",
+        label="Lilith — Vampira",
+        skin_rgb=(244, 212, 198),
+        skin_shade=(0.80, 0.58, 0.58),
+        blush_rgb=(224, 102, 98),
+        hair_rgb=(42, 48, 46),
+        hair_root_rgb=(24, 28, 30),
+        hair_tip_rgb=(68, 76, 70),
+        hair_shade=(0.30, 0.34, 0.38),
+        eye_rgb=(76, 148, 126),
+        brow_rgb=(54, 46, 44),
+        lip_rgb=(212, 114, 112),
+        suit_rgb=(242, 244, 248),
+        trim_rgb=(218, 224, 234),
+        accent_rgb=(188, 52, 86),
+        boot_rgb=(26, 24, 30),
+        skirt_rgb=(26, 26, 32),
+        elf_ears=False,
+        freckles=True,
+        hair_style="low_ponytail",
+        outfit_style="blouse_skirt",
+    ),
+}
+
+
 def _norm_rows(v: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(v, axis=1, keepdims=True)
     return v / np.maximum(n, 1e-6)
 
 
 class _MeshBuilder:
-    """Acumulador de geometria 3D skinned com pesos ósseos suaves e cálculo automático de normais."""
+    """Acumulador de geometria 3D skinned de alta densidade com normais suaves."""
 
     def __init__(self, material_index: int, skin_index: int = 0):
         self.material_index = material_index
@@ -103,18 +237,18 @@ class _MeshBuilder:
     def add_loft(
         self,
         rings: list[tuple[np.ndarray, float, float, float, float, int, int, float]],
-        n_seg: int = 24,
+        n_seg: int = 32,
         shape_fn: Callable[[float, float], tuple[float, float]] | None = None,
         cap_bottom: bool = False,
         cap_top: bool = False,
     ) -> None:
         ring_list = list(rings)
         if cap_bottom and ring_list:
-            c0, rx0, rz0, v0, tx0, j0, j1, w1 = ring_list[0]
-            ring_list.insert(0, (c0 - np.array([0.0, 0.004, 0.0], dtype=np.float32), 0.002, 0.002, v0, tx0, j0, j1, w1))
+            c0, _, _, v0, tx0, j0, j1, w1 = ring_list[0]
+            ring_list.insert(0, (c0 - np.array([0.0, 0.003, 0.0], dtype=np.float32), 0.002, 0.002, v0, tx0, j0, j1, w1))
         if cap_top and ring_list:
-            c1, rx1, rz1, v1, tx1, j0, j1, w1 = ring_list[-1]
-            ring_list.append((c1 + np.array([0.0, 0.004, 0.0], dtype=np.float32), 0.002, 0.002, v1, tx1, j0, j1, w1))
+            c1, _, _, v1, tx1, j0, j1, w1 = ring_list[-1]
+            ring_list.append((c1 + np.array([0.0, 0.003, 0.0], dtype=np.float32), 0.002, 0.002, v1, tx1, j0, j1, w1))
 
         n_r = len(ring_list)
         n_c = n_seg + 1
@@ -146,8 +280,8 @@ class _MeshBuilder:
         center: tuple[float, float, float],
         radii: tuple[float, float, float],
         joint_idx: int,
-        n_lat: int = 16,
-        n_lon: int = 24,
+        n_lat: int = 24,
+        n_lon: int = 36,
         deform_fn: Callable[[float, float, float, float, float], tuple[float, float, float]] | None = None,
         joint_b: int = 0,
         weight_b_fn: Callable[[float], float] | None = None,
@@ -185,7 +319,7 @@ class _MeshBuilder:
         spine_pts: list[tuple[np.ndarray, float, float, int, int, float]],
         n_across: int = 6,
         thickness: float = 0.018,
-        arch_z: float = 0.015,
+        arch_z: float = 0.014,
         side_axis: np.ndarray | None = None,
     ) -> None:
         if side_axis is None:
@@ -231,45 +365,92 @@ class _MeshBuilder:
 
         self.add_grid(pos, uv, jts, wts, wrap_u=True, flip_winding=False)
 
-    def add_torus(
+    def add_elf_ear(self, side: float, base_xyz: tuple[float, float, float], joint_idx: int) -> None:
+        """Esculpe uma orelha élfica longa, curva e pontiaguda em 3D (ícone da Lyra / Elfa Loira!)."""
+        bx, by, bz = base_xyz
+        # 8 seções da base até a ponta afiada apontando para fora (+X*side), levemente para cima (+Y) e trás (-Z)
+        stations = [
+            (0.000, 0.000,  0.000, 0.026, 0.015),
+            (0.028, 0.008, -0.006, 0.028, 0.014),
+            (0.062, 0.022, -0.016, 0.025, 0.012),
+            (0.098, 0.038, -0.026, 0.020, 0.010),
+            (0.132, 0.056, -0.036, 0.014, 0.007),
+            (0.162, 0.074, -0.044, 0.008, 0.005),
+            (0.184, 0.088, -0.050, 0.002, 0.002),
+        ]
+        n_r = len(stations)
+        n_seg = 14
+        pos = np.zeros((n_r, n_seg + 1, 3), dtype=np.float32)
+        uv = np.zeros((n_r, n_seg + 1, 2), dtype=np.float32)
+        jts = np.zeros((n_r, n_seg + 1, 4), dtype=np.float32)
+        wts = np.zeros((n_r, n_seg + 1, 4), dtype=np.float32)
+
+        for r, (dx, dy, dz, ry, rz) in enumerate(stations):
+            v_c = r / max(n_r - 1, 1)
+            for c in range(n_seg + 1):
+                u = c / n_seg
+                ang = u * math.tau
+                ly = math.cos(ang) * ry
+                lz = math.sin(ang) * rz
+                # Sulco côncavo sutil na frente da orelha (+Z)
+                if lz > 0 and 0.15 < v_c < 0.78:
+                    lz *= 0.45
+                pos[r, c] = (bx + side * dx, by + dy + ly, bz + dz + lz)
+                # UV mapeia v_c=0 (base pele) -> v_c=1 (ponta rosada luminosa!)
+                uv[r, c] = (u, v_c)
+                jts[r, c] = (float(joint_idx), 0.0, 0.0, 0.0)
+                wts[r, c] = (1.0, 0.0, 0.0, 0.0)
+
+        self.add_grid(pos, uv, jts, wts, wrap_u=True, flip_winding=(side < 0))
+
+    def add_open_skirt(
         self,
-        center: tuple[float, float, float],
-        major_r: float,
-        minor_r: float,
-        joint_idx: int,
-        n_major: int = 36,
-        n_minor: int = 10,
-        plane: str = "xy",
+        y_top: float,
+        y_bot: float,
+        rx_top: float,
+        rz_top: float,
+        rx_bot: float,
+        rz_bot: float,
+        slit_half_angle_deg: float,
+        j_hips: int,
+        j_l_leg: int,
+        j_r_leg: int,
+        n_rows: int = 10,
+        n_cols: int = 36,
+        pleats: int = 0,
     ) -> None:
-        cx, cy, cz = center
-        pos = np.zeros((n_major + 1, n_minor + 1, 3), dtype=np.float32)
-        uv = np.zeros((n_major + 1, n_minor + 1, 2), dtype=np.float32)
-        jts = np.zeros((n_major + 1, n_minor + 1, 4), dtype=np.float32)
-        wts = np.zeros((n_major + 1, n_minor + 1, 4), dtype=np.float32)
+        """Gera uma saia 3D fluida aberta na frente (ou plissada fechada se slit=0) com dobra orgânica nas coxas."""
+        slit_rad = math.radians(slit_half_angle_deg)
+        # Ângulo 0 = frente (+Z); varremos de +slit_rad até 2*pi - slit_rad (deixando fenda frontal limpa!)
+        pos = np.zeros((n_rows, n_cols, 3), dtype=np.float32)
+        uv = np.zeros((n_rows, n_cols, 2), dtype=np.float32)
+        jts = np.zeros((n_rows, n_cols, 4), dtype=np.float32)
+        wts = np.zeros((n_rows, n_cols, 4), dtype=np.float32)
 
-        for i in range(n_major + 1):
-            u = i / n_major
-            th = u * math.tau
-            ct, st = math.cos(th), math.sin(th)
-            for j in range(n_minor + 1):
-                v = j / n_minor
-                ph = v * math.tau
-                cp, sp = math.cos(ph), math.sin(ph)
-                rr = major_r + minor_r * cp
-                if plane == "xy":
-                    x = cx + rr * ct
-                    y = cy + rr * st
-                    z = cz + minor_r * sp
-                else:
-                    x = cx + rr * ct
-                    y = cy + minor_r * sp
-                    z = cz + rr * st
-                pos[i, j] = (x, y, z)
-                uv[i, j] = (u, v)
-                jts[i, j] = (float(joint_idx), 0.0, 0.0, 0.0)
-                wts[i, j] = (1.0, 0.0, 0.0, 0.0)
+        for r in range(n_rows):
+            v = r / max(n_rows - 1, 1)  # 0 = cintura, 1 = barra inferior
+            y = y_top + (y_bot - y_top) * v
+            # Curva graciosa de saia (abre suavemente sobre os quadris)
+            ease = v ** 0.85
+            rx = rx_top + (rx_bot - rx_top) * ease
+            rz = rz_top + (rz_bot - rz_top) * ease
+            # Na fenda frontal, a abertura cresce ligeiramente para baixo (V invertido elegante!)
+            cur_slit = slit_rad * (0.45 + 0.72 * v)
+            for c in range(n_cols):
+                u = c / max(n_cols - 1, 1)
+                theta = cur_slit + u * (math.tau - 2.0 * cur_slit)
+                wave = 1.0 + (0.045 * math.sin(theta * pleats) * v if pleats > 0 else 0.018 * math.sin(theta * 5.0) * v)
+                x = math.sin(theta) * rx * wave
+                z = math.cos(theta) * rz * wave
+                pos[r, c] = (x, y, z)
+                uv[r, c] = (u, v)
+                # Peso suave de quadril + perna correspondente na barra inferior para acompanhar passos!
+                w_leg = 0.42 * (v ** 1.3)
+                leg_j = j_l_leg if x >= 0 else j_r_leg
+                jts[r, c] = (float(j_hips), float(leg_j), 0.0, 0.0)
+                wts[r, c] = (1.0 - w_leg, w_leg, 0.0, 0.0)
 
-        self.add_grid(pos, uv, jts, wts, wrap_u=True, flip_winding=False)
+        self.add_grid(pos, uv, jts, wts, wrap_u=(slit_half_angle_deg <= 0.1), flip_winding=True)
 
     def add_diamond_spike(
         self,
@@ -322,292 +503,467 @@ class _MeshBuilder:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Texturas procedurais crisp de alta leitura para Pixel-Art 3D
+# Texturas Pictóricas 1024×1024 estilo Tree of Savior (Rosto, Cabelo, Roupas)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _make_anime_face_texture(
-    skin_rgb: tuple[int, int, int],
-    eye_rgb: tuple[int, int, int],
-    hair_rgb: tuple[int, int, int],
-) -> np.ndarray:
-    """Textura facial anime estilo Dungeon Squad: olhos grandes e brilhantes + bochechas rosadas limpas."""
-    w, h = 512, 512
-    img = Image.new("RGBA", (w, h), (*skin_rgb, 255))
+def _make_tos_face_texture(arch: AvatarArchetype) -> np.ndarray:
+    """Textura facial anime HD 1024×1024 pintada em camadas (olhos tipo joia, cílios alados, blush suave e sorriso!)."""
+    w, h = 1024, 1024
+    sr, sg, sb = arch.skin_rgb
+    img = Image.new("RGBA", (w, h), (sr, sg, sb, 255))
 
-    # Olhos posicionados na faixa média-baixa do rosto (estética fofa de Titan / Priestess / Valkyrie!)
-    eye_cy = int(h * 0.60)
-    eye_dx = int(w * 0.066)
     cx = w // 2
+    eye_cy = int(h * 0.565)
+    eye_dx = int(w * 0.068)
 
-    # Blush rosado suave nas bochechas
-    blush = (min(255, skin_rgb[0] + 10), max(0, skin_rgb[1] - 46), max(0, skin_rgb[2] - 34), 125)
-    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
+    # 1. Sombreamento suave de têmporas, queixo e ponte do nariz (estilo ilustração pintada!)
+    shade_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shade_layer)
+    warm_sh = (max(0, sr - 38), max(0, sg - 52), max(0, sb - 48), 90)
+    # Sombra delicada sob o queixo e nas bordas do rosto
+    sd.ellipse([cx - 190, int(h * 0.72), cx + 190, int(h * 0.94)], fill=(max(0, sr - 26), max(0, sg - 36), max(0, sb - 32), 68))
+    # Sombreamento quente suave nas pálpebras superiores
     for sign in (-1, 1):
-        bx = cx + sign * int(w * 0.095)
-        by = eye_cy + int(h * 0.072)
-        od.ellipse([bx - 24, by - 11, bx + 24, by + 11], fill=blush)
-    img = Image.alpha_composite(img, overlay)
-    d = ImageDraw.Draw(img)
+        ex = cx + sign * eye_dx
+        sd.ellipse([ex - 48, eye_cy - 52, ex + 48, eye_cy - 10], fill=warm_sh)
+    shade_layer = shade_layer.filter(ImageFilter.GaussianBlur(radius=14))
+    img = Image.alpha_composite(img, shade_layer)
 
-    er, eg, eb = eye_rgb
-    iris_dark = (max(0, int(er * 0.36)), max(0, int(eg * 0.36)), max(0, int(eb * 0.44)), 255)
-    iris_mid = (min(255, int(er * 1.08)), min(255, int(eg * 1.08)), min(255, int(eb * 1.12)), 255)
-    iris_glow = (min(255, er + 105), min(255, eg + 105), min(255, eb + 110), 255)
-    lash_col = (22, 12, 32, 255)
+    # 2. Blush difuso rosado atravessando bochechas e ponte do nariz (assinatura das 4 referências!)
+    blush_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(blush_layer)
+    br, bg, bb = arch.blush_rgb
+    for sign in (-1, 1):
+        bx = cx + sign * int(w * 0.080)
+        by = eye_cy + int(h * 0.056)
+        bd.ellipse([bx - 56, by - 26, bx + 56, by + 28], fill=(br, bg, bb, 155))
+    # Ponte do nariz levemente corada
+    bd.ellipse([cx - 46, eye_cy + int(h * 0.036), cx + 46, eye_cy + int(h * 0.068)], fill=(br, bg, bb, 108))
+    blush_layer = blush_layer.filter(ImageFilter.GaussianBlur(radius=18))
+    img = Image.alpha_composite(img, blush_layer)
+
+    # Sardas delicadas (Vampira / opcional)
+    if arch.freckles:
+        fd = ImageDraw.Draw(img)
+        fcol = (max(0, sr - 58), max(0, sg - 68), max(0, sb - 64), 165)
+        for sign in (-1, 1):
+            for fx, fy in ((54, 42), (72, 48), (64, 58), (86, 44), (92, 56), (48, 54)):
+                fd.ellipse([cx + sign * fx - 3, eye_cy + fy - 3, cx + sign * fx + 3, eye_cy + fy + 3], fill=fcol)
+
+    # 3. Olhos Anime HD Expressivos (cat-eye com íris multicamadas + cílios alados + brilhos triplos!)
+    d = ImageDraw.Draw(img)
+    er, eg, eb = arch.eye_rgb
+    iris_ring = (max(0, int(er * 0.28)), max(0, int(eg * 0.30)), max(0, int(eb * 0.34)), 255)
+    iris_deep = (max(0, int(er * 0.56)), max(0, int(eg * 0.58)), max(0, int(eb * 0.62)), 255)
+    iris_mid = (min(255, int(er * 1.06)), min(255, int(eg * 1.06)), min(255, int(eb * 1.04)), 255)
+    iris_glow = (min(255, er + 108), min(255, eg + 115), min(255, eb + 75), 255)
+    lash_col = (26, 14, 22, 255)
+    crease_col = (max(0, sr - 72), max(0, sg - 84), max(0, sb - 76), 210)
+    brow_col = (*arch.brow_rgb, 245)
 
     for sign in (-1, 1):
         ex = cx + sign * eye_dx
-        # Esclera branca limpa
-        d.ellipse([ex - 21, eye_cy - 30, ex + 21, eye_cy + 27], fill=(252, 252, 255, 255))
-        # Íris vertical grande tipo joia
-        d.ellipse([ex - 17, eye_cy - 25, ex + 17, eye_cy + 25], fill=iris_dark)
-        d.ellipse([ex - 15, eye_cy - 14, ex + 15, eye_cy + 22], fill=iris_mid)
-        d.ellipse([ex - 11, eye_cy + 2, ex + 11, eye_cy + 20], fill=iris_glow)
-        # Pupila
-        d.ellipse([ex - 7, eye_cy - 8, ex + 7, eye_cy + 7], fill=(16, 10, 26, 255))
-        # Brilhos catchlight crisp
-        d.ellipse([ex - 12, eye_cy - 19, ex - 2, eye_cy - 8], fill=(255, 255, 255, 255))
-        d.ellipse([ex + 4, eye_cy + 7, ex + 11, eye_cy + 14], fill=(255, 255, 255, 240))
-        # Cílio superior bem definido
-        d.arc([ex - 24, eye_cy - 34, ex + 24, eye_cy + 14], start=190, end=350, fill=lash_col, width=9)
+        # Forma amendoada levemente inclinada para fora (expressão sedutora e viva de 8d09d44e.jpg!)
+        sclera_pts = [
+            (ex - sign * 34, eye_cy + 10),
+            (ex - sign * 24, eye_cy - 18),
+            (ex, eye_cy - 28),
+            (ex + sign * 28, eye_cy - 20),
+            (ex + sign * 40, eye_cy - 6),
+            (ex + sign * 30, eye_cy + 20),
+            (ex, eye_cy + 26),
+            (ex - sign * 22, eye_cy + 22),
+        ]
+        d.polygon(sclera_pts, fill=(252, 250, 250, 255))
+        # Sombra suave no topo da esclera sob os cílios
+        d.polygon(
+            [
+                (ex - sign * 30, eye_cy - 2),
+                (ex - sign * 22, eye_cy - 18),
+                (ex, eye_cy - 28),
+                (ex + sign * 28, eye_cy - 20),
+                (ex + sign * 38, eye_cy - 6),
+                (ex + sign * 26, eye_cy - 4),
+                (ex, eye_cy - 8),
+            ],
+            fill=(210, 214, 228, 255),
+        )
 
-    # Boca minúscula suave (em Dungeon Squad o rosto é limpo, foco total nos olhos!)
-    my = eye_cy + int(h * 0.115)
-    d.arc([cx - 8, my - 3, cx + 8, my + 6], start=15, end=165, fill=(190, 104, 118, 255), width=3)
+        # Íris grande e vibrante (recortada sutilmente sob a pálpebra superior)
+        ix = ex - sign * 2
+        iy = eye_cy + 1
+        d.ellipse([ix - 27, iy - 25, ix + 27, iy + 26], fill=iris_ring)
+        d.ellipse([ix - 23, iy - 21, ix + 23, iy + 22], fill=iris_deep)
+        d.ellipse([ix - 20, iy - 10, ix + 20, iy + 20], fill=iris_mid)
+        # Crescente luminoso inferior da íris (dá efeito joia anime!)
+        d.ellipse([ix - 15, iy + 3, ix + 15, iy + 18], fill=iris_glow)
+        # Pupila nítida
+        d.ellipse([ix - 10, iy - 9, ix + 10, iy + 9], fill=(18, 12, 20, 255))
+        # 3 pontos de brilho catchlight
+        d.ellipse([ix - 15, iy - 16, ix - 3, iy - 4], fill=(255, 255, 255, 255))
+        d.ellipse([ix + 6, iy + 6, ix + 14, iy + 14], fill=(255, 255, 255, 235))
+        d.ellipse([ix + 8, iy - 13, ix + 13, iy - 8], fill=(255, 255, 255, 210))
 
-    # Fundo de cabelo atrás/topo
-    d.rectangle([0, 0, w, int(h * 0.36)], fill=(*hair_rgb, 255))
-    d.rectangle([0, 0, int(w * 0.25), h], fill=(*hair_rgb, 255))
-    d.rectangle([int(w * 0.75), 0, w, h], fill=(*hair_rgb, 255))
+        # Cílio superior espesso + puxado cat-eye externo (dá charme imediato ao rosto!)
+        upper_lash = [
+            (ex - sign * 35, eye_cy + 5),
+            (ex - sign * 24, eye_cy - 21),
+            (ex, eye_cy - 31),
+            (ex + sign * 28, eye_cy - 24),
+            (ex + sign * 48, eye_cy - 18),  # ponta puxada do cílio alado!
+            (ex + sign * 39, eye_cy - 7),
+            (ex + sign * 26, eye_cy - 13),
+            (ex, eye_cy - 19),
+            (ex - sign * 21, eye_cy - 12),
+        ]
+        d.polygon(upper_lash, fill=lash_col)
+        # Delineado inferior delicado
+        d.line([(ex - sign * 18, eye_cy + 24), (ex + sign * 26, eye_cy + 20)], fill=(72, 42, 48, 220), width=4)
+        # Dobra fina da pálpebra acima do olho
+        d.line(
+            [(ex - sign * 24, eye_cy - 33), (ex, eye_cy - 41), (ex + sign * 28, eye_cy - 33)],
+            fill=crease_col,
+            width=4,
+        )
+        # Sobrancelha expressiva arqueada (suavemente inclinada para dentro — charme da Lyra!)
+        brow_pts = [
+            (ex - sign * 32, eye_cy - 58),
+            (ex - sign * 6, eye_cy - 68),
+            (ex + sign * 28, eye_cy - 61),
+            (ex + sign * 42, eye_cy - 53),
+            (ex + sign * 26, eye_cy - 52),
+            (ex - sign * 6, eye_cy - 58),
+            (ex - sign * 30, eye_cy - 50),
+        ]
+        d.polygon(brow_pts, fill=brow_col)
+
+    # 4. Narizinho anime suave (ponto de sombra delicado + brilho na ponta)
+    ny = eye_cy + int(h * 0.056)
+    d.arc([cx - 10, ny - 6, cx + 10, ny + 8], start=25, end=155, fill=(max(0, sr - 74), max(0, sg - 82), max(0, sb - 74), 200), width=4)
+    d.ellipse([cx - 5, ny - 10, cx + 5, ny - 3], fill=(min(255, sr + 28), min(255, sg + 26), min(255, sb + 24), 130))
+
+    # 5. Sorriso caloroso brilhante com lábios macios (exatamente como 8d09d44e.jpg!)
+    my = eye_cy + int(h * 0.118)
+    lr, lg, lb = arch.lip_rgb
+    # Lábio inferior cheio suave
+    d.ellipse([cx - 28, my - 2, cx + 28, my + 24], fill=(lr, lg, lb, 215))
+    # Interior do sorriso alegre + leve brilho dos dentes superiores
+    d.polygon([(cx - 26, my - 1), (cx, my + 3), (cx + 26, my - 1), (cx + 16, my + 12), (cx, my + 14), (cx - 16, my + 12)], fill=(158, 56, 66, 255))
+    d.polygon([(cx - 20, my), (cx, my + 3), (cx + 20, my), (cx + 14, my + 7), (cx - 14, my + 7)], fill=(252, 246, 246, 255))
+    # Linha fina do lábio superior
+    d.line([(cx - 30, my - 3), (cx, my + 2), (cx + 30, my - 3)], fill=(122, 46, 52, 240), width=5)
+    # Brilho gloss branco suave no lábio inferior
+    d.ellipse([cx - 11, my + 12, cx + 11, my + 19], fill=(255, 232, 228, 195))
+
+    # Cor de cabelo na parte traseira/topo oculta sob a peruca 3D
+    d.rectangle([0, 0, w, int(h * 0.30)], fill=(*arch.hair_root_rgb, 255))
+    d.rectangle([0, 0, int(w * 0.24), h], fill=(*arch.hair_root_rgb, 255))
+    d.rectangle([int(w * 0.76), 0, w, h], fill=(*arch.hair_root_rgb, 255))
+
     return np.array(img, dtype=np.uint8)
 
 
-def _make_bodysuit_torso_texture(
-    skin_rgb: tuple[int, int, int],
-    suit_rgb: tuple[int, int, int],
-    trim_rgb: tuple[int, int, int],
-    accent_rgb: tuple[int, int, int],
-    style: str = "astral",
-) -> np.ndarray:
-    """Textura esculpida do tronco/quadris: bodysuit cavado / armadura / corset com recorte natural no colo."""
+def _make_ear_texture(arch: AvatarArchetype) -> np.ndarray:
+    """Textura das orelhas élficas: base no tom de pele -> ponta rosada translúcida iluminada (8d09d44e.jpg!)."""
+    w, h = 128, 256
+    sr, sg, sb = arch.skin_rgb
+    br, bg, bb = arch.blush_rgb
+    arr = np.zeros((h, w, 4), dtype=np.uint8)
+    for y in range(h):
+        t = y / max(h - 1, 1)  # 0=base -> 1=ponta
+        # Gradiente quente para a ponta rosada-coral das orelhas élficas!
+        k = (t ** 1.35) * 0.72
+        r = int(sr * (1.0 - k) + min(255, br + 18) * k)
+        g = int(sg * (1.0 - k) + bg * k)
+        b = int(sb * (1.0 - k) + bb * k)
+        arr[y, :, 0] = np.clip(r, 0, 255)
+        arr[y, :, 1] = np.clip(g, 0, 255)
+        arr[y, :, 2] = np.clip(b, 0, 255)
+        arr[y, :, 3] = 255
+    return arr
+
+
+def _make_painted_hair_texture(arch: AvatarArchetype) -> np.ndarray:
+    """Textura pintada de fios de cabelo 512×512 (raízes ricas -> ondas luminosas -> pontas suaves + faixa de brilho!)."""
     w, h = 512, 512
-    img = Image.new("RGBA", (w, h), (*skin_rgb, 255))
-    d = ImageDraw.Draw(img)
-    cx = w // 2
+    rr, rg, rb = arch.hair_root_rgb
+    mr, mg, mb = arch.hair_rgb
+    tr, tg, tb = arch.hair_tip_rgb
 
-    suit = (*suit_rgb, 255)
-    trim = (*trim_rgb, 255)
-    accent = (*accent_rgb, 255)
+    ys = np.linspace(0.0, 1.0, h, dtype=np.float32)[:, None]
+    xs = np.linspace(0.0, 1.0, w, dtype=np.float32)[None, :]
 
-    # Base pélvica traseira + frente em V cavado destacando quadris e coxas!
-    d.rectangle([0, 0, w, int(h * 0.22)], fill=suit)
-    hip_cut_l = [(cx - 128, int(h * 0.03)), (cx - 42, int(h * 0.03)), (cx - 28, int(h * 0.32)), (cx - 144, int(h * 0.32))]
-    hip_cut_r = [(cx + 42, int(h * 0.03)), (cx + 128, int(h * 0.03)), (cx + 144, int(h * 0.32)), (cx + 28, int(h * 0.32))]
-    d.polygon(hip_cut_l, fill=(*skin_rgb, 255))
-    d.polygon(hip_cut_r, fill=(*skin_rgb, 255))
+    # Gradiente vertical raiz -> meio -> ponta
+    top_k = np.clip(ys / 0.35, 0.0, 1.0)
+    bot_k = np.clip((ys - 0.55) / 0.45, 0.0, 1.0)
+    base_r = rr * (1.0 - top_k) + mr * top_k
+    base_g = rg * (1.0 - top_k) + mg * top_k
+    base_b = rb * (1.0 - top_k) + mb * top_k
+    base_r = base_r * (1.0 - bot_k) + tr * bot_k
+    base_g = base_g * (1.0 - bot_k) + tg * bot_k
+    base_b = base_b * (1.0 - bot_k) + tb * bot_k
 
-    front_panel = [
-        (cx - 38, 0),
-        (cx + 38, 0),
-        (cx + 52, int(h * 0.42)),
-        (cx + 84, int(h * 0.64)),
-        (cx - 84, int(h * 0.64)),
-        (cx - 52, int(h * 0.42)),
-    ]
-    d.polygon(front_panel, fill=suit)
-
-    # Costas cobertas até a altura das escápulas
-    d.rectangle([0, 0, int(w * 0.22), int(h * 0.72)], fill=suit)
-    d.rectangle([int(w * 0.78), 0, w, int(h * 0.72)], fill=suit)
-
-    if style == "priestess":
-        d.rectangle([0, int(h * 0.34), w, int(h * 0.41)], fill=trim)
-        d.line([(cx - 38, 0), (cx - 52, int(h * 0.42)), (cx - 84, int(h * 0.64))], fill=trim, width=8)
-        d.line([(cx + 38, 0), (cx + 52, int(h * 0.42)), (cx + 84, int(h * 0.64))], fill=trim, width=8)
-    elif style == "valkyrie":
-        d.rectangle([0, int(h * 0.28), w, int(h * 0.62)], fill=suit)
-        d.rectangle([0, int(h * 0.31), w, int(h * 0.37)], fill=trim)
-        d.line([(cx, int(h * 0.12)), (cx, int(h * 0.64))], fill=trim, width=7)
-    else:
-        d.line([(cx - 38, 0), (cx - 52, int(h * 0.42)), (cx - 84, int(h * 0.64))], fill=accent, width=7)
-        d.line([(cx + 38, 0), (cx + 52, int(h * 0.42)), (cx + 84, int(h * 0.64))], fill=accent, width=7)
-        d.polygon([(cx, int(h * 0.30)), (cx + 20, int(h * 0.38)), (cx, int(h * 0.46)), (cx - 20, int(h * 0.38))], fill=trim)
-
-    # Gargantilha fina delicada no pescoço (deixa colo aberto e elegante!)
-    d.rectangle([0, int(h * 0.87), w, int(h * 0.92)], fill=suit)
-    d.rectangle([0, int(h * 0.89), w, int(h * 0.91)], fill=trim)
-    return np.array(img, dtype=np.uint8)
-
-
-def _make_bust_texture(
-    skin_rgb: tuple[int, int, int],
-    suit_rgb: tuple[int, int, int],
-    trim_rgb: tuple[int, int, int],
-    accent_rgb: tuple[int, int, int],
-) -> np.ndarray:
-    w, h = 256, 256
-    img = Image.new("RGBA", (w, h), (*skin_rgb, 255))
-    d = ImageDraw.Draw(img)
-    split_y = int(h * 0.52)
-    d.rectangle([0, split_y, w, h], fill=(*suit_rgb, 255))
-    d.rectangle([0, split_y - 7, w, split_y + 5], fill=(*trim_rgb, 255))
-    d.line([(0, split_y + 20), (w, split_y + 20)], fill=(*accent_rgb, 255), width=5)
-    return np.array(img, dtype=np.uint8)
-
-
-def _make_leg_texture(
-    skin_rgb: tuple[int, int, int],
-    boot_rgb: tuple[int, int, int],
-    trim_rgb: tuple[int, int, int],
-    accent_rgb: tuple[int, int, int],
-    style: str = "astral",
-) -> np.ndarray:
-    w, h = 256, 512
-    img = Image.new("RGBA", (w, h), (*skin_rgb, 255))
-    d = ImageDraw.Draw(img)
-    cx = w // 2
-
-    boot_top = int(h * 0.55) if style != "priestess" else int(h * 0.48)
-    d.rectangle([0, 0, w, boot_top], fill=(*boot_rgb, 255))
-    d.polygon(
-        [(cx - 56, boot_top - 10), (cx, boot_top + 42), (cx + 56, boot_top - 10)],
-        fill=(*boot_rgb, 255),
+    # Fios longitudinais pintados (múltiplas frequências harmônicas para textura orgânica de pincel!)
+    strands = (
+        0.55 * np.sin(xs * math.tau * 18.0 + np.sin(ys * 6.0) * 0.4)
+        + 0.30 * np.sin(xs * math.tau * 37.0 + 1.2)
+        + 0.15 * np.sin(xs * math.tau * 71.0 + 2.5)
     )
-    d.line([(0, boot_top), (cx - 56, boot_top - 10), (cx, boot_top + 42), (cx + 56, boot_top - 10), (w, boot_top)], fill=(*trim_rgb, 255), width=8)
-    d.line([(cx, int(h * 0.08)), (cx, boot_top + 24)], fill=(*accent_rgb, 255), width=8)
-    if style in ("valkyrie", "priestess"):
-        gy = int(h * 0.74)
-        d.rectangle([0, gy, w, gy + 13], fill=(*boot_rgb, 255))
-        d.rectangle([0, gy + 4, w, gy + 8], fill=(*trim_rgb, 255))
-    return np.array(img, dtype=np.uint8)
+    strand_mul = 1.0 + strands * 0.085
+
+    # Faixa suave de brilho especular anime (angel ring em y ~ 0.24..0.38)
+    wave_y = 0.30 + 0.025 * np.sin(xs * math.tau * 6.0)
+    shine = np.exp(-((ys - wave_y) / 0.055) ** 2) * (0.65 + 0.35 * np.clip(strands + 0.5, 0.0, 1.0))
+
+    r_ch = np.clip(base_r * strand_mul + shine * 46.0, 0, 255).astype(np.uint8)
+    g_ch = np.clip(base_g * strand_mul + shine * 44.0, 0, 255).astype(np.uint8)
+    b_ch = np.clip(base_b * strand_mul + shine * 34.0, 0, 255).astype(np.uint8)
+    a_ch = np.full((h, w), 255, dtype=np.uint8)
+    return np.stack([r_ch, g_ch, b_ch, a_ch], axis=-1)
 
 
-def _make_arm_texture(
-    skin_rgb: tuple[int, int, int],
-    glove_rgb: tuple[int, int, int],
-    trim_rgb: tuple[int, int, int],
-    accent_rgb: tuple[int, int, int],
-) -> np.ndarray:
-    w, h = 256, 256
-    img = Image.new("RGBA", (w, h), (*skin_rgb, 255))
+def _make_corset_torso_texture(arch: AvatarArchetype, outfit_key: str) -> np.ndarray:
+    """Textura 1024×1024 do tronco: suporta camada base limpa (`base` = roupa de baixo simples) ou trajes sobrepostos."""
+    w, h = 1024, 1024
+    sr, sg, sb = arch.skin_rgb
+    img = Image.new("RGBA", (w, h), (sr, sg, sb, 255))
+    cx = w // 2  # u=0.50 = frente (+Z); y=0 base (quadris/virilha), y=h topo (pescoço)!
+
+    # Sombreamento anatômico suave de pele (clavículas, linha abdominal, umbigo e cintura!)
+    sh_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(sh_layer)
+    sk_sh = (max(0, sr - 40), max(0, sg - 52), max(0, sb - 48), 110)
+    sk_hi = (min(255, sr + 28), min(255, sg + 26), min(255, sb + 24), 95)
+    # Clavículas
+    sd.line([(cx - 108, int(h * 0.78)), (cx - 18, int(h * 0.80))], fill=sk_sh, width=10)
+    sd.line([(cx + 108, int(h * 0.78)), (cx + 18, int(h * 0.80))], fill=sk_sh, width=10)
+    sd.ellipse([cx - 24, int(h * 0.79), cx + 24, int(h * 0.85)], fill=sk_sh)
+    # Sulco abdominal delicado + umbigo sutil (y ~ 0.30)
+    sd.line([(cx, int(h * 0.32)), (cx, int(h * 0.56))], fill=(max(0, sr - 26), max(0, sg - 36), max(0, sb - 32), 75), width=8)
+    sd.ellipse([cx - 10, int(h * 0.29), cx + 10, int(h * 0.32)], fill=(max(0, sr - 58), max(0, sg - 68), max(0, sb - 62), 145))
+    # Brilho suave no abdômen e clavículas
+    sd.ellipse([cx - 56, int(h * 0.36), cx + 56, int(h * 0.54)], fill=sk_hi)
+    sh_layer = sh_layer.filter(ImageFilter.GaussianBlur(radius=9))
+    img = Image.alpha_composite(img, sh_layer)
     d = ImageDraw.Draw(img)
-    glove_start = int(h * 0.44)
-    d.rectangle([0, glove_start, w, h], fill=(*glove_rgb, 255))
-    d.rectangle([0, glove_start - 5, w, glove_start + 7], fill=(*trim_rgb, 255))
-    d.line([(w // 2, glove_start + 14), (w // 2, h - 18)], fill=(*accent_rgb, 255), width=6)
-    return np.array(img, dtype=np.uint8)
 
+    if outfit_key == "base":
+        # Roupa de baixo simples e limpa para validar corpo/proporções antes de vestir camadas!
+        u_col = (246, 240, 236, 255)
+        u_trim = (218, 196, 186, 255)
+        u_band = (232, 222, 218, 255)
+        # Calcinha simples de corte clássico em V suave + elástico delicado nos quadris
+        d.rectangle([0, 0, w, int(h * 0.14)], fill=u_col)
+        # Recorte lateral das pernas na frente (destaca a curva do quadril!)
+        d.polygon([(cx - 235, int(h * 0.02)), (cx - 72, int(h * 0.02)), (cx - 52, int(h * 0.17)), (cx - 255, int(h * 0.17))], fill=(sr, sg, sb, 255))
+        d.polygon([(cx + 72, int(h * 0.02)), (cx + 235, int(h * 0.02)), (cx + 255, int(h * 0.17)), (cx + 52, int(h * 0.17))], fill=(sr, sg, sb, 255))
+        # Triângulo frontal e traseiro da calcinha + cós fino contínuo
+        d.polygon([(cx - 66, 0), (cx + 66, 0), (cx + 128, int(h * 0.18)), (cx - 128, int(h * 0.18))], fill=u_col)
+        d.rectangle([0, int(h * 0.15), w, int(h * 0.19)], fill=u_col)
+        d.line([(0, int(h * 0.19)), (w, int(h * 0.19))], fill=u_trim, width=8)
+        # Faixa traseira e alças finas do top/sutiã simples (y ~ 0.52..0.58)
+        d.rectangle([0, int(h * 0.52), w, int(h * 0.58)], fill=u_band)
+        d.line([(0, int(h * 0.52)), (w, int(h * 0.52))], fill=u_trim, width=5)
+        d.line([(0, int(h * 0.58)), (w, int(h * 0.58))], fill=u_trim, width=5)
+        # Alças finas nos ombros
+        d.rectangle([cx - 148, int(h * 0.58), cx - 126, int(h * 0.80)], fill=u_col)
+        d.rectangle([cx + 126, int(h * 0.58), cx + 148, int(h * 0.80)], fill=u_col)
+        return np.array(img, dtype=np.uint8)
 
-def _make_cape_texture(
-    outer_rgb: tuple[int, int, int],
-    inner_rgb: tuple[int, int, int],
-    trim_rgb: tuple[int, int, int],
-) -> np.ndarray:
-    """Capa escura elegante estilo Titan_idle: obsidiana escura nos dois lados com forro sombrio e barra dourada!"""
-    w, h = 256, 256
-    img = Image.new("RGBA", (w, h), (*outer_rgb, 255))
-    d = ImageDraw.Draw(img)
-    # Interior mais rico mas AINDA escuro (destaca as coxas claras em alto contraste — igual Titan_idle!)
-    d.rectangle([w // 2, 0, w, h], fill=(*inner_rgb, 255))
-    # Bordas laterais e barra inferior douradas refinadas
-    d.rectangle([0, int(h * 0.87), w, h], fill=(*trim_rgb, 255))
-    d.rectangle([w // 2 - 14, 0, w // 2 + 14, h], fill=(*trim_rgb, 255))
-    d.rectangle([0, 0, 12, h], fill=(*trim_rgb, 255))
-    d.rectangle([w - 12, 0, w, h], fill=(*trim_rgb, 255))
-    return np.array(img, dtype=np.uint8)
+    suit = (*arch.suit_rgb, 255)
+    suit_dark = (max(0, arch.suit_rgb[0] - 26), max(0, arch.suit_rgb[1] - 22), max(0, arch.suit_rgb[2] - 20), 255)
+    trim = (*arch.trim_rgb, 255)
+    acc = (*arch.accent_rgb, 255)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Paletas modulares por traje / persona
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _resolve_outfit_palette(persona: Persona, outfit_key: str) -> dict[str, object]:
-    hr, hg, hb = persona.hair_color
-    er, eg, eb = persona.eye_color
-
-    if outfit_key in ("focus", "cozy"):
-        style = "priestess"
-        suit = (36, 26, 54)
-        boot = (26, 20, 40)
-        trim = (242, 198, 92)
-        accent = (196, 128, 255)
-        cape_out = (26, 20, 44)
-        cape_in = (58, 36, 92)
-        halo_col = (1.0, 0.88, 0.44)
-        flame_col = (0.76, 0.45, 1.0)
-        skin = (252, 226, 212)
-    elif outfit_key in ("casual", "rainy"):
-        style = "valkyrie"
-        suit = (44, 48, 66)
-        boot = (32, 36, 52)
-        trim = (232, 204, 128)
-        accent = (102, 218, 255)
-        cape_out = (22, 38, 86)
-        cape_in = (34, 58, 122)
-        halo_col = (1.0, 0.94, 0.68)
-        flame_col = (0.48, 0.92, 1.0)
-        skin = (252, 224, 210)
+    if arch.outfit_style == "blouse_skirt":
+        # Camisa branca ajustada com decote em V + botões (Vampira)
+        d.rectangle([0, int(h * 0.24), w, int(h * 0.82)], fill=suit)
+        # Recorte V frontal revelando pescoço e colo
+        d.polygon([(cx - 88, int(h * 0.82)), (cx + 88, int(h * 0.82)), (cx, int(h * 0.56))], fill=(sr, sg, sb, 255))
+        d.line([(cx - 88, int(h * 0.82)), (cx, int(h * 0.56)), (cx + 88, int(h * 0.82))], fill=trim, width=10)
+        d.line([(cx, int(h * 0.24)), (cx, int(h * 0.56))], fill=(180, 186, 198, 255), width=6)
+        # Saia/cós preto na base
+        d.rectangle([0, 0, w, int(h * 0.28)], fill=(*arch.skirt_rgb, 255))
     else:
-        style = "astral"
-        suit = (22, 20, 30)
-        boot = (20, 18, 28)
-        trim = (242, 198, 94)
-        accent = (118, 242, 255)
-        cape_out = (20, 18, 28)
-        cape_in = (44, 36, 52)
-        halo_col = (1.0, 0.96, 0.80)
-        flame_col = (0.52, 0.96, 1.0)
-        skin = (248, 224, 214)
+        # Corpete fantasia estilo Elfa Loira (8d09d44e.jpg!) / Humana Ruiva / Androide Rosa
+        # Base pélvica/faixa inferior + laterais altas
+        d.rectangle([0, 0, w, int(h * 0.22)], fill=suit_dark)
+        # Laterais do quadril livres (destacam coxas curvas pela fenda da saia!)
+        d.polygon([(cx - 240, int(h * 0.02)), (cx - 82, int(h * 0.02)), (cx - 64, int(h * 0.26)), (cx - 256, int(h * 0.26))], fill=(sr, sg, sb, 255))
+        d.polygon([(cx + 82, int(h * 0.02)), (cx + 240, int(h * 0.02)), (cx + 256, int(h * 0.26)), (cx + 64, int(h * 0.26))], fill=(sr, sg, sb, 255))
 
+        # Corpo principal do corpete (da cintura até sob o busto, e subindo pelas laterais/costas!)
+        d.rectangle([0, int(h * 0.22), w, int(h * 0.58)], fill=suit)
+        # Costas e alças laterais do corpete (deixando o decote generoso no peito!)
+        d.rectangle([0, int(h * 0.56), int(w * 0.34), int(h * 0.78)], fill=suit)
+        d.rectangle([int(w * 0.66), int(h * 0.56), w, int(h * 0.78)], fill=suit)
+
+        # Babado de renda branca ondulada contornando o decote/alças (assinatura 8d09d44e.jpg!)
+        for bx in range(int(w * 0.30), int(w * 0.71), 22):
+            by = int(h * 0.56)
+            d.ellipse([bx - 14, by - 12, bx + 14, by + 16], fill=trim)
+        d.line([(int(w * 0.33), int(h * 0.56)), (int(w * 0.33), int(h * 0.79))], fill=trim, width=18)
+        d.line([(int(w * 0.67), int(h * 0.56)), (int(w * 0.67), int(h * 0.79))], fill=trim, width=18)
+
+        # Painel frontal central do corpete com cadarços cruzados (lacing!) e costura dourada
+        d.rectangle([cx - 72, int(h * 0.24), cx + 72, int(h * 0.56)], fill=suit_dark)
+        d.line([(cx - 72, int(h * 0.24)), (cx - 72, int(h * 0.56))], fill=acc, width=7)
+        d.line([(cx + 72, int(h * 0.24)), (cx + 72, int(h * 0.56))], fill=acc, width=7)
+        # Cadarços cruzados X-X-X na barriga!
+        for k in range(4):
+            y0 = int(h * (0.28 + k * 0.068))
+            y1 = int(h * (0.34 + k * 0.068))
+            d.line([(cx - 46, y0), (cx + 46, y1)], fill=acc, width=7)
+            d.line([(cx + 46, y0), (cx - 46, y1)], fill=acc, width=7)
+            d.ellipse([cx - 52, y0 - 6, cx - 40, y0 + 6], fill=trim)
+            d.ellipse([cx + 40, y0 - 6, cx + 52, y0 + 6], fill=trim)
+
+        # Faixa de cinto e laço frontal na cintura
+        d.rectangle([0, int(h * 0.21), w, int(h * 0.27)], fill=suit_dark)
+        d.line([(0, int(h * 0.21)), (w, int(h * 0.21))], fill=acc, width=6)
+        d.line([(0, int(h * 0.27)), (w, int(h * 0.27))], fill=acc, width=6)
+
+    return np.array(img, dtype=np.uint8)
+
+
+def _make_bust_texture(arch: AvatarArchetype, outfit_key: str = "base") -> np.ndarray:
+    """Textura 512×512 do busto esculpido: decote luminoso + sutiã simples (`base`) ou bojo do corpete!"""
+    w, h = 512, 512
+    sr, sg, sb = arch.skin_rgb
+    img = Image.new("RGBA", (w, h), (sr, sg, sb, 255))
+
+    hl = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    hd = ImageDraw.Draw(hl)
+    hd.ellipse([w // 2 - 92, int(h * 0.14), w // 2 + 92, int(h * 0.42)], fill=(min(255, sr + 32), min(255, sg + 32), min(255, sb + 30), 115))
+    hl = hl.filter(ImageFilter.GaussianBlur(radius=22))
+    img = Image.alpha_composite(img, hl)
+    d = ImageDraw.Draw(img)
+
+    if outfit_key == "base":
+        # Sutiã/top simples delicado (creme-marfim com renda fina) deixando proporções 100% visíveis!
+        u_col = (246, 240, 236, 255)
+        u_trim = (218, 196, 186, 255)
+        split_y = int(h * 0.44)
+        d.rectangle([0, split_y, w, h], fill=u_col)
+        for rx in range(0, w + 20, 22):
+            d.ellipse([rx - 13, split_y - 10, rx + 13, split_y + 10], fill=u_col)
+        d.line([(0, split_y + 10), (w, split_y + 10)], fill=u_trim, width=5)
+        return np.array(img, dtype=np.uint8)
+
+    if arch.outfit_style == "blouse_skirt":
+        d.rectangle([0, int(h * 0.18), w, h], fill=(*arch.suit_rgb, 255))
+    else:
+        split_y = int(h * 0.56)
+        d.rectangle([0, split_y, w, h], fill=(*arch.suit_rgb, 255))
+        for rx in range(0, w + 24, 28):
+            d.ellipse([rx - 18, split_y - 16, rx + 18, split_y + 14], fill=(*arch.trim_rgb, 255))
+        d.line([(0, split_y + 12), (w, split_y + 12)], fill=(*arch.accent_rgb, 255), width=6)
+
+    return np.array(img, dtype=np.uint8)
+
+
+def _make_skirt_texture(arch: AvatarArchetype) -> np.ndarray:
+    """Textura 512×512 da saia fantasia: tecido rico com borda creme/dourada e dobras pintadas."""
+    w, h = 512, 512
+    r, g, b = arch.skirt_rgb
+    img = Image.new("RGBA", (w, h), (r, g, b, 255))
+    d = ImageDraw.Draw(img)
+    for x in range(0, w, 32):
+        d.rectangle([x, 0, x + 10, h], fill=(max(0, r - 14), max(0, g - 12), max(0, b - 12), 255))
+    d.rectangle([0, 0, 26, h], fill=(*arch.trim_rgb, 255))
+    d.rectangle([w - 26, 0, w, h], fill=(*arch.trim_rgb, 255))
+    d.rectangle([0, h - 32, w, h], fill=(*arch.trim_rgb, 255))
+    d.line([(28, 0), (28, h - 32)], fill=(*arch.accent_rgb, 255), width=6)
+    d.line([(w - 28, 0), (w - 28, h - 32)], fill=(*arch.accent_rgb, 255), width=6)
+    d.line([(0, h - 34), (w, h - 34)], fill=(*arch.accent_rgb, 255), width=6)
+    return np.array(img, dtype=np.uint8)
+
+
+def _make_leg_texture(arch: AvatarArchetype, outfit_key: str = "base") -> np.ndarray:
+    """Textura 512×1024 das pernas: pele limpa com sombreamento sutil no joelho (`base`) ou botas fantasia!"""
+    w, h = 512, 1024
+    sr, sg, sb = arch.skin_rgb
+    img = Image.new("RGBA", (w, h), (sr, sg, sb, 255))
+    cx = w // 2
+
+    # Sombreamento anatômico sutil nos joelhos e brilho nas coxas
+    sh = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(sh)
+    sd.ellipse([cx - 38, int(h * 0.47), cx + 38, int(h * 0.53)], fill=(max(0, sr - 22), max(0, sg - 30), max(0, sb - 26), 90))
+    sd.ellipse([cx - 46, int(h * 0.65), cx + 46, int(h * 0.88)], fill=(min(255, sr + 24), min(255, sg + 22), min(255, sb + 20), 85))
+    sh = sh.filter(ImageFilter.GaussianBlur(radius=16))
+    img = Image.alpha_composite(img, sh)
+
+    if outfit_key == "base":
+        return np.array(img, dtype=np.uint8)
+
+    d = ImageDraw.Draw(img)
+    boot_top = int(h * 0.48)
+    br, bg, bb = arch.boot_rgb
+    b_dark = (max(0, br - 24), max(0, bg - 20), max(0, bb - 18), 255)
+    d.rectangle([0, 0, w, boot_top], fill=(br, bg, bb, 255))
+    d.rectangle([0, boot_top - 48, w, boot_top + 12], fill=b_dark)
+    d.rectangle([0, boot_top + 8, w, boot_top + 22], fill=(*arch.trim_rgb, 255))
+    d.rectangle([cx - 34, boot_top - 34, cx + 34, boot_top - 6], fill=(*arch.accent_rgb, 255))
+    d.rectangle([cx - 22, boot_top - 26, cx + 22, boot_top - 14], fill=b_dark)
+    for k in range(5):
+        yk = int(h * (0.10 + k * 0.065))
+        d.line([(cx - 24, yk), (cx + 24, yk + 26)], fill=(*arch.accent_rgb, 255), width=6)
+        d.line([(cx + 24, yk), (cx - 24, yk + 26)], fill=(*arch.accent_rgb, 255), width=6)
+    return np.array(img, dtype=np.uint8)
+
+
+def _make_arm_texture(arch: AvatarArchetype, outfit_key: str = "base") -> np.ndarray:
+    """Textura 512×512 dos braços: pele limpa (`base`) ou luvas/mangas do traje."""
+    w, h = 512, 512
+    sr, sg, sb = arch.skin_rgb
+    img = Image.new("RGBA", (w, h), (sr, sg, sb, 255))
+    if outfit_key == "base":
+        return np.array(img, dtype=np.uint8)
+    d = ImageDraw.Draw(img)
+    if arch.outfit_style == "blouse_skirt":
+        d.rectangle([0, 0, w, int(h * 0.62)], fill=(*arch.suit_rgb, 255))
+        d.rectangle([0, int(h * 0.58), w, int(h * 0.64)], fill=(*arch.trim_rgb, 255))
+    else:
+        glove_start = int(h * 0.62)
+        br, bg, bb = arch.boot_rgb
+        d.rectangle([0, glove_start, w, h], fill=(br, bg, bb, 255))
+        d.rectangle([0, glove_start - 14, w, glove_start + 16], fill=(max(0, br - 20), max(0, bg - 16), max(0, bb - 14), 255))
+        d.line([(0, glove_start + 16), (w, glove_start + 16)], fill=(*arch.accent_rgb, 255), width=7)
+    return np.array(img, dtype=np.uint8)
+
+
+def _make_eyelid_texture(arch: AvatarArchetype) -> np.ndarray:
+    """Pálpebra na cor exata da pele com cílio curvo fofo para piscar/sorrir de olhos fechados!"""
+    w, h = 128, 128
+    img = Image.new("RGBA", (w, h), (*arch.skin_rgb, 255))
+    d = ImageDraw.Draw(img)
+    d.arc([16, 48, w - 16, 98], start=15, end=165, fill=(28, 16, 22, 255), width=8)
+    return np.array(img, dtype=np.uint8)
+
+
+def _resolve_archetype(persona: Persona, archetype_id: str | None = None) -> AvatarArchetype:
+    if archetype_id and archetype_id in ARCHETYPES:
+        return ARCHETYPES[archetype_id]
+    # Mapeamento padrão das personas enquanto refinamos a Elfa Loira como modelo principal!
+    if persona.id in ARCHETYPES:
+        return ARCHETYPES[persona.id]
     if persona.id == "nyx":
-        hair = (224, 196, 232) if style == "astral" else (190, 52, 88)
-        eye = (255, 78, 128)
-        accent = (255, 86, 142) if style != "astral" else (255, 118, 176)
-        flame_col = (1.0, 0.36, 0.64)
-        halo_col = (1.0, 0.84, 0.42)
-    elif persona.id == "mira":
-        hair = (238, 236, 246) if style == "astral" else (min(255, hr + 48), min(255, hg + 45), min(255, hb + 52))
-        eye = (max(80, er), max(115, eg), min(255, eb + 30))
-    else:
-        hair = (min(255, max(40, hr)), min(255, max(40, hg)), min(255, max(40, hb)))
-        eye = (er, eg, eb)
-
-    return {
-        "style": style,
-        "skin": skin,
-        "hair": hair,
-        "eye": eye,
-        "suit": suit,
-        "boot": boot,
-        "trim": trim,
-        "accent": accent,
-        "cape_out": cape_out,
-        "cape_in": cape_in,
-        "halo_col": halo_col,
-        "flame_col": flame_col,
-    }
+        return ARCHETYPES["vampira_negra"]
+    return ARCHETYPES["elfa_loira"]
 
 
-def build_dungeon_squad_model(persona: Persona, outfit_key: str = "starlight") -> VrmModel:
-    """Constrói um `VrmModel` 3D estilizado de alta arte no padrão *Dungeon Squad* pronto para GPU."""
-    pal = _resolve_outfit_palette(persona, outfit_key)
-    style = str(pal["style"])
-    skin_rgb = pal["skin"]
-    hair_rgb = pal["hair"]
-    eye_rgb = pal["eye"]
-    suit_rgb = pal["suit"]
-    boot_rgb = pal["boot"]
-    trim_rgb = pal["trim"]
-    accent_rgb = pal["accent"]
-    cape_out = pal["cape_out"]
-    cape_in = pal["cape_in"]
-    halo_col = pal["halo_col"]
-    flame_col = pal["flame_col"]
+def build_dungeon_squad_model(
+    persona: Persona,
+    outfit_key: str = "base",
+    archetype_id: str | None = None,
+) -> VrmModel:
+    """Constrói um `VrmModel` 3D de alta definição estilo Tree of Savior para qualquer um dos 4 arquétipos base."""
+    arch = _resolve_archetype(persona, archetype_id)
+    is_base_layer = outfit_key == "base"
 
-    # ── 1. Hierarquia de Ossos VRM 1.0 (~4.2 cabeças, curvas acentuadas!) ──
+    # ── 1. Hierarquia de Ossos VRM 1.0 (~4.8 cabeças, altura 1.48 m) ──
     nodes: list[VrmNode] = []
     world_pos: list[np.ndarray] = []
     name_to_idx: dict[str, int] = {}
@@ -627,52 +983,43 @@ def build_dungeon_squad_model(persona: Persona, outfit_key: str = "starlight") -
         name_to_idx[name] = idx
         return idx
 
-    b_hips = _add_bone("hips", (0.0, 0.56, 0.0), None)
-    b_spine = _add_bone("spine", (0.0, 0.67, 0.0), "hips")
-    b_chest = _add_bone("chest", (0.0, 0.78, 0.0), "spine")
-    b_uchest = _add_bone("upperChest", (0.0, 0.87, 0.0), "chest")
-    b_neck = _add_bone("neck", (0.0, 0.94, 0.0), "upperChest")
-    b_head = _add_bone("head", (0.0, 0.99, 0.0), "neck")
+    b_hips = _add_bone("hips", (0.0, 0.62, 0.0), None)
+    b_spine = _add_bone("spine", (0.0, 0.74, 0.0), "hips")
+    b_chest = _add_bone("chest", (0.0, 0.86, 0.0), "spine")
+    b_uchest = _add_bone("upperChest", (0.0, 0.96, 0.0), "chest")
+    b_neck = _add_bone("neck", (0.0, 1.04, 0.0), "upperChest")
+    b_head = _add_bone("head", (0.0, 1.10, 0.0), "neck")
 
-    b_l_sh = _add_bone("leftShoulder", (0.055, 0.90, 0.0), "upperChest")
-    b_l_ua = _add_bone("leftUpperArm", (0.125, 0.89, 0.0), "leftShoulder")
-    b_l_la = _add_bone("leftLowerArm", (0.285, 0.89, 0.0), "leftUpperArm")
-    b_l_hd = _add_bone("leftHand", (0.435, 0.89, 0.0), "leftLowerArm")
+    b_l_sh = _add_bone("leftShoulder", (0.060, 0.99, 0.0), "upperChest")
+    b_l_ua = _add_bone("leftUpperArm", (0.138, 0.98, 0.0), "leftShoulder")
+    b_l_la = _add_bone("leftLowerArm", (0.310, 0.98, 0.0), "leftUpperArm")
+    b_l_hd = _add_bone("leftHand", (0.470, 0.98, 0.0), "leftLowerArm")
 
-    b_r_sh = _add_bone("rightShoulder", (-0.055, 0.90, 0.0), "upperChest")
-    b_r_ua = _add_bone("rightUpperArm", (-0.125, 0.89, 0.0), "rightShoulder")
-    b_r_la = _add_bone("rightLowerArm", (-0.285, 0.89, 0.0), "rightUpperArm")
-    b_r_hd = _add_bone("rightHand", (-0.435, 0.89, 0.0), "rightLowerArm")
+    b_r_sh = _add_bone("rightShoulder", (-0.060, 0.99, 0.0), "upperChest")
+    b_r_ua = _add_bone("rightUpperArm", (-0.138, 0.98, 0.0), "rightShoulder")
+    b_r_la = _add_bone("rightLowerArm", (-0.310, 0.98, 0.0), "rightUpperArm")
+    b_r_hd = _add_bone("rightHand", (-0.470, 0.98, 0.0), "rightLowerArm")
 
-    b_l_ul = _add_bone("leftUpperLeg", (0.095, 0.54, 0.0), "hips")
-    b_l_ll = _add_bone("leftLowerLeg", (0.100, 0.28, 0.0), "leftUpperLeg")
-    b_l_ft = _add_bone("leftFoot", (0.100, 0.055, 0.015), "leftLowerLeg")
+    b_l_ul = _add_bone("leftUpperLeg", (0.098, 0.60, 0.0), "hips")
+    b_l_ll = _add_bone("leftLowerLeg", (0.100, 0.31, 0.0), "leftUpperLeg")
+    b_l_ft = _add_bone("leftFoot", (0.100, 0.058, 0.015), "leftLowerLeg")
 
-    b_r_ul = _add_bone("rightUpperLeg", (-0.095, 0.54, 0.0), "hips")
-    b_r_ll = _add_bone("rightLowerLeg", (-0.100, 0.28, 0.0), "rightUpperLeg")
-    b_r_ft = _add_bone("rightFoot", (-0.100, 0.055, 0.015), "rightLowerLeg")
+    b_r_ul = _add_bone("rightUpperLeg", (-0.098, 0.60, 0.0), "hips")
+    b_r_ll = _add_bone("rightLowerLeg", (-0.100, 0.31, 0.0), "rightUpperLeg")
+    b_r_ft = _add_bone("rightFoot", (-0.100, 0.058, 0.015), "rightLowerLeg")
 
-    # Rabo-de-cavalo esvoaçante arqueando graciosamente para trás/lado (sem jamais atravessar a capa!)
-    b_pt0 = _add_bone("ponytail_0", (0.04, 1.24, -0.15), "head")
-    b_pt1 = _add_bone("ponytail_1", (0.20, 0.98, -0.27), "ponytail_0")
-    b_pt2 = _add_bone("ponytail_2", (0.34, 0.64, -0.32), "ponytail_1")
-    b_pt3 = _add_bone("ponytail_3", (0.42, 0.28, -0.30), "ponytail_2")
+    # Cadeias SpringBone para cabelos longos ondulados (centro, esquerda, direita e mechas frontais!)
+    b_hc0 = _add_bone("hair_c_0", (0.0, 1.24, -0.15), "head")
+    b_hc1 = _add_bone("hair_c_1", (0.0, 0.96, -0.20), "hair_c_0")
+    b_hc2 = _add_bone("hair_c_2", (0.0, 0.66, -0.22), "hair_c_1")
 
-    b_hl0 = _add_bone("hair_l_0", (0.12, 1.12, 0.045), "head")
-    b_hl1 = _add_bone("hair_l_1", (0.13, 0.94, 0.035), "hair_l_0")
-    b_hr0 = _add_bone("hair_r_0", (-0.12, 1.12, 0.045), "head")
-    b_hr1 = _add_bone("hair_r_1", (-0.13, 0.94, 0.035), "hair_r_0")
+    b_hl0 = _add_bone("hair_l_0", (0.13, 1.22, -0.04), "head")
+    b_hl1 = _add_bone("hair_l_1", (0.16, 0.96, -0.07), "hair_l_0")
+    b_hl2 = _add_bone("hair_l_2", (0.18, 0.68, -0.10), "hair_l_1")
 
-    # Abas da capa abertas em V largo para emoldurar e revelar 100% o vão entre as coxas!
-    b_cl0 = _add_bone("cape_l_0", (0.14, 0.89, -0.10), "upperChest")
-    b_cl1 = _add_bone("cape_l_1", (0.28, 0.60, -0.15), "cape_l_0")
-    b_cl2 = _add_bone("cape_l_2", (0.44, 0.20, -0.19), "cape_l_1")
-
-    b_cr0 = _add_bone("cape_r_0", (-0.14, 0.89, -0.10), "upperChest")
-    b_cr1 = _add_bone("cape_r_1", (-0.28, 0.60, -0.15), "cape_r_0")
-    b_cr2 = _add_bone("cape_r_2", (-0.44, 0.20, -0.19), "cape_r_1")
-
-    b_halo = _add_bone("halo_ring", (0.0, 1.18, -0.19), "upperChest")
+    b_hr0 = _add_bone("hair_r_0", (-0.13, 1.22, -0.04), "head")
+    b_hr1 = _add_bone("hair_r_1", (-0.16, 0.96, -0.07), "hair_r_0")
+    b_hr2 = _add_bone("hair_r_2", (-0.18, 0.68, -0.10), "hair_r_1")
 
     humanoid_bones = {
         "hips": b_hips, "spine": b_spine, "chest": b_chest, "upperChest": b_uchest,
@@ -689,114 +1036,114 @@ def build_dungeon_squad_model(persona: Persona, outfit_key: str = "starlight") -
         inv_bind[j, :3, 3] = -world_pos[j]
     skin = VrmSkin(joints=list(range(n_joints)), inv_bind_matrices=inv_bind)
 
-    # ── 2. Materiais ──
-    hr_f, hg_f, hb_f = hair_rgb[0] / 255.0, hair_rgb[1] / 255.0, hair_rgb[2] / 255.0
-    sr_f, sg_f, sb_f = skin_rgb[0] / 255.0, skin_rgb[1] / 255.0, skin_rgb[2] / 255.0
-    tr_f, tg_f, tb_f = trim_rgb[0] / 255.0, trim_rgb[1] / 255.0, trim_rgb[2] / 255.0
+    # ── 2. Materiais Pictóricos HD (1024×1024 / 512×512) ──
+    tr_f, tg_f, tb_f = arch.trim_rgb[0] / 255.0, arch.trim_rgb[1] / 255.0, arch.trim_rgb[2] / 255.0
+    ar_f, ag_f, ab_f = arch.accent_rgb[0] / 255.0, arch.accent_rgb[1] / 255.0, arch.accent_rgb[2] / 255.0
 
     materials = [
-        VrmMaterial(0, "ds_face", "face", (1.0, 1.0, 1.0, 1.0), (0.86, 0.76, 0.80), _make_anime_face_texture(skin_rgb, eye_rgb, hair_rgb)),
-        VrmMaterial(1, "ds_torso", "tops", (1.0, 1.0, 1.0, 1.0), (0.72, 0.64, 0.78), _make_bodysuit_torso_texture(skin_rgb, suit_rgb, trim_rgb, accent_rgb, style)),
-        VrmMaterial(2, "ds_bust", "skin", (1.0, 1.0, 1.0, 1.0), (0.80, 0.68, 0.76), _make_bust_texture(skin_rgb, suit_rgb, trim_rgb, accent_rgb)),
-        VrmMaterial(3, "ds_legs", "bottoms", (1.0, 1.0, 1.0, 1.0), (0.76, 0.66, 0.78), _make_leg_texture(skin_rgb, boot_rgb, trim_rgb, accent_rgb, style)),
-        VrmMaterial(4, "ds_arms", "skin", (1.0, 1.0, 1.0, 1.0), (0.78, 0.68, 0.76), _make_arm_texture(skin_rgb, suit_rgb, trim_rgb, accent_rgb)),
-        VrmMaterial(5, "ds_hair", "hair", (hr_f, hg_f, hb_f, 1.0), (hr_f * 0.60, hg_f * 0.58, min(1.0, hb_f * 0.74)), None, double_sided=True),
-        VrmMaterial(6, "ds_cape", "cape", (1.0, 1.0, 1.0, 1.0), (0.56, 0.52, 0.66), _make_cape_texture(cape_out, cape_in, trim_rgb), double_sided=True),
-        VrmMaterial(7, "ds_gold", "gold", (tr_f, tg_f, tb_f, 1.0), (tr_f * 0.62, tg_f * 0.50, tb_f * 0.34), None),
-        VrmMaterial(8, "ds_halo_emissive", "emissive", (halo_col[0], halo_col[1], halo_col[2], 1.0), (1.0, 0.92, 0.68), None, double_sided=True),
-        VrmMaterial(9, "ds_flame_emissive", "emissive", (flame_col[0], flame_col[1], flame_col[2], 1.0), (0.8, 0.95, 1.0), None, double_sided=True),
-        VrmMaterial(10, "ds_eyelid", "skin", (sr_f, sg_f, sb_f, 1.0), (sr_f * 0.85, sg_f * 0.78, sb_f * 0.80), None),
+        VrmMaterial(0, "tos_face", "face", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_tos_face_texture(arch)),
+        VrmMaterial(1, "tos_torso", "skin", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_corset_torso_texture(arch, outfit_key)),
+        VrmMaterial(2, "tos_bust", "skin", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_bust_texture(arch, outfit_key)),
+        VrmMaterial(3, "tos_legs", "skin", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_leg_texture(arch, outfit_key)),
+        VrmMaterial(4, "tos_arms", "skin", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_arm_texture(arch, outfit_key)),
+        VrmMaterial(5, "tos_hair", "hair", (1.0, 1.0, 1.0, 1.0), arch.hair_shade, _make_painted_hair_texture(arch), double_sided=True),
+        VrmMaterial(6, "tos_skirt", "bottoms", (1.0, 1.0, 1.0, 1.0), (0.58, 0.44, 0.44), _make_skirt_texture(arch), double_sided=True),
+        VrmMaterial(7, "tos_lace", "tops", (tr_f, tg_f, tb_f, 1.0), (0.80, 0.76, 0.78), None, double_sided=True),
+        VrmMaterial(8, "tos_gold", "gold", (ar_f, ag_f, ab_f, 1.0), (ar_f * 0.60, ag_f * 0.48, ab_f * 0.34), None),
+        VrmMaterial(9, "tos_ears", "skin", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_ear_texture(arch)),
+        VrmMaterial(10, "tos_eyelid", "face", (1.0, 1.0, 1.0, 1.0), arch.skin_shade, _make_eyelid_texture(arch)),
     ]
 
     primitives: list[VrmPrimitive] = []
 
-    # ── 3. Tronco Ampulheta Esculpido ──
+    # ── 3. Tronco Ampulheta Esculpido (Alta Densidade 36 segmentos!) ──
     mb_torso = _MeshBuilder(material_index=1)
 
     def _torso_shape(theta: float, v: float) -> tuple[float, float]:
         back = max(0.0, -math.cos(theta))
-        hip_zone = math.exp(-((v - 0.16) / 0.14) ** 2)
-        return (1.0, 1.0 + back * 0.26 * hip_zone)
+        hip_zone = math.exp(-((v - 0.16) / 0.15) ** 2)
+        return (1.0, 1.0 + back * 0.28 * hip_zone)
 
     torso_rings = [
-        (np.array([0.0, 0.45, 0.0], dtype=np.float32), 0.120, 0.095, 0.00, -0.005, b_hips, b_hips, 0.0),
-        (np.array([0.0, 0.50, 0.0], dtype=np.float32), 0.168, 0.124, 0.10, -0.012, b_hips, b_hips, 0.0),
-        (np.array([0.0, 0.56, 0.0], dtype=np.float32), 0.174, 0.128, 0.20, -0.014, b_hips, b_spine, 0.15),
-        (np.array([0.0, 0.63, 0.0], dtype=np.float32), 0.120, 0.092, 0.32, -0.006, b_hips, b_spine, 0.65),
-        (np.array([0.0, 0.70, 0.0], dtype=np.float32), 0.086, 0.072, 0.44,  0.002, b_spine, b_chest, 0.30),
-        (np.array([0.0, 0.77, 0.0], dtype=np.float32), 0.108, 0.086, 0.58,  0.005, b_chest, b_chest, 0.0),
-        (np.array([0.0, 0.85, 0.0], dtype=np.float32), 0.122, 0.092, 0.72,  0.002, b_chest, b_uchest, 0.65),
-        (np.array([0.0, 0.91, 0.0], dtype=np.float32), 0.108, 0.076, 0.82, -0.004, b_uchest, b_neck, 0.25),
-        (np.array([0.0, 0.95, 0.0], dtype=np.float32), 0.045, 0.044, 0.90, -0.004, b_neck, b_head, 0.25),
-        (np.array([0.0, 1.02, 0.0], dtype=np.float32), 0.042, 0.042, 1.00, -0.004, b_neck, b_head, 0.75),
+        (np.array([0.0, 0.50, 0.0], dtype=np.float32), 0.122, 0.096, 0.00, -0.005, b_hips, b_hips, 0.0),
+        (np.array([0.0, 0.56, 0.0], dtype=np.float32), 0.172, 0.126, 0.10, -0.012, b_hips, b_hips, 0.0),
+        (np.array([0.0, 0.62, 0.0], dtype=np.float32), 0.176, 0.128, 0.20, -0.014, b_hips, b_spine, 0.15),
+        (np.array([0.0, 0.70, 0.0], dtype=np.float32), 0.116, 0.090, 0.32, -0.005, b_hips, b_spine, 0.65),
+        (np.array([0.0, 0.77, 0.0], dtype=np.float32), 0.088, 0.072, 0.44,  0.002, b_spine, b_chest, 0.32),
+        (np.array([0.0, 0.85, 0.0], dtype=np.float32), 0.112, 0.088, 0.58,  0.004, b_chest, b_chest, 0.0),
+        (np.array([0.0, 0.93, 0.0], dtype=np.float32), 0.128, 0.094, 0.72,  0.002, b_chest, b_uchest, 0.65),
+        (np.array([0.0, 1.00, 0.0], dtype=np.float32), 0.118, 0.076, 0.83, -0.004, b_uchest, b_neck, 0.25),
+        (np.array([0.0, 1.05, 0.0], dtype=np.float32), 0.045, 0.044, 0.91, -0.004, b_neck, b_head, 0.25),
+        (np.array([0.0, 1.13, 0.0], dtype=np.float32), 0.042, 0.042, 1.00, -0.004, b_neck, b_head, 0.75),
     ]
-    mb_torso.add_loft(torso_rings, n_seg=28, shape_fn=_torso_shape, cap_bottom=True, cap_top=True)
+    mb_torso.add_loft(torso_rings, n_seg=36, shape_fn=_torso_shape, cap_bottom=True, cap_top=True)
     primitives.append(mb_torso.build(mesh_index=len(primitives)))
 
-    # ── 4. Busto Voluptuoso Esculpido ──
+    # ── 4. Busto Voluptuoso Esculpido Suavemente ──
     mb_bust = _MeshBuilder(material_index=2)
     for sign in (-1.0, 1.0):
         def _bust_deform(x: float, y: float, z: float, u: float, v: float, s: float = sign) -> tuple[float, float, float]:
-            drop = -0.014 * max(0.0, z / 0.095)
-            flare = s * 0.012 * max(0.0, z / 0.095)
+            drop = -0.016 * max(0.0, z / 0.10)
+            flare = s * 0.014 * max(0.0, z / 0.10)
             return (x + flare, y + drop, z)
 
         mb_bust.add_ellipsoid(
-            center=(sign * 0.068, 0.822, 0.088),
-            radii=(0.082, 0.084, 0.092),
+            center=(sign * 0.070, 0.902, 0.090),
+            radii=(0.086, 0.088, 0.096),
             joint_idx=b_chest,
-            n_lat=14,
-            n_lon=20,
+            n_lat=20,
+            n_lon=28,
             deform_fn=_bust_deform,
             joint_b=b_uchest,
-            weight_b_fn=lambda v: 0.30 * v,
+            weight_b_fn=lambda v: 0.28 * v,
         )
     primitives.append(mb_bust.build(mesh_index=len(primitives)))
 
-    # ── 5. Coxas Grossas Voluptuosas, Panturrilhas e Botas de Salto Alto ──
+    # ── 5. Coxas Curvas Voluptuosas, Panturrilhas e Botas Fantasia ──
     mb_legs = _MeshBuilder(material_index=3)
     for side, j_ul, j_ll, j_ft in ((1.0, b_l_ul, b_l_ll, b_l_ft), (-1.0, b_r_ul, b_r_ll, b_r_ft)):
-        lx = side * 0.098
+        lx = side * 0.100
 
         def _thigh_shape(theta: float, v: float, s: float = side) -> tuple[float, float]:
             outer = max(0.0, s * math.sin(theta))
             thigh_bulge = math.exp(-((v - 0.78) / 0.18) ** 2)
             calf_back = max(0.0, -math.cos(theta)) * math.exp(-((v - 0.34) / 0.14) ** 2)
-            return (1.0 + outer * 0.25 * thigh_bulge, 1.0 + calf_back * 0.22)
+            return (1.0 + outer * 0.24 * thigh_bulge, 1.0 + calf_back * 0.22)
 
         leg_rings = [
-            (np.array([lx, 0.005, 0.032], dtype=np.float32), 0.036, 0.068, 0.00, 0.012, j_ft, j_ft, 0.0),
-            (np.array([lx, 0.055, 0.012], dtype=np.float32), 0.038, 0.044, 0.08, 0.000, j_ft, j_ll, 0.35),
-            (np.array([lx, 0.125, 0.000], dtype=np.float32), 0.042, 0.045, 0.20, -0.004, j_ll, j_ll, 0.0),
-            (np.array([lx, 0.215, 0.000], dtype=np.float32), 0.058, 0.062, 0.36, -0.008, j_ll, j_ll, 0.0),
-            (np.array([lx, 0.285, 0.004], dtype=np.float32), 0.062, 0.064, 0.50,  0.004, j_ll, j_ul, 0.50),
-            (np.array([lx, 0.365, 0.004], dtype=np.float32), 0.085, 0.089, 0.64,  0.002, j_ul, j_ul, 0.0),
-            (np.array([lx, 0.455, 0.002], dtype=np.float32), 0.106, 0.110, 0.80, -0.004, j_ul, b_hips, 0.18),
-            (np.array([lx * 0.92, 0.540, 0.000], dtype=np.float32), 0.108, 0.112, 0.94, -0.008, j_ul, b_hips, 0.58),
-            (np.array([lx * 0.78, 0.580, 0.000], dtype=np.float32), 0.086, 0.090, 1.00, -0.006, b_hips, b_hips, 0.0),
+            (np.array([lx, 0.005, 0.036], dtype=np.float32), 0.038, 0.070, 0.00, 0.012, j_ft, j_ft, 0.0),
+            (np.array([lx, 0.060, 0.012], dtype=np.float32), 0.038, 0.044, 0.08, 0.000, j_ft, j_ll, 0.35),
+            (np.array([lx, 0.140, 0.000], dtype=np.float32), 0.043, 0.046, 0.20, -0.004, j_ll, j_ll, 0.0),
+            (np.array([lx, 0.240, 0.000], dtype=np.float32), 0.058, 0.062, 0.36, -0.008, j_ll, j_ll, 0.0),
+            (np.array([lx, 0.315, 0.004], dtype=np.float32), 0.062, 0.064, 0.50,  0.004, j_ll, j_ul, 0.50),
+            (np.array([lx, 0.405, 0.004], dtype=np.float32), 0.086, 0.090, 0.64,  0.002, j_ul, j_ul, 0.0),
+            (np.array([lx, 0.505, 0.002], dtype=np.float32), 0.106, 0.110, 0.80, -0.004, j_ul, b_hips, 0.18),
+            (np.array([lx * 0.92, 0.595, 0.000], dtype=np.float32), 0.108, 0.112, 0.94, -0.008, j_ul, b_hips, 0.58),
+            (np.array([lx * 0.78, 0.640, 0.000], dtype=np.float32), 0.088, 0.092, 1.00, -0.006, b_hips, b_hips, 0.0),
         ]
-        mb_legs.add_loft(leg_rings, n_seg=22, shape_fn=_thigh_shape, cap_bottom=True, cap_top=True)
-        mb_legs.add_diamond_spike((lx, 0.055, -0.030), (0.0, -1.0, -0.08), 0.055, 0.015, j_ft)
+        mb_legs.add_loft(leg_rings, n_seg=28, shape_fn=_thigh_shape, cap_bottom=True, cap_top=True)
+        if not is_base_layer:
+            mb_legs.add_diamond_spike((lx, 0.058, -0.030), (0.0, -1.0, -0.08), 0.058, 0.016, j_ft)
     primitives.append(mb_legs.build(mesh_index=len(primitives)))
 
-    # ── 6. Braços Delicados e Mãos com Luvas Longas ──
+    # ── 6. Braços Delicados e Luvas de Aventureira ──
     mb_arms = _MeshBuilder(material_index=4)
     for side, j_sh, j_ua, j_la, j_hd in (
         (1.0, b_l_sh, b_l_ua, b_l_la, b_l_hd),
         (-1.0, b_r_sh, b_r_ua, b_r_la, b_r_hd),
     ):
         arm_stations = [
-            (0.115, 0.042, 0.042, 0.00, j_sh, j_ua, 0.60),
-            (0.165, 0.038, 0.038, 0.20, j_ua, j_ua, 0.00),
-            (0.235, 0.034, 0.034, 0.42, j_ua, j_la, 0.15),
-            (0.285, 0.031, 0.031, 0.56, j_ua, j_la, 0.55),
-            (0.355, 0.029, 0.029, 0.74, j_la, j_la, 0.00),
-            (0.425, 0.023, 0.021, 0.90, j_la, j_hd, 0.70),
-            (0.470, 0.030, 0.017, 0.97, j_hd, j_hd, 0.00),
-            (0.505, 0.016, 0.011, 1.00, j_hd, j_hd, 0.00),
+            (0.125, 0.044, 0.044, 0.00, j_sh, j_ua, 0.60),
+            (0.180, 0.039, 0.039, 0.20, j_ua, j_ua, 0.00),
+            (0.255, 0.035, 0.035, 0.42, j_ua, j_la, 0.15),
+            (0.310, 0.032, 0.032, 0.56, j_ua, j_la, 0.55),
+            (0.385, 0.031, 0.031, 0.74, j_la, j_la, 0.00),
+            (0.455, 0.025, 0.023, 0.90, j_la, j_hd, 0.70),
+            (0.500, 0.032, 0.018, 0.97, j_hd, j_hd, 0.00),
+            (0.535, 0.017, 0.011, 1.00, j_hd, j_hd, 0.00),
         ]
         n_r = len(arm_stations)
-        n_seg = 14
+        n_seg = 18
         pos = np.zeros((n_r, n_seg + 1, 3), dtype=np.float32)
         uv = np.zeros((n_r, n_seg + 1, 2), dtype=np.float32)
         jts = np.zeros((n_r, n_seg + 1, 4), dtype=np.float32)
@@ -805,203 +1152,197 @@ def build_dungeon_squad_model(persona: Persona, outfit_key: str = "starlight") -
             for c in range(n_seg + 1):
                 u = c / n_seg
                 ang = u * math.tau
-                pos[r, c] = (side * x_off, 0.89 + math.cos(ang) * ry, math.sin(ang) * rz)
+                pos[r, c] = (side * x_off, 0.98 + math.cos(ang) * ry, math.sin(ang) * rz)
                 uv[r, c] = (u, v_c)
                 jts[r, c] = (float(j0), float(j1), 0.0, 0.0)
                 wts[r, c] = (1.0 - w1, w1, 0.0, 0.0)
         mb_arms.add_grid(pos, uv, jts, wts, wrap_u=True, flip_winding=(side < 0))
     primitives.append(mb_arms.build(mesh_index=len(primitives)))
 
-    # ── 7. Cabeça Anime Fofa e Compacta (estilo Titan / Priestess!) ──
+    # ── 7. Cabeça Anime HD Esculpida (36×48, queixo delicado + nariz anime sutil!) ──
     mb_head = _MeshBuilder(material_index=0)
 
     def _head_deform(x: float, y: float, z: float, u: float, v: float) -> tuple[float, float, float]:
-        chin_t = max(0.0, (0.40 - v) / 0.40)
-        x_scale = 1.0 - 0.28 * (chin_t ** 1.35)
-        z_scale = 1.0 - 0.16 * (chin_t ** 1.35)
-        if z > 0.0:
-            z *= 0.93
-        return (x * x_scale, y, z * z_scale)
+        # Queixo anime em V macio na parte inferior (v < 0.42)
+        chin_t = max(0.0, (0.42 - v) / 0.42)
+        x_scale = 1.0 - 0.30 * (chin_t ** 1.38)
+        z_scale = 1.0 - 0.14 * (chin_t ** 1.35)
+        # Bochechas macias e femininas (v ~ 0.36..0.52)
+        cheek = math.exp(-((v - 0.42) / 0.10) ** 2) * max(0.0, z / 0.14)
+        x_scale += 0.045 * cheek
+        # Narizinho anime sutil e arrebitado em 3D (visível no perfil 3/4 sem sujar a frente!)
+        du = (u - 0.50) / 0.026
+        dv = (v - 0.38) / 0.045
+        nose = 0.014 * math.exp(-(du * du + dv * dv)) if z > 0 else 0.0
+        # Leve achatamento frontal na zona dos olhos para máxima legibilidade!
+        z_out = z * (0.94 if z > 0 else 1.0) * z_scale + nose
+        return (x * x_scale, y, z_out)
 
     mb_head.add_ellipsoid(
-        center=(0.0, 1.125, 0.008),
-        radii=(0.138, 0.144, 0.134),
+        center=(0.0, 1.245, 0.008),
+        radii=(0.142, 0.152, 0.138),
         joint_idx=b_head,
-        n_lat=22,
-        n_lon=32,
+        n_lat=36,
+        n_lon=48,
         deform_fn=_head_deform,
     )
     primitives.append(mb_head.build(mesh_index=len(primitives)))
 
-    # ── 7b. Pálpebras animadas por Morph Target (blink / happy / sleepy!) ──
+    # ── 7b. Pálpebras animadas por Morph Target (piscar suave + sorriso feliz!) ──
     mb_lid = _MeshBuilder(material_index=10)
     for sign in (-1.0, 1.0):
         mb_lid.add_ellipsoid(
-            center=(sign * 0.050, 1.114, 0.118),
-            radii=(0.034, 0.025, 0.015),
+            center=(sign * 0.052, 1.224, 0.123),
+            radii=(0.036, 0.025, 0.014),
             joint_idx=b_head,
-            n_lat=8,
-            n_lon=12,
+            n_lat=10,
+            n_lon=14,
         )
     lid_prim = mb_lid.build(mesh_index=len(primitives))
     open_pos = lid_prim.positions.copy()
     closed_pos = lid_prim.positions.copy()
     open_pos[:, 2] -= 0.036
     open_pos[:, 1] += 0.012
-    closed_pos[:, 2] += 0.008
+    closed_pos[:, 2] += 0.009
     lid_prim.positions = open_pos
     lid_prim.morph_deltas = [closed_pos - open_pos]
     lid_mesh_idx = len(primitives)
     primitives.append(lid_prim)
 
-    # ── 8. Cabelo Anime Volumoso (Franja Longa Fofa + Mechas Laterais + Rabo-de-Cavalo Esvoaçante!) ──
+    # ── 7c. Orelhas Élficas Longas em 3D (assinatura da Lyra / Elfa Loira!) ──
+    if arch.elf_ears:
+        mb_ears = _MeshBuilder(material_index=9)
+        mb_ears.add_elf_ear(1.0, (0.122, 1.225, -0.008), b_head)
+        mb_ears.add_elf_ear(-1.0, (-0.122, 1.225, -0.008), b_head)
+        primitives.append(mb_ears.build(mesh_index=len(primitives)))
+
+    # ── 8. Cabelo Multicamadas Pintado à Mão (Ondulado Longo p/ Elfa Loira + suporte aos 4 estilos!) ──
     mb_hair = _MeshBuilder(material_index=5)
+    # Volume macio do topo/coroa do cabelo
     mb_hair.add_ellipsoid(
-        center=(0.0, 1.148, -0.014),
-        radii=(0.156, 0.152, 0.152),
+        center=(0.0, 1.275, -0.014),
+        radii=(0.156, 0.154, 0.154),
         joint_idx=b_head,
-        n_lat=16,
-        n_lon=24,
-        deform_fn=lambda x, y, z, u, v: (x, y if v > 0.25 else y + 0.03, z if z < 0.075 else 0.075),
+        n_lat=22,
+        n_lon=32,
+        deform_fn=lambda x, y, z, u, v: (x, y if v > 0.28 else y + 0.035, z if z < 0.088 else 0.088),
     )
 
-    # Franja espessa cobrindo toda a testa até logo acima dos olhos (estilo Titan_idle & Valkyrie!)
-    bang_configs = [
-        (-0.098, 0.046, 1.095, 0.132),
-        (-0.048, 0.045, 1.122, 0.150),
-        (0.000,  0.046, 1.112, 0.154),
-        (0.048,  0.045, 1.122, 0.150),
-        (0.098,  0.046, 1.095, 0.132),
+    # Coroa penteada para trás com ondas suaves + mechas soltas emoldurando a testa (estilo 8d09d44e.jpg!)
+    if arch.hair_style == "wavy_long":
+        # Mechas onduladas puxadas suavemente para trás nas laterais da testa (mostrando os olhos verdes e sobrancelhas!)
+        for sign in (-1.0, 1.0):
+            crown_wave = [
+                (np.array([sign * 0.015, 1.405, 0.068], dtype=np.float32), 0.045, 1.0, b_head, b_head, 0.0),
+                (np.array([sign * 0.082, 1.372, 0.095], dtype=np.float32), 0.056, 1.15, b_head, b_head, 0.0),
+                (np.array([sign * 0.140, 1.305, 0.065], dtype=np.float32), 0.050, 1.05, b_head, b_head, 0.0),
+                (np.array([sign * 0.154, 1.240, 0.005], dtype=np.float32), 0.044, 0.90, b_head, b_head, 0.0),
+            ]
+            mb_hair.add_ribbon(crown_wave, n_across=5, thickness=0.024, arch_z=0.014)
+
+            # Mecha fina solta caindo em S delicado na têmpora/bochecha (detalhe encantador da Elfa!)
+            wisp = [
+                (np.array([sign * 0.065, 1.365, 0.118], dtype=np.float32), 0.020, 0.85, b_head, b_head, 0.0),
+                (np.array([sign * 0.105, 1.295, 0.122], dtype=np.float32), 0.022, 0.85, b_head, b_head, 0.0),
+                (np.array([sign * 0.132, 1.205, 0.102], dtype=np.float32), 0.018, 0.70, b_head, b_head, 0.0),
+                (np.array([sign * 0.125, 1.125, 0.082], dtype=np.float32), 0.008, 0.40, b_head, b_head, 0.0),
+            ]
+            mb_hair.add_ribbon(wisp, n_across=4, thickness=0.013, arch_z=0.008)
+
+            # Mecha longa ondulada caindo atrás da orelha élfica sobre o ombro/peito!
+            j0, j1, j2 = (b_hl0, b_hl1, b_hl2) if sign > 0 else (b_hr0, b_hr1, b_hr2)
+            side_lock = [
+                (np.array([sign * 0.135, 1.26, -0.02], dtype=np.float32), 0.048, 1.0, b_head, j0, 0.40),
+                (np.array([sign * 0.172, 1.11, -0.03], dtype=np.float32), 0.060, 1.05, j0, j1, 0.35),
+                (np.array([sign * 0.195, 0.96,  0.01], dtype=np.float32), 0.064, 1.0, j1, j1, 0.0),
+                (np.array([sign * 0.185, 0.80,  0.03], dtype=np.float32), 0.052, 0.85, j1, j2, 0.65),
+                (np.array([sign * 0.210, 0.66,  0.00], dtype=np.float32), 0.024, 0.50, j2, j2, 0.0),
+            ]
+            mb_hair.add_ribbon(side_lock, n_across=5, thickness=0.026, arch_z=0.014)
+    else:
+        # Franja cheia versátil para Ruiva / Androide Rosa / Vampira
+        for bx, bw, bot_y, fz in ((-0.095, 0.044, 1.22, 0.138), (-0.045, 0.044, 1.25, 0.152), (0.005, 0.046, 1.24, 0.155), (0.055, 0.044, 1.25, 0.152), (0.100, 0.044, 1.22, 0.138)):
+            pts = [
+                (np.array([bx * 0.62, 1.395, 0.045], dtype=np.float32), bw * 0.78, 1.0, b_head, b_head, 0.0),
+                (np.array([bx * 0.88, 1.325, fz * 0.94], dtype=np.float32), bw * 0.95, 1.1, b_head, b_head, 0.0),
+                (np.array([bx, bot_y + 0.035, fz], dtype=np.float32), bw * 0.85, 0.9, b_head, b_head, 0.0),
+                (np.array([bx * 1.03, bot_y, fz * 0.96], dtype=np.float32), bw * 0.25, 0.45, b_head, b_head, 0.0),
+            ]
+            mb_hair.add_ribbon(pts, n_across=4, thickness=0.020, arch_z=0.011)
+
+    # 7 mechas longas onduladas nas costas (leque volumoso que ondula com vento e caminhada 360°!)
+    back_specs = [
+        (-0.145, -0.095, 0.072, 0.60, b_hr0, b_hr1, b_hr2, -0.03),
+        (-0.095, -0.145, 0.078, 0.54, b_hr0, b_hr1, b_hr2,  0.02),
+        (-0.045, -0.165, 0.082, 0.48, b_hc0, b_hc1, b_hc2, -0.02),
+        ( 0.000, -0.172, 0.086, 0.46, b_hc0, b_hc1, b_hc2,  0.025),
+        ( 0.045, -0.165, 0.082, 0.48, b_hc0, b_hc1, b_hc2, -0.02),
+        ( 0.095, -0.145, 0.078, 0.54, b_hl0, b_hl1, b_hl2,  0.02),
+        ( 0.145, -0.095, 0.072, 0.60, b_hl0, b_hl1, b_hl2, -0.03),
     ]
-    for bx, bw, bot_y, front_z in bang_configs:
+    for bx, bz, bw, end_y, j0, j1, j2, sway_w in back_specs:
         pts = [
-            (np.array([bx * 0.62, 1.280, 0.040], dtype=np.float32), bw * 0.75, 1.0, b_head, b_head, 0.0),
-            (np.array([bx * 0.88, 1.210, front_z * 0.94], dtype=np.float32), bw * 0.95, 1.1, b_head, b_head, 0.0),
-            (np.array([bx, bot_y + 0.036, front_z], dtype=np.float32), bw * 0.88, 0.92, b_head, b_head, 0.0),
-            (np.array([bx * 1.02, bot_y, front_z * 0.96], dtype=np.float32), bw * 0.26, 0.45, b_head, b_head, 0.0),
+            (np.array([bx * 0.72, 1.32, bz * 0.85], dtype=np.float32), bw * 0.82, 1.0, b_head, j0, 0.35),
+            (np.array([bx * 1.02, 1.15, bz * 1.12], dtype=np.float32), bw * 1.05, 1.1, j0, j0, 0.0),
+            (np.array([bx * 1.18 + sway_w, 0.96, bz * 1.24 - 0.02], dtype=np.float32), bw * 1.15, 1.0, j0, j1, 0.65),
+            (np.array([bx * 1.28 - sway_w, 0.76, bz * 1.22 - 0.03], dtype=np.float32), bw * 0.98, 0.85, j1, j2, 0.55),
+            (np.array([bx * 1.35 + sway_w, end_y + 0.08, bz * 1.15 - 0.02], dtype=np.float32), bw * 0.55, 0.60, j2, j2, 0.0),
+            (np.array([bx * 1.38, end_y, bz * 1.10], dtype=np.float32), bw * 0.12, 0.28, j2, j2, 0.0),
         ]
-        mb_hair.add_ribbon(pts, n_across=4, thickness=0.022, arch_z=0.012)
-
-    # Mechas laterais abraçando delicadamente o contorno das bochechas
-    for sign, j0, j1 in ((1.0, b_hl0, b_hl1), (-1.0, b_hr0, b_hr1)):
-        pts = [
-            (np.array([sign * 0.125, 1.20, 0.048], dtype=np.float32), 0.036, 1.0, b_head, j0, 0.35),
-            (np.array([sign * 0.140, 1.09, 0.062], dtype=np.float32), 0.040, 1.0, j0, j0, 0.0),
-            (np.array([sign * 0.142, 0.97, 0.052], dtype=np.float32), 0.030, 0.8, j0, j1, 0.70),
-            (np.array([sign * 0.126, 0.88, 0.038], dtype=np.float32), 0.010, 0.4, j1, j1, 0.0),
-        ]
-        mb_hair.add_ribbon(pts, n_across=4, thickness=0.020, arch_z=0.010, side_axis=np.array([0.0, 0.0, 1.0], dtype=np.float32))
-
-    # Rabo-de-cavalo alto arqueando para trás e para o lado (sem nunca furar a capa!)
-    top_knot = [
-        (np.array([0.01, 1.25, -0.09], dtype=np.float32), 0.054, 1.1, b_head, b_pt0, 0.35),
-        (np.array([0.04, 1.35, -0.14], dtype=np.float32), 0.064, 1.25, b_pt0, b_pt0, 0.0),
-        (np.array([0.11, 1.22, -0.22], dtype=np.float32), 0.088, 1.2, b_pt0, b_pt1, 0.50),
-        (np.array([0.24, 0.92, -0.28], dtype=np.float32), 0.110, 1.1, b_pt1, b_pt2, 0.45),
-        (np.array([0.36, 0.58, -0.31], dtype=np.float32), 0.088, 0.9, b_pt2, b_pt3, 0.55),
-        (np.array([0.44, 0.24, -0.28], dtype=np.float32), 0.032, 0.45, b_pt3, b_pt3, 0.0),
-        (np.array([0.47, 0.12, -0.25], dtype=np.float32), 0.008, 0.20, b_pt3, b_pt3, 0.0),
-    ]
-    mb_hair.add_ribbon(top_knot, n_across=5, thickness=0.038, arch_z=0.018)
-
-    tail_2 = [
-        (np.array([-0.03, 1.22, -0.13], dtype=np.float32), 0.068, 1.0, b_head, b_pt0, 0.45),
-        (np.array([0.06, 0.96, -0.23], dtype=np.float32), 0.086, 0.95, b_pt0, b_pt1, 0.65),
-        (np.array([0.17, 0.64, -0.27], dtype=np.float32), 0.072, 0.80, b_pt1, b_pt2, 0.70),
-        (np.array([0.26, 0.30, -0.25], dtype=np.float32), 0.024, 0.42, b_pt2, b_pt3, 0.85),
-    ]
-    mb_hair.add_ribbon(tail_2, n_across=4, thickness=0.028, arch_z=0.012)
+        mb_hair.add_ribbon(pts, n_across=5, thickness=0.028, arch_z=0.014)
     primitives.append(mb_hair.build(mesh_index=len(primitives)))
 
-    # ── 9. Capa Dupla Dramática Escura em V Largo (revela 100% as coxas + barra dourada elegante!) ──
-    mb_cape = _MeshBuilder(material_index=6)
-    # Manto delicado apenas sobre os ombros/nuca (acima do decote!)
-    cape_shawl = [
-        (np.array([0.0, 0.895, -0.025], dtype=np.float32), 0.152, 0.095, 0.00, -0.022, b_uchest, b_uchest, 0.0),
-        (np.array([0.0, 0.935, -0.022], dtype=np.float32), 0.145, 0.090, 0.55, -0.020, b_uchest, b_neck, 0.25),
-        (np.array([0.0, 0.962, -0.018], dtype=np.float32), 0.088, 0.070, 1.00, -0.016, b_uchest, b_neck, 0.45),
-    ]
-    mb_cape.add_loft(cape_shawl, n_seg=22)
+    # ── 9–11. Camadas externas de roupa (omitidas no modo `base` = roupa de baixo limpa para fácil incrementação!) ──
+    if not is_base_layer:
+        mb_skirt = _MeshBuilder(material_index=6)
+        if arch.outfit_style == "blouse_skirt":
+            mb_skirt.add_open_skirt(
+                y_top=0.73, y_bot=0.45, rx_top=0.118, rz_top=0.095, rx_bot=0.225, rz_bot=0.175,
+                slit_half_angle_deg=0.0, j_hips=b_hips, j_l_leg=b_l_ul, j_r_leg=b_r_ul, pleats=14,
+            )
+        else:
+            mb_skirt.add_open_skirt(
+                y_top=0.72, y_bot=0.34, rx_top=0.124, rz_top=0.098, rx_bot=0.245, rz_bot=0.195,
+                slit_half_angle_deg=34.0, j_hips=b_hips, j_l_leg=b_l_ul, j_r_leg=b_r_ul, pleats=0,
+            )
+        primitives.append(mb_skirt.build(mesh_index=len(primitives)))
 
-    # Abas longas escuras abrindo amplamente pelas laterais (deixam silhueta limpa entre as coxas!)
-    for sign, j0, j1, j2 in ((1.0, b_cl0, b_cl1, b_cl2), (-1.0, b_cr0, b_cr1, b_cr2)):
-        cape_pts = [
-            (np.array([sign * 0.13, 0.89, -0.09], dtype=np.float32), 0.072, 1.0, b_uchest, j0, 0.55),
-            (np.array([sign * 0.23, 0.66, -0.14], dtype=np.float32), 0.092, 0.9, j0, j1, 0.50),
-            (np.array([sign * 0.36, 0.36, -0.18], dtype=np.float32), 0.118, 0.8, j1, j2, 0.55),
-            (np.array([sign * 0.48, 0.07, -0.20], dtype=np.float32), 0.100, 0.6, j2, j2, 0.0),
-            (np.array([sign * 0.53, 0.01, -0.21], dtype=np.float32), 0.036, 0.4, j2, j2, 0.0),
-        ]
-        mb_cape.add_ribbon(cape_pts, n_across=5, thickness=0.013, arch_z=0.014)
-    primitives.append(mb_cape.build(mesh_index=len(primitives)))
+        mb_lace = _MeshBuilder(material_index=7)
+        if arch.outfit_style != "blouse_skirt":
+            for sign in (-1.0, 1.0):
+                ruffle = [
+                    (np.array([sign * 0.110, 0.94, 0.075], dtype=np.float32), 0.026, 0.85, b_uchest, b_uchest, 0.0),
+                    (np.array([sign * 0.132, 0.99, 0.042], dtype=np.float32), 0.032, 0.95, b_uchest, b_uchest, 0.0),
+                    (np.array([sign * 0.128, 1.01, -0.020], dtype=np.float32), 0.030, 0.90, b_uchest, b_uchest, 0.0),
+                    (np.array([sign * 0.105, 0.96, -0.072], dtype=np.float32), 0.024, 0.80, b_uchest, b_uchest, 0.0),
+                ]
+                mb_lace.add_ribbon(ruffle, n_across=4, thickness=0.011, arch_z=0.008)
+        primitives.append(mb_lace.build(mesh_index=len(primitives)))
 
-    # ── 10. Ornamentos Dourados + Arma Modular na MÃO ESQUERDA (nunca atrapalha o aceno da direita!) ──
-    mb_gold = _MeshBuilder(material_index=7)
-    # Presilha dourada no alto do rabo-de-cavalo (Titan_idle!)
-    mb_gold.add_ellipsoid((0.02, 1.295, -0.10), (0.044, 0.032, 0.038), b_head, n_lat=10, n_lon=14)
-    # Broche dourado elegante no fecho da capa (garganta)
-    mb_gold.add_diamond_spike((0.0, 0.915, 0.068), (0.0, -1.0, 0.25), 0.045, 0.022, b_uchest)
+        mb_gold = _MeshBuilder(material_index=8)
+        mb_gold.add_ellipsoid((0.0, 0.715, 0.095), (0.024, 0.020, 0.018), b_hips, n_lat=8, n_lon=12)
+        for sign in (-1.0, 1.0):
+            mb_gold.add_diamond_spike((sign * 0.016, 0.715, 0.098), (sign * 0.88, 0.18, 0.18), 0.068, 0.020, b_hips)
+            mb_gold.add_diamond_spike((sign * 0.010, 0.708, 0.098), (sign * 0.32, -0.92, 0.15), 0.115, 0.016, b_hips)
+        primitives.append(mb_gold.build(mesh_index=len(primitives)))
 
-    if style == "priestess":
-        # Cajado Crescente Dourado erguido na mão ESQUERDA (Image 4!)
-        staff_rings = [
-            (np.array([0.46, 0.08, 0.04], dtype=np.float32), 0.015, 0.015, 0.0, 0.0, b_l_hd, b_l_hd, 0.0),
-            (np.array([0.46, 1.38, 0.04], dtype=np.float32), 0.017, 0.017, 1.0, 0.0, b_l_hd, b_l_hd, 0.0),
-        ]
-        mb_gold.add_loft(staff_rings, n_seg=10, cap_bottom=True, cap_top=True)
-        mb_gold.add_torus((0.46, 1.48, 0.04), 0.118, 0.022, b_l_hd, n_major=24, n_minor=8, plane="xy")
-        mb_gold.add_diamond_spike((0.46, 1.59, 0.04), (0.0, 1.0, 0.0), 0.10, 0.030, b_l_hd)
-    elif style == "valkyrie":
-        # Espada Rúnica elegante na mão ESQUERDA (Image 5!)
-        mb_gold.add_diamond_spike((0.47, 0.89, 0.04), (0.30, 0.94, 0.14), 0.66, 0.038, b_l_hd)
-        mb_gold.add_diamond_spike((0.47, 0.89, 0.04), (-0.92, 0.35, 0.0), 0.11, 0.020, b_l_hd)
-        mb_gold.add_diamond_spike((0.47, 0.89, 0.04), (0.92, -0.35, 0.0), 0.11, 0.020, b_l_hd)
-    primitives.append(mb_gold.build(mesh_index=len(primitives)))
-
-    # ── 11. Halo Celestial Luminoso atrás da Cabeça (Titan_idle + Image 3 + Image 6!) ──
-    mb_halo = _MeshBuilder(material_index=8)
-    halo_c = (0.0, 1.185, -0.185)
-    mb_halo.add_torus(halo_c, 0.295, 0.016, b_halo, n_major=42, n_minor=8, plane="xy")
-    for deg, slen in ((0.0, 0.10), (90.0, 0.12), (180.0, 0.10), (270.0, 0.09), (45.0, 0.065), (135.0, 0.065), (225.0, 0.065), (315.0, 0.065)):
-        rad = math.radians(deg)
-        bx = halo_c[0] + math.cos(rad) * 0.295
-        by = halo_c[1] + math.sin(rad) * 0.295
-        mb_halo.add_diamond_spike((bx, by, halo_c[2]), (math.cos(rad), math.sin(rad), 0.0), slen, 0.020, b_halo)
-    primitives.append(mb_halo.build(mesh_index=len(primitives)))
-
-    # ── 12. Chamas Arcanas Brilhantes Flutuando sobre as Palmas (Titan_idle!) ──
-    mb_flames = _MeshBuilder(material_index=9)
-    for sign, j_hd in ((1.0, b_l_hd), (-1.0, b_r_hd)):
-        if style == "priestess" and sign > 0:
-            mb_flames.add_ellipsoid((0.46, 1.48, 0.04), (0.046, 0.046, 0.046), j_hd, n_lat=8, n_lon=10)
-            continue
-        if style == "valkyrie" and sign > 0:
-            continue
-        hx = sign * 0.475
-        mb_flames.add_diamond_spike((hx, 0.92, 0.02), (sign * 0.20, 0.95, 0.12), 0.15, 0.032, j_hd)
-        mb_flames.add_diamond_spike((hx + sign * 0.042, 0.90, -0.01), (sign * 0.44, 0.86, -0.10), 0.11, 0.024, j_hd)
-        mb_flames.add_diamond_spike((hx - sign * 0.032, 0.91, 0.04), (-sign * 0.18, 0.94, 0.22), 0.10, 0.022, j_hd)
-    primitives.append(mb_flames.build(mesh_index=len(primitives)))
-
-    # ── 13. Expressões faciais & SpringBones ──
+    # ── 12. Expressões & SpringBones ──
     expressions = {
         "blink": [(lid_mesh_idx, 0, 1.0)],
-        "happy": [(lid_mesh_idx, 0, 0.30)],
-        "relaxed": [(lid_mesh_idx, 0, 0.48)],
+        "happy": [(lid_mesh_idx, 0, 0.25)],
+        "relaxed": [(lid_mesh_idx, 0, 0.45)],
         "angry": [],
-        "sad": [(lid_mesh_idx, 0, 0.25)],
+        "sad": [(lid_mesh_idx, 0, 0.22)],
         "surprised": [],
     }
     springs = [
-        VrmSpringChain(joints=[b_pt0, b_pt1, b_pt2, b_pt3], stiffness=0.85, drag=0.45),
-        VrmSpringChain(joints=[b_hl0, b_hl1], stiffness=1.1, drag=0.5),
-        VrmSpringChain(joints=[b_hr0, b_hr1], stiffness=1.1, drag=0.5),
-        VrmSpringChain(joints=[b_cl0, b_cl1, b_cl2], stiffness=0.75, drag=0.42),
-        VrmSpringChain(joints=[b_cr0, b_cr1, b_cr2], stiffness=0.75, drag=0.42),
+        VrmSpringChain(joints=[b_hc0, b_hc1, b_hc2], stiffness=0.82, drag=0.45),
+        VrmSpringChain(joints=[b_hl0, b_hl1, b_hl2], stiffness=0.86, drag=0.46),
+        VrmSpringChain(joints=[b_hr0, b_hr1, b_hr2], stiffness=0.86, drag=0.46),
     ]
 
     return VrmModel(
-        name=f"DungeonSquad_{persona.id}_{style}",
+        name=f"DungeonSquad_{arch.id}_{outfit_key}",
         is_vrm1=True,
         nodes=nodes,
         roots=[b_hips],
@@ -1012,6 +1353,6 @@ def build_dungeon_squad_model(persona: Persona, outfit_key: str = "starlight") -
         expressions=expressions,
         springs=springs,
         constraints=[],
-        height=1.42,
+        height=1.48,
         min_y=0.0,
     )

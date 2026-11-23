@@ -136,10 +136,10 @@ def render_world_showcase(
     canvas.avatar.vrm_dynamic_recolor = False  # preserva as cores nativas do VRM no showcase
 
     shots = [
-        (10.5, "clear", "overlook", "idle", "starlight", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada — Traje Astral (Pixel-Art 3D)!"),
-        (18.0, "clear", "lantern", "wave", "focus", "affectionate", "Carinhosa", "heart", "IDLE", "Por do sol — Traje Sacerdotisa + Cajado Crescente!"),
-        (16.0, "rain", "garden_l", "walk", "casual", "cozy", "Aconchegada", "music", "MUSIC", "Chuva suave — Traje Valquiria caminhando em 360°!"),
-        (23.5, "clear", "music_spot", "dance", "starlight", "happy", "Animada", "sparkle", "IDLE", "Noite magica — Giro 360° sob a lua e vaga-lumes!"),
+        (10.5, "clear", "overlook", "idle", "base", "happy", "Radiante", "sparkle", "IDLE", "Manha ensolarada — Elfa Loira HD (Tree of Savior)!"),
+        (18.0, "clear", "lantern", "wave", "base", "affectionate", "Carinhosa", "heart", "IDLE", "Por do sol — Rosto expressivo & aceno em tempo real!"),
+        (16.0, "rain", "garden_l", "walk", "base", "cozy", "Aconchegada", "music", "MUSIC", "Chuva suave — Caminhada 360° com reflexo molhado!"),
+        (23.5, "clear", "music_spot", "dance", "base", "happy", "Animada", "sparkle", "IDLE", "Noite magica — Giro 360° sob a lua e vaga-lumes!"),
     ]
 
     tiles: list[Image.Image] = []
@@ -366,7 +366,7 @@ def main() -> int:
     parser.add_argument("--persona", default="mira")
     parser.add_argument("--scene", default="sky_sanctuary")
     parser.add_argument("--style", choices=("vrm_3d", "world_sprite"), default="vrm_3d")
-    parser.add_argument("--vrm", default="dungeon_squad", help="Nome/caminho de modelo .vrm ou 'dungeon_squad' (padrão).")
+    parser.add_argument("--vrm", default="elfa_loira", help="Arquétipo HD ('elfa_loira'|'humana_ruiva'|'androide_rosa'|'vampira_negra') ou caminho .vrm.")
     parser.add_argument("--mode", choices=("world", "scenes", "expressions", "outfits", "sprites", "rig_parts", "gif"), default="world")
     parser.add_argument("--out", default="showcase.png")
     args = parser.parse_args()

@@ -353,28 +353,24 @@ def test_dungeon_squad_pixel_art_3d_outfits_and_360():
     from pathlib import Path
 
     mira = load_persona("mira")
-    canvas = WallpaperCanvas(mira, render_style="vrm_3d", vrm_path=Path("dungeon_squad"))
+    canvas = WallpaperCanvas(mira, render_style="vrm_3d", vrm_path=Path("elfa_loira"))
     assert canvas.avatar.has_vrm_3d()
     assert canvas.avatar._builtin_dungeon_squad is True
-    assert canvas.avatar._vrm_renderer.pixel_art is True
+    assert canvas.avatar._vrm_renderer.pixel_art is False
 
-    # Valida troca dinâmica de trajes (starlight / focus / casual) sem pré-renderizar vídeos
-    canvas.avatar.outfit = "starlight"
-    img_astral = canvas.render_to_image(640, 360)
-    assert not img_astral.isNull()
-    assert canvas.avatar._vrm_model.name.endswith("_astral")
+    # Valida renderização HD dos 4 arquétipos base (Elfa Loira, Humana Ruiva, Androide Rosa, Vampira)
+    for aid in ("elfa_loira", "humana_ruiva", "androide_rosa", "vampira_negra"):
+        assert canvas.avatar.set_vrm_model(aid) is True
+        img = canvas.render_to_image(640, 360)
+        assert not img.isNull()
+        assert aid in canvas.avatar._vrm_model.name
 
-    canvas.avatar.outfit = "focus"
-    img_priestess = canvas.render_to_image(640, 360)
-    assert not img_priestess.isNull()
-    assert canvas.avatar._vrm_model.name.endswith("_priestess")
-
-    canvas.avatar.outfit = "casual"
+    # Valida giro 360° suave caminhando para a direita
+    canvas.avatar.set_vrm_model("elfa_loira")
     canvas.avatar.pos_x, canvas.avatar.pos_y = 0.35, 0.88
     canvas.avatar.walk_to(0.75, 0.88)
     for _ in range(18):
         canvas.step_animation(0.05)
     assert 40.0 < canvas.avatar._vrm_animator.yaw_deg < 140.0
-    img_valkyrie = canvas.render_to_image(640, 360)
-    assert not img_valkyrie.isNull()
-    assert canvas.avatar._vrm_model.name.endswith("_valkyrie")
+    img_walk = canvas.render_to_image(640, 360)
+    assert not img_walk.isNull()

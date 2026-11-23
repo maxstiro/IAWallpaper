@@ -91,12 +91,13 @@ class AvatarRig:
         self.outfit: str = "casual"
         self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | dance | admire_view | music_sway | sleep
 
-        # Motor 3D HD Pixel-Art / Cel-Shaded (Dungeon Squad procedural + VRM 0.x / 1.0 via ModernGL GPU)
+        # Motor 3D HD estilo Tree of Savior (640x800 MSAA 4x, com modo Pixel-Art opcional)
         self.vrm_path: Path | None = None
         self.vrm_dynamic_recolor: bool = True
-        self.vrm_pixel_art: bool = True
+        self.vrm_pixel_art: bool = False
         self._builtin_dungeon_squad: bool = False
-        self._ds_built_key: tuple[str, str] | None = None
+        self._active_archetype: str = "elfa_loira"
+        self._ds_built_key: tuple[str, str, str] | None = None
         self._vrm_model = None
         self._vrm_animator = None
         self._vrm_renderer = None
@@ -169,8 +170,9 @@ class AvatarRig:
         elif self.render_style == "vrm_3d":
             self.set_vrm_model("dungeon_squad")
 
-    def _rebuild_builtin_dungeon_squad(self) -> bool:
-        """Constrói/atualiza em tempo real o avatar 3D esculpido estilo Dungeon Squad para a persona e traje atuais."""
+    def _rebuild_builtin_dungeon_squad(self, archetype_id: str | None = None) -> bool:
+        """Constrói/atualiza em tempo real um dos 4 arquétipos base em HD (sobre malha studio VRM ou fallback procedural)."""
+        arch = archetype_id or self._active_archetype or "elfa_loira"
         prev_anim = self._vrm_animator
         if self._vrm_renderer is not None:
             self._vrm_renderer.release()
@@ -178,34 +180,47 @@ class AvatarRig:
         self._vrm_animator = None
         self._vrm_renderer = None
         try:
+            from ..paths import Paths
             from .dungeon_avatar import build_dungeon_squad_model
             from .vrm_animator import VrmAnimator
             from .vrm_renderer import VrmRenderer
+            from .vrm_sculptor import GIRL_ARCHETYPES, build_sculpted_vrm_girl
 
-            model = build_dungeon_squad_model(self.persona, self.outfit)
+            vrm_dir = Paths().vrm_generated_dir
+            if arch in GIRL_ARCHETYPES and (vrm_dir / "Victoria_Rubin.vrm").is_file():
+                # Camada base limpa (`base` = roupa de baixo simples) sobre malha studio 100% íntegra!
+                model = build_sculpted_vrm_girl(vrm_dir, archetype_id=arch, outfit_key="base")
+            else:
+                model = build_dungeon_squad_model(self.persona, self.outfit, archetype_id=arch if arch in GIRL_ARCHETYPES else "elfa_loira")
+
             animator = VrmAnimator(model)
             if prev_anim is not None:
                 animator.time = prev_anim.time
                 animator.walk_phase = prev_anim.walk_phase
                 animator.yaw_deg = prev_anim.yaw_deg
                 animator.target_yaw_deg = prev_anim.target_yaw_deg
-            renderer = VrmRenderer(model, width=512, height=640, samples=4, pixel_art=self.vrm_pixel_art, pixel_size=(152, 190))
+            renderer = VrmRenderer(model, width=640, height=800, samples=4, pixel_art=self.vrm_pixel_art, pixel_size=(152, 190))
             self._vrm_model = model
             self._vrm_animator = animator
             self._vrm_renderer = renderer
             self._builtin_dungeon_squad = True
-            self._ds_built_key = (self.persona.id, self.outfit)
-            self.vrm_path = Path("dungeon_squad")
-            log(f"[vrm] Avatar 3D Dungeon Squad construído: {model.name} (pixel_art={self.vrm_pixel_art})")
+            self._active_archetype = arch
+            self._ds_built_key = (self.persona.id, self.outfit, arch)
+            self.vrm_path = Path(arch)
+            log(f"[vrm] Avatar 3D HD construído: {model.name} (pixel_art={self.vrm_pixel_art})")
             return True
         except Exception as err:
-            log(f"[vrm] Falha ao construir avatar Dungeon Squad: {err}")
+            log(f"[vrm] Falha ao construir avatar 3D ({arch}): {err}")
             return False
 
     def set_vrm_model(self, path: Path | str | None) -> bool:
-        """Carrega o avatar 3D Dungeon Squad nativo (`"dungeon_squad"`) ou um modelo `.vrm` / `.glb` externo."""
-        if path is not None and str(path).strip().lower() in ("dungeon_squad", "builtin:dungeon_squad"):
-            return self._rebuild_builtin_dungeon_squad()
+        """Carrega um dos 4 arquétipos base HD (`elfa_loira`, `humana_ruiva`, `androide_rosa`, `vampira_negra`) ou `.vrm` externo."""
+        if path is not None:
+            key = str(path).strip().lower()
+            if key in ("elfa_loira", "humana_ruiva", "androide_rosa", "vampira_negra"):
+                return self._rebuild_builtin_dungeon_squad(archetype_id=key)
+            if key in ("dungeon_squad", "builtin:dungeon_squad"):
+                return self._rebuild_builtin_dungeon_squad(archetype_id="elfa_loira")
 
         self._builtin_dungeon_squad = False
         self._ds_built_key = None
@@ -225,7 +240,7 @@ class AvatarRig:
             model = load_vrm(Path(path))
             animator = VrmAnimator(model)
             animator.stylized_proportions = self.vrm_pixel_art
-            renderer = VrmRenderer(model, width=512, height=640, samples=4, pixel_art=self.vrm_pixel_art, pixel_size=(152, 190))
+            renderer = VrmRenderer(model, width=640, height=800, samples=4, pixel_art=self.vrm_pixel_art, pixel_size=(152, 190))
             self._vrm_model = model
             self._vrm_animator = animator
             self._vrm_renderer = renderer
@@ -660,7 +675,7 @@ class AvatarRig:
         sun_x_norm: float,
     ) -> None:
         """Renderiza o avatar 3D (HD Pixel-Art Nearest-Neighbor estilo Dungeon Squad ou MToon suave) ancorado em `draw_y`."""
-        if self._builtin_dungeon_squad and self._ds_built_key != (self.persona.id, self.outfit):
+        if self._builtin_dungeon_squad and self._ds_built_key != (self.persona.id, self.outfit, self._active_archetype):
             self._rebuild_builtin_dungeon_squad()
         if self._vrm_renderer is None or self._vrm_animator is None:
             return

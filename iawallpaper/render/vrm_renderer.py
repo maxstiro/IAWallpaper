@@ -1,17 +1,18 @@
-"""VRM RENDERER — Renderizador 3D HD Pixel-Art & MToon Cel-Shaded em GPU via ModernGL (OpenGL 3.3 Core).
+"""VRM RENDERER — Renderizador 3D estilo Tree of Savior (HD MSAA 4x Painterly Cel-Shaded) & Modo Pixel-Art opcional.
 
-Opera em dois modos selecionáveis na GPU:
-1. **Modo HD Pixel-Art 3D (`pixel_art=True`, padrão estilo *Dungeon Squad*)**:
-   - Passo 1: Renderiza o avatar 3D (esculpido ou `.VRM` externo) em um FBO MRT sem MSAA de baixa resolução
-     nítida (`152x190` pixels virtuais) com cel-shading quantizado em 3 bandas, brilho especular anime e
-     emissão luminosa (halo celestial, olhos e chamas arcanas).
-   - Passo 2: Shader fullscreen de pós-processamento em espaço de pixel adiciona contorno externo exato de
-     **1 pixel** (`dark ink`) + linhas internas de profundidade/contorno (separando busto, coxas, braços,
-     franja e capa) + halo luminoso suave em torno de elementos emissivos.
-   - Composição em `QPainter` com **Nearest-Neighbor (`SmoothPixmapTransform=False`)** garantindo blocos de
-     pixel nítidos idênticos a *Dungeon Squad*, porém girando suavemente em 360° a >250 FPS!
-2. **Modo Suave MToon MSAA 4x (`pixel_art=False`)**:
-   - Renderização anime 3D tradicional de alta resolução (`512x640`, MSAA 4x + contorno inverted-hull).
+Suporta dois perfis de renderização em GPU via ModernGL (OpenGL 3.3 Core Profile):
+1. **Modo Tree of Savior HD (`pixel_art=False`, padrão a partir do Milestone 16)**:
+   - Renderização nativa em alta definição (`640x800`, MSAA 4x) preservando cada detalhe do rosto
+     (olhos em camadas, cílios, sobrancelhas, rubor, lábios, mechas de cabelo, rendas e corpete).
+   - Shader cel-shaded pictórico estilo *Tree of Savior*:
+     * Sombreamento quente *subsurface* na pele/rosto (tons pêssego/âmbar em vez de cinza/roxo frio) +
+       brilho especular suave de pele viva.
+     * Faixa de brilho especular anime em arco (*hair gloss halo*) nos cabelos.
+     * Contorno fino *inverted-hull* em tinta café-escuro apenas no corpo/cabelo/roupas (mantendo o rosto
+       limpo e legível em qualquer distância no desktop).
+     * Rim-light Fresnel sincronizado ao ciclo circadiano (`AtmospherePalette`).
+2. **Modo Retro Pixel-Art 3D (`pixel_art=True`, opcional)**:
+   - Mantém o pipeline MRT `152x190` + contorno 1px + Nearest-Neighbor disponível caso desejado.
 """
 
 from dataclasses import dataclass
@@ -105,6 +106,7 @@ uniform vec3 u_rim_color;
 uniform float u_rim_strength;
 uniform vec3 u_cam_pos;
 uniform int u_is_face;
+uniform int u_is_skin;
 uniform int u_is_eye;
 uniform int u_is_hair;
 uniform int u_is_emissive;
@@ -129,7 +131,6 @@ void main() {
 
     vec3 albedo = tex.rgb * u_base_color.rgb * u_role_tint;
     if (u_is_emissive == 1) {
-        // Halo celestial e chamas arcanas brilham intensamente sem escurecimento de sombra!
         vec3 glow_col = clamp(albedo * 1.18 + vec3(0.08), 0.0, 1.0);
         f_color = vec4(glow_col, (u_alpha_mode == 0) ? 1.0 : alpha);
         f_meta = vec4(v_view_depth, u_mat_group, 1.0, 0.0);
@@ -148,7 +149,6 @@ void main() {
     vec3 col;
 
     if (u_pixel_art == 1) {
-        // Cel-shading quantizado em 3 bandas nítidas estilo Dungeon Squad (shadow / mid / lit + highlight crisp!)
         float band;
         if (u_is_face == 1) {
             band = (ndotl > -0.18) ? 1.0 : 0.68;
@@ -159,10 +159,7 @@ void main() {
         vec3 lit_c = albedo * (u_light_color * 0.96 + u_ambient_color * 0.14);
         vec3 mid_c = albedo * mix(deep_shade, vec3(1.0), 0.45) * (u_ambient_color * 0.72 + vec3(0.24));
         vec3 shd_c = albedo * deep_shade * (u_ambient_color * 0.56 + vec3(0.16));
-
         col = (band >= 0.85) ? lit_c : ((band >= 0.35) ? mid_c : shd_c);
-
-        // Brilho especular em degrau nítido (ponto de luz pixel art no cabelo, busto, coxas e ouro!)
         if (u_is_face == 0) {
             float sp_pow = (u_is_gold == 1) ? 14.0 : ((u_is_hair == 1) ? 16.0 : 24.0);
             float sp_raw = pow(max(dot(N, H), 0.0), sp_pow);
@@ -170,24 +167,66 @@ void main() {
             float sp_gain = (u_is_gold == 1) ? 0.42 : ((u_is_hair == 1) ? 0.28 : 0.16);
             col += mix(vec3(1.0), u_light_color, 0.35) * sp_step * sp_gain;
         }
-
-        // Rim-light em degrau limpo para destacar silhueta contra qualquer horário do cenário
         float fr = pow(1.0 - max(dot(N, V), 0.0), 2.8);
         float rim_step = (fr > 0.48 && u_is_face == 0) ? 1.0 : 0.0;
         col += u_rim_color * rim_step * u_rim_strength * 0.42;
     } else {
-        float toon = (u_is_face == 1)
-            ? smoothstep(-0.26, 0.18, ndotl) * 0.40 + 0.60
-            : smoothstep(-0.06, 0.10, ndotl);
-        vec3 lit = albedo * (u_light_color * 0.90 + u_ambient_color * 0.16);
-        vec3 shaded = albedo * u_shade_color * (u_ambient_color * 0.66 + vec3(0.18));
-        col = mix(shaded, lit, toon);
-        float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-        col += u_rim_color * fresnel * u_rim_strength * ((u_is_face == 1) ? 0.24 : 0.78);
+        // ── Shader Pictórico HD estilo Tree of Savior (ToS) ──
+        if (u_is_face == 1) {
+            // Iluminação facial frontal generosa e suave (preserva 100% da leitura de olhos, blush e sorriso!)
+            float face_lit = smoothstep(-0.38, 0.24, ndotl) * 0.30 + 0.70;
+            vec3 warm_face_shade = albedo * mix(u_shade_color, vec3(0.92, 0.74, 0.70), 0.55);
+            vec3 lit_face = albedo * (u_light_color * 0.90 + u_ambient_color * 0.16);
+            col = mix(warm_face_shade, lit_face, face_lit);
+            // Leve fresnel rosado suave nas bochechas/orelhas
+            float fr_f = pow(1.0 - max(dot(N, V), 0.0), 3.6);
+            col += u_rim_color * fr_f * u_rim_strength * 0.18;
+        } else if (u_is_skin == 1) {
+            // Pele viva com banda subsurface quente (pêssego/coral na transição luz-sombra!) + brilho úmido suave
+            float toon = smoothstep(-0.14, 0.18, ndotl);
+            float sss_band = exp(-pow((ndotl - 0.02) / 0.16, 2.0));
+            vec3 skin_lit = albedo * (u_light_color * 0.94 + u_ambient_color * 0.14);
+            vec3 skin_shd = albedo * mix(u_shade_color, vec3(0.78, 0.54, 0.52), 0.55) * (u_ambient_color * 0.72 + vec3(0.24));
+            col = mix(skin_shd, skin_lit, toon);
+            col += vec3(0.14, 0.05, 0.03) * sss_band * albedo;
+            // Brilho especular acetinado suave de pele (colo, busto, coxas — estilo Tree of Savior!)
+            float spec_skin = smoothstep(0.58, 0.90, pow(max(dot(N, H), 0.0), 20.0));
+            col += mix(vec3(1.0, 0.95, 0.88), u_light_color, 0.40) * spec_skin * 0.12;
+            float fr_s = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+            col += u_rim_color * fr_s * u_rim_strength * 0.42;
+        } else if (u_is_hair == 1) {
+            // Cabelo anime estilo ToS com sombra saturada quente e anel de brilho especular (angel ring!)
+            float toon_h = smoothstep(-0.16, 0.16, ndotl);
+            float mid_h = smoothstep(-0.45, -0.05, ndotl);
+            vec3 h_lit = albedo * (u_light_color * 0.96 + u_ambient_color * 0.14);
+            vec3 h_mid = albedo * mix(u_shade_color, vec3(1.0), 0.45) * (u_ambient_color * 0.76 + vec3(0.20));
+            vec3 h_shd = albedo * u_shade_color * (u_ambient_color * 0.62 + vec3(0.16));
+            col = mix(mix(h_shd, h_mid, mid_h), h_lit, toon_h);
+            // Anel especular alongado horizontalmente (assinatura de cabelo anime pintado à mão!)
+            vec3 H_aniso = normalize(vec3(H.x * 0.55, H.y * 1.45, H.z));
+            float gloss = smoothstep(0.60, 0.86, pow(max(dot(N, H_aniso), 0.0), 16.0));
+            float gloss_sharp = smoothstep(0.82, 0.94, pow(max(dot(N, H_aniso), 0.0), 32.0));
+            col += mix(vec3(1.0, 0.98, 0.92), u_light_color, 0.25) * (gloss * 0.20 + gloss_sharp * 0.24);
+            float fr_h = pow(1.0 - max(dot(N, V), 0.0), 2.8);
+            col += u_rim_color * fr_h * u_rim_strength * 0.55;
+        } else {
+            // Roupas, couro, renda e ornamentos dourados com 2.5 bandas ricas e brilho suave
+            float toon_c = smoothstep(-0.10, 0.14, ndotl);
+            float deep_c = smoothstep(-0.48, -0.10, ndotl);
+            vec3 c_lit = albedo * (u_light_color * 0.94 + u_ambient_color * 0.14);
+            vec3 c_mid = albedo * mix(u_shade_color, vec3(1.0), 0.35) * (u_ambient_color * 0.72 + vec3(0.22));
+            vec3 c_shd = albedo * u_shade_color * (u_ambient_color * 0.56 + vec3(0.16));
+            col = mix(mix(c_shd, c_mid, deep_c), c_lit, toon_c);
+            float sp_pow = (u_is_gold == 1) ? 16.0 : 28.0;
+            float sp = smoothstep(0.45, 0.78, pow(max(dot(N, H), 0.0), sp_pow));
+            col += mix(vec3(1.0, 0.96, 0.85), u_light_color, 0.35) * sp * ((u_is_gold == 1) ? 0.44 : 0.14);
+            float fr_c = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+            col += u_rim_color * fr_c * u_rim_strength * 0.52;
+        }
     }
 
     if (u_is_eye == 1) {
-        col = mix(col, albedo * 1.24 + u_rim_color * 0.10, 0.58);
+        col = mix(col, albedo * 1.22 + u_rim_color * 0.08, 0.55);
     }
 
     col = clamp(col, 0.0, 1.0);
@@ -220,7 +259,6 @@ void main() {
 
     ivec2 offs[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
 
-    // 1. Pixel transparente adjacente à silhueta -> contorno externo exato de 1 pixel (ou glow suave p/ emissivo!)
     if (c.a < 0.5) {
         bool has_solid = false;
         bool has_emissive = false;
@@ -243,7 +281,6 @@ void main() {
             return;
         }
         if (has_emissive) {
-            // Aura pixelada suave em volta do halo dourado e das chamas arcanas!
             f_out = vec4(em_col, 0.45);
             return;
         }
@@ -251,13 +288,11 @@ void main() {
         return;
     }
 
-    // 2. Elementos emissivos (halo / chamas arcanas) preservam brilho puro
     if (m.b > 0.5) {
         f_out = c;
         return;
     }
 
-    // 3. Contornos internos nítidos de 1 pixel em saltos de profundidade (separa braços, busto, coxas, franja e capa!)
     float depth = m.r;
     float group = m.g;
     bool is_face = (m.a > 0.5);
@@ -270,7 +305,6 @@ void main() {
             continue;
         }
         float nd = nm.r;
-        // Só desenha linha interna no pixel MAIS DISTANTE para manter a linha exatamente 1px fina!
         if (depth - nd > 0.065) {
             edge = max(edge, is_face ? 0.42 : 0.62);
         } else if (!is_face && abs(group - nm.g) > 0.5 && depth >= nd - 0.015) {
@@ -279,7 +313,6 @@ void main() {
     }
 
     vec3 col = mix(c.rgb, u_ink_color, edge);
-    // Leve quantização de paleta pixel-art (18 níveis por canal) para arremate retrô-HD limpo
     col = floor(col * 18.0 + 0.5) / 18.0;
     f_out = vec4(clamp(col, 0.0, 1.0), c.a);
 }
@@ -379,15 +412,15 @@ def compute_role_tints(persona: Persona, outfit_key: str, dynamic_recolor: bool 
 
 
 class VrmRenderer:
-    """Renderizador hardware OpenGL 3.3 com pipeline HD Pixel-Art 3D (estilo Dungeon Squad) e MToon MSAA 4x."""
+    """Renderizador hardware OpenGL 3.3 estilo Tree of Savior HD (`640x800` MSAA 4x) + modo Pixel-Art opcional."""
 
     def __init__(
         self,
         model: VrmModel,
-        width: int = 512,
-        height: int = 640,
+        width: int = 640,
+        height: int = 800,
         samples: int = 4,
-        pixel_art: bool = True,
+        pixel_art: bool = False,
         pixel_size: tuple[int, int] = (152, 190),
     ):
         self.model = model
@@ -401,14 +434,13 @@ class VrmRenderer:
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
         self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA, moderngl.ONE, moderngl.ONE_MINUS_SRC_ALPHA)
 
-        # Framebuffers do modo suave MSAA 4x
+        # Framebuffers HD MSAA 4x (padrão estilo Tree of Savior!)
         max_samples = min(samples, getattr(self.ctx, "max_samples", 4))
         if max_samples >= 2:
             self._msaa_color = self.ctx.renderbuffer((self.width, self.height), components=4, samples=max_samples)
-            self._msaa_meta = self.ctx.renderbuffer((self.width, self.height), components=4, samples=max_samples, dtype="f2")
             self._msaa_depth = self.ctx.depth_renderbuffer((self.width, self.height), samples=max_samples)
             self._fbo_draw = self.ctx.framebuffer(
-                color_attachments=[self._msaa_color, self._msaa_meta],
+                color_attachments=[self._msaa_color],
                 depth_attachment=self._msaa_depth,
             )
             self._fbo_resolve = self.ctx.simple_framebuffer((self.width, self.height), components=4)
@@ -416,7 +448,7 @@ class VrmRenderer:
             self._fbo_draw = self.ctx.simple_framebuffer((self.width, self.height), components=4)
             self._fbo_resolve = self._fbo_draw
 
-        # Framebuffers do modo HD Pixel-Art 3D (MRT sem MSAA + pós-processo de contorno exato 1px!)
+        # Framebuffers opcionais do modo Retro Pixel-Art 3D
         self._pa_color_tex = self.ctx.texture((self.pixel_w, self.pixel_h), 4)
         self._pa_color_tex.filter = (moderngl.NEAREST, moderngl.NEAREST)
         self._pa_meta_tex = self.ctx.texture((self.pixel_w, self.pixel_h), 4, dtype="f2")
@@ -432,7 +464,6 @@ class VrmRenderer:
         self.prog["u_albedo"].value = 0
         self.prog["u_bone_tex"].value = 1
 
-        # Fullscreen quad para pós-processo pixel-art 1px outline
         self._post_prog = self.ctx.program(vertex_shader=_POST_VS, fragment_shader=_POST_FS)
         self._post_prog["u_color_tex"].value = 0
         self._post_prog["u_meta_tex"].value = 1
@@ -440,7 +471,6 @@ class VrmRenderer:
         self._quad_vbo = self.ctx.buffer(quad.tobytes())
         self._quad_vao = self.ctx.vertex_array(self._post_prog, [(self._quad_vbo, "2f", "in_pos")])
 
-        # Texturas dos materiais (fallback 1x1 branco)
         self._white_tex = self.ctx.texture((1, 1), 4, bytes([255, 255, 255, 255]))
         self._mat_textures: list[moderngl.Texture] = []
         for mat in model.materials:
@@ -448,16 +478,12 @@ class VrmRenderer:
                 arr = np.ascontiguousarray(mat.texture_rgba, dtype=np.uint8)
                 h, w, _ = arr.shape
                 tex = self.ctx.texture((w, h), 4, arr.tobytes())
-                if self.pixel_art:
-                    tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
-                else:
-                    tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
-                    tex.build_mipmaps()
+                tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
+                tex.build_mipmaps()
                 self._mat_textures.append(tex)
             else:
                 self._mat_textures.append(self._white_tex)
 
-        # Texturas de ossos (1 por skin, formato 4 x J RGBA32F -> número ilimitado de ossos!)
         self._skin_textures: list[moderngl.Texture] = []
         for sk in model.skins:
             n_j = max(1, len(sk.joints))
@@ -468,7 +494,6 @@ class VrmRenderer:
         self._dummy_bone_tex = self.ctx.texture((4, 1), 4, np.eye(4, dtype=np.float32).tobytes(), dtype="f4")
         self._dummy_bone_tex.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
-        # VBOs & VAOs por primitiva
         self._gpu_prims: list[_GpuPrimitive] = []
         for prim in model.primitives:
             pos_vbo = self.ctx.buffer(np.ascontiguousarray(prim.positions, dtype=np.float32).tobytes(), dynamic=bool(prim.morph_deltas))
@@ -523,22 +548,29 @@ class VrmRenderer:
         outfit_key: str = "casual",
         sun_x_norm: float = 0.5,
         dynamic_recolor: bool = True,
+        camera_focus: str = "full",
     ) -> QPixmap:
-        """Renderiza o frame atual do avatar 3D (HD Pixel-Art 1px outline ou MToon suave) em `QPixmap` RGBA."""
+        """Renderiza o frame atual em `QPixmap` RGBA (`camera_focus`: `'full'` corpo inteiro ou `'portrait'` close-up rosto!)."""
         self._upload_bones_and_morphs(animator)
 
-        is_ds_builtin = self.model.name.startswith("DungeonSquad_")
+        is_builtin = self.model.name.startswith("DungeonSquad_")
         h = self.model.height
         min_y = self.model.min_y
-        # Enquadramento confortável para halo celestial, cajado e pés plantados na base!
-        center_y = min_y + h * (0.53 if is_ds_builtin else 0.50)
-        dist = h * (2.82 if is_ds_builtin else 2.55)
-        eye = np.array([0.0, center_y + h * (0.20 if is_ds_builtin else 0.28), dist], dtype=np.float32)
-        target = np.array([0.0, center_y - h * 0.01, 0.0], dtype=np.float32)
+
+        if camera_focus == "portrait":
+            # Enquadramento retrato busto/rosto para inspeção fina de expressão e cabelo!
+            target_y = min_y + h * 0.78
+            eye = np.array([0.0, target_y + h * 0.03, h * 0.96], dtype=np.float32)
+            target = np.array([0.0, target_y, 0.0], dtype=np.float32)
+        else:
+            center_y = min_y + h * (0.51 if is_builtin else 0.50)
+            dist = h * (2.68 if is_builtin else 2.55)
+            eye = np.array([0.0, center_y + h * (0.20 if is_builtin else 0.28), dist], dtype=np.float32)
+            target = np.array([0.0, center_y - h * 0.01, 0.0], dtype=np.float32)
 
         rt_w = self.pixel_w if self.pixel_art else self.width
         rt_h = self.pixel_h if self.pixel_art else self.height
-        proj = _perspective(28.0, rt_w / max(float(rt_h), 1.0), 0.1, 20.0)
+        proj = _perspective(27.0, rt_w / max(float(rt_h), 1.0), 0.1, 20.0)
         view = _look_at(eye, target, np.array([0.0, 1.0, 0.0], dtype=np.float32))
         model_m = np.eye(4, dtype=np.float32)
         mvp = proj @ view @ model_m
@@ -552,33 +584,33 @@ class VrmRenderer:
         self.prog["u_view"].write(np.ascontiguousarray(view.T, dtype=np.float32).tobytes())
         self.prog["u_cam_pos"].value = (float(eye[0]), float(eye[1]), float(eye[2]))
 
-        lx = (sun_x_norm - 0.5) * 1.2 + 0.42
-        l_dir = np.array([lx, 0.88, 0.78], dtype=np.float32)
+        lx = (sun_x_norm - 0.5) * 1.1 + 0.36
+        l_dir = np.array([lx, 0.78, 0.92], dtype=np.float32)
         l_dir /= max(float(np.linalg.norm(l_dir)), 1e-6)
         self.prog["u_light_dir"].value = (float(l_dir[0]), float(l_dir[1]), float(l_dir[2]))
 
         tr, tg, tb = atmosphere.avatar_tint
-        ta = clamp(atmosphere.avatar_tint_alpha, 0.0, 0.72)
+        ta = clamp(atmosphere.avatar_tint_alpha, 0.0, 0.68)
         light_col = (
-            1.0 * (1.0 - ta * 0.30) + (tr / 255.0) * (ta * 0.40),
-            1.0 * (1.0 - ta * 0.30) + (tg / 255.0) * (ta * 0.40),
-            1.0 * (1.0 - ta * 0.30) + (tb / 255.0) * (ta * 0.40),
+            1.0 * (1.0 - ta * 0.28) + (tr / 255.0) * (ta * 0.38),
+            1.0 * (1.0 - ta * 0.28) + (tg / 255.0) * (ta * 0.38),
+            1.0 * (1.0 - ta * 0.28) + (tb / 255.0) * (ta * 0.38),
         )
         amb_col = (
-            0.78 * (1.0 - ta * 0.40) + (tr / 255.0) * (ta * 0.50),
-            0.80 * (1.0 - ta * 0.40) + (tg / 255.0) * (ta * 0.50),
-            0.86 * (1.0 - ta * 0.40) + (tb / 255.0) * (ta * 0.50),
+            0.80 * (1.0 - ta * 0.38) + (tr / 255.0) * (ta * 0.48),
+            0.80 * (1.0 - ta * 0.38) + (tg / 255.0) * (ta * 0.48),
+            0.84 * (1.0 - ta * 0.38) + (tb / 255.0) * (ta * 0.48),
         )
         rr, rg, rb = atmosphere.rim_light
         self.prog["u_light_color"].value = light_col
         self.prog["u_ambient_color"].value = amb_col
         self.prog["u_rim_color"].value = (rr / 255.0, rg / 255.0, rb / 255.0)
-        self.prog["u_rim_strength"].value = 0.52 + ta * 0.38
-        self.prog["u_outline_color"].value = (0.07, 0.04, 0.11)
+        self.prog["u_rim_strength"].value = 0.48 + ta * 0.36
+        # Tinta marrom-café/ameixa escura estilo Tree of Savior (muito mais suave e artística que preto duro!)
+        self.prog["u_outline_color"].value = (0.14, 0.07, 0.09)
         self.prog["u_pixel_art"].value = 1 if self.pixel_art else 0
 
-        # Modelo procedural DungeonSquad já traz sua própria paleta por traje/persona!
-        role_tints = compute_role_tints(persona, outfit_key, dynamic_recolor=(dynamic_recolor and not is_ds_builtin))
+        role_tints = compute_role_tints(persona, outfit_key, dynamic_recolor=(dynamic_recolor and not is_builtin))
 
         if self.pixel_art:
             self._fbo_pa_geom.use()
@@ -588,11 +620,11 @@ class VrmRenderer:
             self._fbo_draw.use()
             self.ctx.viewport = (0, 0, self.width, self.height)
             self.ctx.clear(0.0, 0.0, 0.0, 0.0, depth=1.0)
-            # Inverted-hull apenas no modo 3D suave (no pixel-art usamos contorno 1px perfeito no pós-processo!)
+            # Contorno fino elegante estilo Tree of Savior (inverted-hull delicado fora do rosto/olhos!)
             self.ctx.enable(moderngl.CULL_FACE)
             self.ctx.front_face = "cw"
             self.prog["u_is_outline"].value = 1
-            self.prog["u_outline_extrude"].value = 0.0040
+            self.prog["u_outline_extrude"].value = 0.0026 if camera_focus == "portrait" else 0.0034
             for gp in self._sorted_prims:
                 mat = self.model.materials[gp.prim.material_index] if 0 <= gp.prim.material_index < len(self.model.materials) else None
                 if mat is None or mat.alpha_mode != "OPAQUE" or mat.role in ("face", "eye", "emissive"):
@@ -603,7 +635,6 @@ class VrmRenderer:
                 self.prog["u_mat_group"].value = _ROLE_GROUP_ID.get(mat.role, 3.0)
                 gp.vao.render(moderngl.TRIANGLES)
 
-        # Render principal da geometria 3D
         self.ctx.enable(moderngl.DEPTH_TEST)
         self.ctx.front_face = "ccw"
         self.prog["u_is_outline"].value = 0
@@ -624,6 +655,7 @@ class VrmRenderer:
                 self.prog["u_alpha_mode"].value = alpha_code.get(mat.alpha_mode, 0)
                 self.prog["u_alpha_cutoff"].value = mat.alpha_cutoff
                 self.prog["u_is_face"].value = 1 if mat.role == "face" else 0
+                self.prog["u_is_skin"].value = 1 if mat.role == "skin" else 0
                 self.prog["u_is_eye"].value = 1 if mat.role == "eye" else 0
                 self.prog["u_is_hair"].value = 1 if mat.role == "hair" else 0
                 self.prog["u_is_emissive"].value = 1 if mat.role == "emissive" else 0
@@ -642,6 +674,7 @@ class VrmRenderer:
                 self.prog["u_role_tint"].value = (1.0, 1.0, 1.0)
                 self.prog["u_alpha_mode"].value = 0
                 self.prog["u_is_face"].value = 0
+                self.prog["u_is_skin"].value = 0
                 self.prog["u_is_eye"].value = 0
                 self.prog["u_is_hair"].value = 0
                 self.prog["u_is_emissive"].value = 0
@@ -655,7 +688,6 @@ class VrmRenderer:
         self.ctx.disable(moderngl.CULL_FACE)
 
         if self.pixel_art:
-            # Passo 2: Pós-processamento pixel-art 1px outline + internal creases!
             self._fbo_pa_out.use()
             self.ctx.viewport = (0, 0, self.pixel_w, self.pixel_h)
             self.ctx.disable(moderngl.DEPTH_TEST)
