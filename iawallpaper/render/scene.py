@@ -256,8 +256,12 @@ class SceneCompositor:
         else:
             self.whisper_rect = QRectF()
 
-        # HUD ambiental ultra-discreto no canto inferior esquerdo (estilo Wallpaper Engine)
-        self._paint_ambient_hud(painter, width, height, circadian, weather, emotion, avatar.persona.name, affinity, activity)
+        # HUD ambiental ultra-discreto no canto inferior esquerdo (com retrato 2D expressivo se disponível!)
+        display_name = avatar._char_pack.name if avatar._char_pack is not None else avatar.persona.name
+        mood_portrait = avatar._char_pack.portrait_for_mood("sleepy" if asleep else emotion.mood) if avatar._char_pack is not None else None
+        self._paint_ambient_hud(
+            painter, width, height, circadian, weather, emotion, display_name, affinity, activity, portrait=mood_portrait
+        )
 
         painter.restore()
         return atmo
@@ -468,30 +472,53 @@ class SceneCompositor:
         persona_name: str,
         affinity: float,
         activity: str,
+        portrait: QPixmap | None = None,
     ) -> None:
-        """Card glassmórfico discreto no canto inferior esquerdo (escala responsiva para nunca cobrir a personagem)."""
+        """Card glassmórfico discreto no canto inferior esquerdo (com medalhão de retrato 2D expressivo quando disponível)."""
         hh = int(circadian.hour) % 24
         mm = int((circadian.hour - int(circadian.hour)) * 60.0)
         sc = clamp(h / 1080.0, 0.56, 1.0)
-        card_w, card_h = 355.0 * sc, 74.0 * sc
+        has_p = portrait is not None and not portrait.isNull()
+        p_pad = 64.0 * sc if has_p else 0.0
+        card_w, card_h = 355.0 * sc + p_pad, 74.0 * sc
         rect = QRectF(24.0 * sc, h - card_h - 54.0 * sc, card_w, card_h)
 
         painter.setBrush(QColor(12, 16, 30, 152))
         painter.setPen(QPen(QColor(255, 255, 255, 42), 1.0))
         painter.drawRoundedRect(rect, 14.0 * sc, 14.0 * sc)
 
+        if has_p and portrait is not None:
+            pr = 28.0 * sc
+            pcx = rect.left() + 10.0 * sc + pr
+            pcy = rect.center().y()
+            clip_path = QPainterPath()
+            clip_path.addEllipse(QPointF(pcx, pcy), pr, pr)
+            painter.save()
+            painter.setBrush(QColor(34, 42, 68, 220))
+            painter.setPen(QPen(QColor(245, 212, 138, 195), 1.8 * sc))
+            painter.drawEllipse(QPointF(pcx, pcy), pr, pr)
+            painter.setClipPath(clip_path)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            pw, ph = portrait.width(), portrait.height()
+            side = pr * 2.18
+            scale_p = max(side / max(pw, 1), side / max(ph, 1))
+            dw, dh = pw * scale_p, ph * scale_p
+            painter.drawPixmap(QRectF(pcx - dw * 0.5, pcy - dh * 0.44, dw, dh), portrait, QRectF(portrait.rect()))
+            painter.restore()
+
+        tx = p_pad
         f_clock = QFont("Segoe UI", max(10, int(17 * sc)))
         f_clock.setBold(True)
         painter.setFont(f_clock)
         painter.setPen(QColor(245, 248, 255, 240))
-        painter.drawText(rect.adjusted(14 * sc, 7 * sc, -14 * sc, -32 * sc), Qt.AlignLeft | Qt.AlignVCenter, f"{hh:02d}:{mm:02d}")
+        painter.drawText(rect.adjusted(14 * sc + tx, 7 * sc, -14 * sc, -32 * sc), Qt.AlignLeft | Qt.AlignVCenter, f"{hh:02d}:{mm:02d}")
 
         f_sub = QFont("Segoe UI", max(7, int(9 * sc)))
         painter.setFont(f_sub)
         painter.setPen(QColor(202, 218, 245, 220))
         line1 = f"{circadian.label_pt} · {weather.label_pt} ({weather.temperature_c:.0f}°C)"
-        painter.drawText(rect.adjusted(96 * sc, 9 * sc, -12 * sc, -34 * sc), Qt.AlignLeft | Qt.AlignVCenter, line1)
+        painter.drawText(rect.adjusted(96 * sc + tx, 9 * sc, -12 * sc, -34 * sc), Qt.AlignLeft | Qt.AlignVCenter, line1)
 
         line2 = f"{persona_name} · {emotion.label} · Afinidade {affinity:.0f}% · {activity}"
         painter.setPen(QColor(168, 205, 255, 215))
-        painter.drawText(rect.adjusted(14 * sc, 40 * sc, -12 * sc, -6 * sc), Qt.AlignLeft | Qt.AlignVCenter, line2)
+        painter.drawText(rect.adjusted(14 * sc + tx, 40 * sc, -12 * sc, -6 * sc), Qt.AlignLeft | Qt.AlignVCenter, line2)

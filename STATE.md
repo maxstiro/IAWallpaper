@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-23 (Milestone 18 Concluído — **Arya** como piloto no **Motor Wan 2.2 de Máximo Reaproveitamento**: `character_pack.py` + `character_pipeline.py` integrados, 8 direções reais via 5 ângulos canônicos espelhados, sincronia matemática passo-chão, reversão temporal de transições e **34/34 testes verdes**)
+> **Última atualização**: 2026-11-23 (Milestone 18.5 Concluído — **Biblioteca Completa da Arya na Roupa Base**: **15 clipes Wan 2.2 @ 16 FPS** cobrindo todos os 5/5 ângulos canônicos [8 direções], todas as posturas [`sit_floor`, `sit_chair`, `lie`], ações [`wave` 41f, `interact`, `spin` 360°], **3 transições reversíveis** [`trans_sit_floor`, `trans_sit_chair`, `trans_lie`] + **6 retratos expressivos 2D** no medalhão ao vivo do HUD · **34/34 testes verdes**)
 
 ---
 
@@ -25,11 +25,12 @@
 ## 2. Assets Locais (fora do Git)
 - **Personagem Piloto Oficial — Arya (`assets/generated/characters/arya/`)**:
   - `character.json` + `master_idle_SE.png` (~4.1 cabeças estilo *Rapscallion × Dungeon Squad × Tree of Savior* em roupa base creme/marrom).
-  - `outfits/base/anchors/`: `master.png`, `walk_SE.png`, `walk_L.png`, `walk_NE.png`, `walk_N.png` (poses-âncora de passo puro via Qwen 2.1 Edit, sem mão na cintura estática).
-  - `outfits/base/clips/` (5 clipes assados @ 16 FPS cobrindo todas as **8 direções**): `clip_idle_SE.webp` (41f), `clip_walk_SE.webp` (25f), `clip_walk_L.webp` (25f), `clip_walk_NE.webp` (25f), `clip_walk_N.webp` (25f) + `manifest.json` pronto para fila background de Tiers 1/2 (`wave_SE`, `walk_S`, `sit_floor_SE`, `sit_chair_SE`, `lie_SE`, `interact_SE`, `trans_sit_floor`, `trans_sit_chair`, `trans_lie`, `run_*`, `spin_SE`).
+  - `portraits/` (**6 retratos expressivos 2D desacoplados** exibidos no medalhão ao vivo do HUD): `happy.png`, `affectionate.png`, `shy.png`, `pouty.png`, `sleepy.png`, `focused.png`.
+  - `outfits/base/anchors/` (**9 poses-âncora Qwen 2.1 Edit**): `master.png`, `walk_SE.png`, `walk_L.png`, `walk_NE.png`, `walk_N.png`, `walk_S.png`, `sit_floor_SE.png`, `sit_chair_SE.png`, `lie_SE.png`.
+  - `outfits/base/clips/` (**15 clipes Wan 2.2 @ 16 FPS assados**): `idle_SE` (41f), `wave_SE` (41f), `walk_S/SE/L/NE/N` (25f — todos os 5/5 ângulos canônicos cobrindo 8 direções + corrida acelerada `1.45×`), `sit_floor_SE` (25f), `sit_chair_SE` (25f), `lie_SE` (25f), `interact_SE` (25f), `spin_SE` (25f), e **3 transições reversíveis** `trans_sit_floor`, `trans_sit_chair`, `trans_lie` (25f — ida e volta automática via `reverse=True`!).
 - **Cenário Padrão — Observatório Celeste (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**: Praça aberta ensolarada estilo Tree of Savior reiluminada 1:1 via Qwen 2.1 (`day`, `sunset`, `night`, `rain`).
 - **Motores Opcionais Preservados**: Rig Live2D 2.5D (`assets/generated/live2d/elfa_loira/`) e 4 Arquétipos 3D VRM (`assets/generated/vrm/`).
-- **Prévias & GIFs Validados (Milestone 18)**: `m18_arya_8dir_strip.png`, `m18_plaza_check_strip.png` e `m18_arya_8dir_plaza_tg.gif` (16 FPS, 8 direções com passo sincronizado enviados ao Telegram).
+- **Prévias & GIFs Validados (Milestones 18 & 18.5)**: `m18_arya_8dir_strip.png`, `m18_arya_8dir_plaza_v2_tg.gif`, `m185_arya_portraits_and_anchors.png`, `m185_arya_actions_strip.png` e `m185_arya_life_plaza_tg.gif` (todos enviados e validados no Telegram).
 
 ---
 
@@ -43,6 +44,6 @@
 ---
 
 ## 4. Próximas Etapas
-- **Expansão de Biblioteca da Arya (Tiers 1/2 em Background + Outfits 1:1)**: Assar os clipes restantes da `base/` (`wave_SE`, `walk_S`, posturas `sit_floor/sit_chair/lie`, `interact_SE`, transições reversíveis `trans_sit_floor/trans_sit_chair/trans_lie` e retratos expressivos `portraits/*.png`) + gerar o primeiro outfit completo 1:1 (ex: roupa aventureira/casual) sobre as âncoras da Arya.
-- **Replicação do Fluxo para Novas Personagens**: Usar `CharacterPipeline` para criar as demais garotas base (Humana Ruiva, Androide Rosa, Vampira) na mesma pasta padronizada `assets/generated/characters/<id>/`.
+- **1º Outfit Completo 1:1 da Arya (`generate_outfit_anchors_sync`)**: Vestir as 9 âncoras da `base/` com o primeiro traje completo 1:1 via Qwen Image 2.1 Edit (zero retrabalho de pose!) e assar os clipes do novo traje.
+- **Replicação do Fluxo para Novas Personagens**: Usar `CharacterPipeline` para criar a próxima personagem (`Humana Ruiva`, `Androide Rosa` ou `Vampira`) na estrutura padronizada `assets/generated/characters/<id>/`.
 - **Milestone 19**: Ancoragem ao vivo Windows 11 Build 26300, multi-monitor independente e áudio reativo opcional.

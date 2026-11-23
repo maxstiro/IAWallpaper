@@ -88,6 +88,15 @@ class ClipMeta:
     loop: bool = True
 
 
+# Escala de altura relativa ao corpo em pé (mantém o tamanho da cabeça 1:1 quando sentada/deitada após recorte tight do clipe!)
+CLIP_HEIGHT_SCALE: dict[str, float] = {
+    "sit_floor_SE": 0.78,
+    "sit_chair_SE": 0.90,
+    "lie_SE":       0.70,
+    "trans_lie":    0.78,
+}
+
+
 @dataclass(frozen=True)
 class ResolvedClip:
     clip: SpriteClip
@@ -97,6 +106,7 @@ class ResolvedClip:
     speed_mul: float = 1.0
     stride_ratio: float = 0.0
     loop: bool = True
+    height_scale: float = 1.0
 
 
 @dataclass
@@ -127,7 +137,16 @@ class CharacterPack:
         if clip is None:
             return None
         _, flip_x = DIRECTION_TO_CANONICAL.get(compass_dir, ("SE", False))
-        return ResolvedClip(clip=clip, key=tkey, flip_x=flip_x, reverse=is_rev, speed_mul=1.0, stride_ratio=0.0, loop=False)
+        return ResolvedClip(
+            clip=clip,
+            key=tkey,
+            flip_x=flip_x,
+            reverse=is_rev,
+            speed_mul=1.0,
+            stride_ratio=0.0,
+            loop=False,
+            height_scale=CLIP_HEIGHT_SCALE.get(tkey, 1.0),
+        )
 
     def resolve_action(self, action: str, compass_dir: str = "SE") -> ResolvedClip | None:
         """Resolve o melhor clipe disponível para `(action, compass_dir)` aplicando espelhamento 8->5 e fallback de Tier."""
@@ -213,7 +232,16 @@ class CharacterPack:
         for cand in alias_map.get(action, ("idle_SE", "idle")):
             c = _get(cand)
             if c is not None:
-                return ResolvedClip(clip=c, key=cand, flip_x=posture_flip, reverse=False, speed_mul=1.0, stride_ratio=0.0, loop=True)
+                return ResolvedClip(
+                    clip=c,
+                    key=cand,
+                    flip_x=posture_flip,
+                    reverse=False,
+                    speed_mul=1.0,
+                    stride_ratio=0.0,
+                    loop=True,
+                    height_scale=CLIP_HEIGHT_SCALE.get(cand, 1.0),
+                )
 
         # Último fallback: primeiro clipe disponível
         first_k, first_c = next(iter(self.clips.items()))

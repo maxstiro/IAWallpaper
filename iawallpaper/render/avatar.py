@@ -1098,8 +1098,8 @@ class AvatarRig:
         if frame.isNull():
             return
 
-        # Altura projetada calibrada 1:1 com `CharacterPack.synced_walk_speed_norm` (h_norm ≈ 0.36 * depth_scale!)
-        target_h = 385.0 * u
+        # Altura projetada calibrada 1:1 com `CharacterPack.synced_walk_speed_norm` e `height_scale` de postura!
+        target_h = 385.0 * u * resolved.height_scale
         aspect = frame.width() / max(frame.height(), 1)
         target_w = target_h * aspect
         sx = -1.0 if resolved.flip_x else 1.0

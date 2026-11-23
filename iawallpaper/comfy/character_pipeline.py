@@ -619,6 +619,57 @@ class CharacterPipeline:
             out[k] = dst
         return out
 
+    def generate_portraits_sync(
+        self,
+        char_dir: Path,
+        expressions: tuple[str, ...] | list[str] | None = None,
+        base_seed: int = 79100,
+        skip_existing: bool = True,
+        on_progress: Callable[[str], None] | None = None,
+    ) -> dict[str, Path]:
+        """Gera os retratos 2D expressivos desacoplados (`portraits/<mood>.png`) via Qwen Image 2.1 Edit."""
+        char_dir = Path(char_dir)
+        master_p = char_dir / "master_idle_SE.png"
+        if not master_p.is_file():
+            master_p = char_dir / "outfits" / "base" / "anchors" / "master.png"
+        if not master_p.is_file():
+            raise FileNotFoundError(f"master_idle_SE.png ausente em {char_dir}")
+
+        pdir = char_dir / "portraits"
+        pdir.mkdir(parents=True, exist_ok=True)
+        up_master = self.bridge.upload_image_on_white(master_p, f"iaw_portrait_master_{char_dir.name}.png")
+
+        keys = list(expressions) if expressions is not None else list(PORTRAIT_EXPRESSIONS.keys())
+        out: dict[str, Path] = {}
+        for idx, expr in enumerate(keys):
+            desc = PORTRAIT_EXPRESSIONS.get(expr)
+            if not desc:
+                continue
+            dst = pdir / f"{expr}.png"
+            if skip_existing and dst.is_file():
+                out[expr] = dst
+                continue
+            if on_progress:
+                on_progress(f"Gerando retrato expressivo {expr}...")
+            g = build_qwen_anchor_workflow(
+                base_uploaded_image=up_master,
+                prompt=(
+                    f"Keep this exact curvy shortstack character, exact face, exact hair, exact ears, exact skin tone, "
+                    f"exact top/outfit and crisp 2D Rapscallion Tree of Savior hand-painted ink art style. "
+                    f"Frame as a clean CLOSE-UP BUST PORTRAIT (head, ears, shoulders and upper chest centered, facing viewer) showing a vivid "
+                    f"{desc}, pure solid flat white background, zero background scenery."
+                ),
+                neg="full body, legs, feet, different character, 3d render, photorealistic, shadow, scenery, text, watermark, 2girls",
+                prefix=f"IAW_portrait_{char_dir.name}_{expr}",
+                seed=base_seed + idx * 13,
+                steps=10,
+                cfg=1.45,
+                use_rembg=True,
+            )
+            self._run_and_save(g, dst, timeout_s=300.0)
+            out[expr] = dst
+        return out
+
     def generate_outfit_anchors_sync(
         self,
         char_dir: Path,
