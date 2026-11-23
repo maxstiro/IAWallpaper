@@ -27,10 +27,14 @@ class SpriteClip:
     def duration(self) -> float:
         return len(self.frames) / max(self.fps, 1.0)
 
-    def frame_at(self, time_s: float) -> QPixmap:
+    def frame_at(self, time_s: float, reverse: bool = False, loop: bool = True) -> QPixmap:
         if not self.frames:
             return QPixmap()
-        idx = int(time_s * self.fps) % len(self.frames)
+        n = len(self.frames)
+        raw_idx = int(max(0.0, time_s) * self.fps)
+        idx = (raw_idx % n) if loop else min(raw_idx, n - 1)
+        if reverse:
+            idx = (n - 1) - idx
         return self.frames[idx]
 
 

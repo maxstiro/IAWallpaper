@@ -37,6 +37,7 @@ class Paths:
         self.vrm_generated_dir = self.generated_dir / "vrm"
         self.live2d_dir = self.assets_dir / "live2d"
         self.live2d_generated_dir = self.generated_dir / "live2d"
+        self.characters_generated_dir = self.generated_dir / "characters"
 
         self.settings_file = self.data_dir / "settings.json"
         self.routine_file = self.data_dir / "routine.json"
@@ -122,3 +123,24 @@ class Paths:
                     if sub.is_dir() and (sub / "base.png").is_file():
                         return sub
         return None
+
+    def list_character_packs(self) -> list[Path]:
+        """Lista todas as pastas de personagens padronizadas (`assets/generated/characters/<char_id>/`)."""
+        if not self.characters_generated_dir.is_dir():
+            return []
+        return sorted(
+            sub for sub in self.characters_generated_dir.iterdir()
+            if sub.is_dir() and (sub / "outfits").is_dir()
+        )
+
+    def resolve_character_dir(self, char_id: str = "arya") -> Path | None:
+        """Resolve a pasta de um CharacterPack Wan 2.2 (`characters/<char_id>/`) ou o primeiro disponível."""
+        key = str(char_id or "arya").strip()
+        direct = Path(key)
+        if direct.is_dir() and (direct / "outfits").is_dir():
+            return direct
+        cand = self.characters_generated_dir / key.lower()
+        if cand.is_dir() and (cand / "outfits").is_dir():
+            return cand
+        packs = self.list_character_packs()
+        return packs[0] if packs else None

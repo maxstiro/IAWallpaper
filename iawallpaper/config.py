@@ -7,7 +7,7 @@ from .mathutil import clamp, valor_real
 from .store import read_json, write_json
 
 VALID_MODES = ("wallpaper", "preview")
-VALID_RENDER_STYLES = ("live2d_25d", "vrm_3d", "world_sprite", "portrait")
+VALID_RENDER_STYLES = ("world_sprite", "live2d_25d", "vrm_3d", "portrait")
 VALID_WEATHER_MODES = ("auto", "clear", "cloudy", "rain", "storm", "snow", "fog")
 VALID_OUTFITS = (None, "base", "casual", "cozy", "rainy", "focus", "nightwear", "starlight")
 
@@ -15,9 +15,10 @@ VALID_OUTFITS = (None, "base", "casual", "cozy", "rainy", "focus", "nightwear", 
 @dataclass
 class Settings:
     persona_id: str = "mira"
+    character_id: str = "arya"
     scene_id: str = "sky_sanctuary"
     mode: str = "wallpaper"
-    render_style: str = "live2d_25d"
+    render_style: str = "world_sprite"
     vrm_model: str = "elfa_loira"
     vrm_dynamic_recolor: bool = False
     fps_cap: int = 60
@@ -42,7 +43,7 @@ class Settings:
     def sanitized(self) -> "Settings":
         """Retorna uma cópia validada dentro dos domínios seguros."""
         mode = self.mode if self.mode in VALID_MODES else "wallpaper"
-        render_style = self.render_style if self.render_style in VALID_RENDER_STYLES else "live2d_25d"
+        render_style = self.render_style if self.render_style in VALID_RENDER_STYLES else "world_sprite"
         weather_mode = self.weather_mode if self.weather_mode in VALID_WEATHER_MODES else "auto"
         outfit = self.outfit_override if self.outfit_override in VALID_OUTFITS else None
         fps_cap = 30 if int(self.fps_cap) <= 30 else 60
@@ -62,6 +63,7 @@ class Settings:
                 lat, lon = None, None
         return Settings(
             persona_id=str(self.persona_id or "mira").strip().lower(),
+            character_id=str(self.character_id or "arya").strip().lower(),
             scene_id=str(self.scene_id or "sky_sanctuary").strip().lower(),
             mode=mode,
             render_style=render_style,

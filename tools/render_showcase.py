@@ -114,10 +114,11 @@ def render_world_showcase(
     persona_id: str,
     scene_id: str,
     out_path: Path,
-    render_style: str = "live2d_25d",
+    render_style: str = "world_sprite",
     vrm_name: str = "",
+    character_id: str = "arya",
 ) -> Path:
-    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (Motor 2.5D Live2D/Spine2D, 3D VRM ou Clipes Wan 2.2)."""
+    """Renderiza mosaico 2x2 no modo Mundo Vivo 2.5D (Clipes Wan 2.2 8-Dir, Live2D/Spine2D ou 3D VRM)."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -127,6 +128,7 @@ def render_world_showcase(
     persona = load_persona(persona_id, personas_dir=paths.personas_dir)
     vrm_p = paths.resolve_vrm_model(vrm_name) if render_style == "vrm_3d" else None
     l2d_p = paths.resolve_live2d_rig(vrm_name or "elfa_loira") if render_style == "live2d_25d" else None
+    char_p = paths.resolve_character_dir(character_id) if render_style == "world_sprite" else None
     canvas = WallpaperCanvas(
         persona,
         sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
@@ -134,6 +136,7 @@ def render_world_showcase(
         render_style=render_style,
         vrm_path=vrm_p,
         live2d_dir=l2d_p,
+        character_dir=char_p,
     )
     canvas.avatar.vrm_dynamic_recolor = False  # preserva as cores nativas do VRM no showcase
 
@@ -273,11 +276,12 @@ def render_animated_gif(
     out_path: Path,
     width: int = 720,
     height: int = 405,
-    fps: int = 20,
-    render_style: str = "live2d_25d",
+    fps: int = 16,
+    render_style: str = "world_sprite",
     vrm_name: str = "",
+    character_id: str = "arya",
 ) -> Path:
-    """Renderiza GIF animado fluido em 20 FPS demonstrando motor Live2D/Spine2D, caminhada, cabelo fluido e aceno."""
+    """Renderiza GIF animado fluido demonstrando Clipes Wan 2.2 (8 Direções + Step Sync), Live2D ou VRM."""
     app = QApplication.instance() or QApplication([])
     for f in (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"):
         if Path(f).exists():
@@ -287,6 +291,7 @@ def render_animated_gif(
     persona = load_persona(persona_id, personas_dir=paths.personas_dir)
     vrm_p = paths.resolve_vrm_model(vrm_name) if render_style == "vrm_3d" else None
     l2d_p = paths.resolve_live2d_rig(vrm_name or "elfa_loira") if render_style == "live2d_25d" else None
+    char_p = paths.resolve_character_dir(character_id) if render_style == "world_sprite" else None
     canvas = WallpaperCanvas(
         persona,
         sprite_dirs=[paths.persona_assets(persona.id), paths.persona_generated_assets(persona.id)],
@@ -294,6 +299,7 @@ def render_animated_gif(
         render_style=render_style,
         vrm_path=vrm_p,
         live2d_dir=l2d_p,
+        character_dir=char_p,
     )
     canvas.avatar.vrm_dynamic_recolor = False
     canvas.avatar.outfit = "base"
@@ -369,17 +375,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--persona", default="mira")
     parser.add_argument("--scene", default="sky_sanctuary")
-    parser.add_argument("--style", choices=("live2d_25d", "vrm_3d", "world_sprite"), default="live2d_25d")
+    parser.add_argument("--style", choices=("world_sprite", "live2d_25d", "vrm_3d"), default="world_sprite")
+    parser.add_argument("--character", default="arya", help="ID do CharacterPack Wan 2.2 (ex: 'arya').")
     parser.add_argument("--vrm", default="elfa_loira", help="Arquétipo HD ('elfa_loira'|'humana_ruiva'|'androide_rosa'|'vampira_negra') ou caminho .vrm.")
     parser.add_argument("--mode", choices=("world", "scenes", "expressions", "outfits", "sprites", "rig_parts", "gif"), default="world")
     parser.add_argument("--out", default="showcase.png")
     args = parser.parse_args()
     if args.mode == "world":
-        out = render_world_showcase(args.persona, args.scene, Path(args.out), render_style=args.style, vrm_name=args.vrm)
+        out = render_world_showcase(args.persona, args.scene, Path(args.out), render_style=args.style, vrm_name=args.vrm, character_id=args.character)
     elif args.mode == "rig_parts":
         out = render_rig_parts_sheet(args.persona, Path(args.out))
     elif args.mode == "gif":
-        out = render_animated_gif(args.persona, args.scene, Path(args.out), render_style=args.style, vrm_name=args.vrm)
+        out = render_animated_gif(args.persona, args.scene, Path(args.out), render_style=args.style, vrm_name=args.vrm, character_id=args.character)
     elif args.mode == "sprites":
         out = render_strip(args.persona, ["rig_base", "sprite_idle", "sprite_walk1", "sprite_walk2", "sprite_sit", "sprite_happy"], Path(args.out))
     elif args.mode == "expressions":

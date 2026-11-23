@@ -427,3 +427,123 @@ def test_live2d_25d_gpu_mesh_engine(tmp_path):
         frame = canvas.render_to_image(640, 360)
         assert not frame.isNull()
         assert not canvas.avatar.head_rect.isEmpty()
+
+
+def test_character_pack_8dir_mirroring_reversal_and_step_sync(tmp_path):
+    _ensure_qapp()
+    import json
+    from PIL import Image, ImageDraw
+    from iawallpaper.render.character_pack import load_character_pack, vector_to_compass8
+
+    # 1. Bússola 8 direções (compensando 16:9)
+    assert vector_to_compass8(0.0, 1.0) == "S"
+    assert vector_to_compass8(0.56, 1.0) == "SE"
+    assert vector_to_compass8(1.0, 0.0) == "L"
+    assert vector_to_compass8(0.56, -1.0) == "NE"
+    assert vector_to_compass8(0.0, -1.0) == "N"
+    assert vector_to_compass8(-0.56, -1.0) == "NO"
+    assert vector_to_compass8(-1.0, 0.0) == "O"
+    assert vector_to_compass8(-0.56, 1.0) == "SO"
+
+    # 2. Monta CharacterPack sintético da Arya
+    char_dir = tmp_path / "arya"
+    outfit_dir = char_dir / "outfits" / "base"
+    clips_dir = outfit_dir / "clips"
+    clips_dir.mkdir(parents=True)
+    (char_dir / "portraits").mkdir(parents=True)
+
+    (char_dir / "character.json").write_text(
+        json.dumps({"id": "arya", "name": "Arya", "default_outfit": "base"}), encoding="utf-8"
+    )
+    (outfit_dir / "manifest.json").write_text(
+        json.dumps({
+            "character_id": "arya",
+            "outfit_id": "base",
+            "default_stride_ratio": 0.62,
+            "clips": {
+                "idle_SE": {"tier": 0, "fps": 16.0, "frames": 4, "stride_ratio": 0.0, "loop": True, "status": "ready"},
+                "walk_SE": {"tier": 0, "fps": 16.0, "frames": 4, "stride_ratio": 0.64, "loop": True, "status": "ready"},
+                "walk_L": {"tier": 1, "fps": 16.0, "frames": 4, "stride_ratio": 0.72, "loop": True, "status": "ready"},
+                "walk_NE": {"tier": 0, "fps": 16.0, "frames": 4, "stride_ratio": 0.60, "loop": True, "status": "ready"},
+                "walk_N": {"tier": 1, "fps": 16.0, "frames": 4, "stride_ratio": 0.56, "loop": True, "status": "ready"},
+                "sit_floor_SE": {"tier": 1, "fps": 16.0, "frames": 4, "stride_ratio": 0.0, "loop": True, "status": "ready"},
+                "trans_sit_floor": {"tier": 2, "fps": 16.0, "frames": 4, "stride_ratio": 0.0, "loop": False, "status": "ready"},
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    for cname in ("clip_idle_SE.webp", "clip_walk_SE.webp", "clip_walk_L.webp", "clip_walk_NE.webp", "clip_walk_N.webp", "clip_sit_floor_SE.webp", "clip_trans_sit_floor.webp"):
+        frames = []
+        for i in range(4):
+            im = Image.new("RGBA", (96, 140), (0, 0, 0, 0))
+            ImageDraw.Draw(im).rectangle([24, 16 + i * 2, 72, 130], fill=(220 - i * 20, 175, 110 + i * 20, 255))
+            frames.append(im)
+        frames[0].save(clips_dir / cname, save_all=True, append_images=frames[1:], duration=62, loop=0)
+
+    p_img = Image.new("RGBA", (64, 64), (240, 200, 140, 255))
+    p_img.save(char_dir / "portraits" / "happy.png")
+
+    pack = load_character_pack(char_dir, "base")
+    assert pack is not None
+    assert pack.name == "Arya"
+    assert pack.portrait_for_mood("happy") is not None
+
+    # Espelhamento 8->5 canônico + fallback
+    assert (pack.resolve_action("walk", "SO").key, pack.resolve_action("walk", "SO").flip_x) == ("walk_SE", True)
+    assert (pack.resolve_action("walk", "O").key, pack.resolve_action("walk", "O").flip_x) == ("walk_L", True)
+    assert (pack.resolve_action("walk", "NO").key, pack.resolve_action("walk", "NO").flip_x) == ("walk_NE", True)
+    assert (pack.resolve_action("walk", "N").key, pack.resolve_action("walk", "N").flip_x) == ("walk_N", False)
+    assert pack.resolve_action("walk", "S").key == "walk_SE"  # fallback automático sem walk_S
+
+    # Reaproveitamento de `run` acelerando `walk` em 1.45x
+    run_res = pack.resolve_action("run", "O")
+    assert run_res.key == "walk_L" and run_res.flip_x is True and run_res.speed_mul == 1.45
+
+    # Transição normal e reversa (0s de geração extra para levantar!)
+    tr_down = pack.resolve_transition("idle", "sit_floor", "SE")
+    tr_up = pack.resolve_transition("sit_floor", "idle", "SE")
+    assert tr_down is not None and tr_down.reverse is False and tr_down.loop is False
+    assert tr_up is not None and tr_up.reverse is True and tr_up.loop is False
+    assert tr_down.clip.frame_at(0.0, reverse=False, loop=False).toImage() == tr_up.clip.frame_at(9.0, reverse=True, loop=False).toImage()
+
+    # Velocidade sincronizada com profundidade
+    v_near = pack.synced_walk_speed_norm(pack.resolve_action("walk", "L"), depth_scale=1.0)
+    v_far = pack.synced_walk_speed_norm(pack.resolve_action("walk", "L"), depth_scale=0.6)
+    assert v_near > v_far > 0.0
+
+    # Integração completa no WallpaperCanvas (8 direções + corrida + transição reversa)
+    mira = load_persona("mira")
+    canvas = WallpaperCanvas(mira, render_style="world_sprite", character_dir=char_dir)
+    assert canvas.avatar.has_character_pack()
+
+    canvas.avatar.pos_x, canvas.avatar.pos_y = 0.50, 0.90
+    canvas.avatar.walk_to(0.50, 0.72)
+    canvas.step_animation(0.05)
+    img_n = canvas.render_to_image(480, 270)
+    assert not img_n.isNull()
+    assert canvas.avatar.compass_dir == "N"
+    assert canvas.avatar._current_pack_sig == ("walk_N", False, False)
+
+    canvas.avatar.walk_to(0.25, 0.72, run=True)
+    canvas.step_animation(0.05)
+    canvas.render_to_image(480, 270)
+    assert canvas.avatar.action == "run"
+    assert canvas.avatar.compass_dir == "O"
+    assert canvas.avatar._current_pack_sig == ("walk_L", True, False)
+
+    # Sentar e levantar usando a mesma transição em sentido direto e reverso!
+    canvas.avatar.target_x, canvas.avatar.target_y = canvas.avatar.pos_x, canvas.avatar.pos_y
+    canvas.avatar.action = "idle"
+    canvas.avatar.trigger_action("sit_floor")
+    assert canvas.avatar._trans_resolved is not None and canvas.avatar._trans_resolved.reverse is False
+    for _ in range(12):
+        canvas.step_animation(0.05)
+    assert canvas.avatar.action == "sit_floor" and canvas.avatar._trans_resolved is None
+
+    canvas.avatar.trigger_action("idle")
+    assert canvas.avatar._trans_resolved is not None and canvas.avatar._trans_resolved.reverse is True
+    for _ in range(12):
+        canvas.step_animation(0.05)
+    assert canvas.avatar.action == "idle" and canvas.avatar._trans_resolved is None
+    assert not canvas.render_to_image(480, 270).isNull()

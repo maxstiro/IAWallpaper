@@ -3,6 +3,12 @@
 from pathlib import Path
 
 from iawallpaper.comfy.bridge import ComfyBridge
+from iawallpaper.comfy.character_pipeline import (
+    TIER_CLIP_CATALOG,
+    CharacterPipeline,
+    build_qwen_anchor_workflow,
+    build_wan_transition_workflow,
+)
 from iawallpaper.comfy.presets import LoraSpec, find_comfy_preset, load_comfy_presets
 from iawallpaper.comfy.workflows import (
     build_avatar_variant_img2img_workflow,
@@ -166,3 +172,60 @@ def test_director_outfits_whispers_and_sleep(tmp_path: Path):
     )
     assert out_sleep.asleep is True
     assert out_sleep.outfit == "nightwear"
+
+
+def test_character_pipeline_workflows_and_init(tmp_path: Path):
+    from PIL import Image
+
+    # Loop Wan 2.2 (start == end) -> sem nó 9b, 25f @ 16 FPS, isnet-anime sem alpha_matting
+    g_loop = build_wan_transition_workflow(
+        start_uploaded_image="arya_walk_N.png",
+        end_uploaded_image="arya_walk_N.png",
+        clip_key="walk_N",
+        prompt="continuous back walk cycle",
+        character_id="arya",
+        length=25,
+        fps=16.0,
+    )
+    assert "9b" not in g_loop
+    assert g_loop["10"]["inputs"]["start_image"] == ["9", 0]
+    assert g_loop["10"]["inputs"]["end_image"] == ["9", 0]
+    assert g_loop["10"]["inputs"]["length"] == 25
+    assert g_loop["14"]["inputs"]["alpha_matting"] is False
+    assert g_loop["15"]["inputs"]["fps"] == 16.0
+
+    # Transição Wan 2.2 (start != end) -> carrega imagem final distinta no nó 9b!
+    g_trans = build_wan_transition_workflow(
+        start_uploaded_image="arya_master.png",
+        end_uploaded_image="arya_sit_floor.png",
+        clip_key="trans_sit_floor",
+        prompt="sit down transition",
+        character_id="arya",
+        length=25,
+        fps=16.0,
+    )
+    assert "9b" in g_trans
+    assert g_trans["10"]["inputs"]["start_image"] == ["9", 0]
+    assert g_trans["10"]["inputs"]["end_image"] == ["9b", 0]
+
+    # Âncora Qwen 2.1 Edit com LoRA Anime Illustration e RemBG
+    g_qwen = build_qwen_anchor_workflow(
+        base_uploaded_image="arya_master.png",
+        prompt="back view walking pose",
+        neg="front view",
+        prefix="IAW_anchor_arya_walk_N",
+    )
+    assert g_qwen["4"]["class_type"] == "TextEncodeQwenImage21"
+    assert g_qwen["11"]["class_type"] == "LoraLoaderModelOnly"
+    assert g_qwen["7"]["inputs"]["model"] == "isnet-anime"
+
+    # Inicialização padronizada do pack de personagem
+    master = tmp_path / "master_src.png"
+    Image.new("RGBA", (64, 96), (240, 210, 140, 255)).save(master)
+    outfit_dir = CharacterPipeline.init_character_pack(
+        tmp_path / "characters", "arya", "Arya", master, outfit_id="base"
+    )
+    assert (outfit_dir / "anchors" / "master.png").is_file()
+    assert (outfit_dir / "manifest.json").is_file()
+    assert (outfit_dir.parent.parent / "character.json").is_file()
+    assert len(TIER_CLIP_CATALOG) == 18

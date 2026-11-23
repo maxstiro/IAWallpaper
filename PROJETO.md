@@ -2,7 +2,7 @@
 
 > **Regra Permanente de Agente**: Mantenha este arquivo (`PROJETO.md`), [`STATE.md`](STATE.md) e [`roadmap.md`](roadmap.md) sempre atualizados e referenciados a cada marco concluído. São a fonte única de verdade sobre a arquitetura, decisões de engenharia e evolução do projeto.
 > **Repositório Oficial**: `https://github.com/maxstiro/IAWallpaper.git`
-> **Última atualização**: 2026-11-23 (Milestone 17 — Motor 2.5D Live2D / Spine2D em GPU `live2d_mesh.py`: Arte 2D Pura do ComfyUI + Malha Elástica Contínua + Expressões 1:1 + Outfits em Camadas)
+> **Última atualização**: 2026-11-23 (Milestone 18 Concluído — **Arya** + Motor Wan 2.2 de Máximo Reaproveitamento: 8 direções, Grafo de Poses com reversão temporal, sincronia matemática de passos e pipeline 3 Tiers · **34/34 testes verdes**)
 
 ---
 
@@ -42,8 +42,8 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
 | **Core** | `iawallpaper/core/` | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | não | não |
 | **Plataforma** | `iawallpaper/plataforma/` | `desktop_host.py`, `windows.py` | não | sim |
 | **Sense** | `iawallpaper/sense/` | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | não | não |
-| **Comfy** | `iawallpaper/comfy/` | `presets.py`, `bridge.py`, `workflows.py` | não | não |
-| **Render** | `iawallpaper/render/` | `live2d_mesh.py`, `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `sprite_clip.py`, `avatar.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
+| **Comfy** | `iawallpaper/comfy/` | `presets.py`, `bridge.py`, `workflows.py`, `character_pipeline.py` | não | não |
+| **Render** | `iawallpaper/render/` | `character_pack.py`, `sprite_clip.py`, `avatar.py`, `live2d_mesh.py`, `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | sim | não |
 | **Mind** | `iawallpaper/mind/` | `director.py` | não | não |
 | **UI** | `iawallpaper/ui/` | `theme.py`, `control_center.py`, `neural_monitor.py`, `tray.py` | sim | não |
 | **App** | `iawallpaper/app.py`, `main.py` | Orquestração principal, trava de instância única, ciclos 16ms/100ms/500ms/15m/30s, launcher `start_iawallpaper.ps1` | sim | sim |
@@ -93,3 +93,8 @@ core  <  plataforma  <  sense  <  comfy  <  render  <  mind  <  ui  <  app.py
   - **Fim Definitivo do Aspecto 3D**: Em vez de modelos 3D VRoid, anima **ilustração 2D pura** gerada fielmente à arte de referência da **Elfa Loira** via Qwen Image 2.1 Edit (`base.png`, `base_blink.png`, `base_happy.png`, `base_back.png`) sobre uma malha triangular elástica contínua (`~7.000` triângulos) na GPU (`ModernGL` MSAA 4x).
   - **Skinning Geodésico Sem Costuras & Deformadores Live2D**: Detecção automática de 12 ossos anatômicos + pesos suaves calculados por BFS geodésico dentro da silhueta opaca (zero cortes ou pontes entre coxas/braços) + suavização Laplaciana `C²`, somados a *Head Parallax Turn 2.5D* (cursor look-at), mola *soft-body* no busto/respiração, ondas fluidas no cabelo e micro-twitch nas orelhas élficas.
   - **Expressões 1:1, Vista Costas & Outfits Modulares**: Crossfade de textura 1:1 pintada à mão no rosto (`u_blink`, `u_happy`, rubor dinâmico LIF), troca automática para `base_back.png` ao subir a praça e suporte nativo a camadas modulares `outfit_*.png` sobre a mesma malha (zero re-rigging por roupa!). Integrado em `avatar.py`, `canvas.py`, `paths.py`, `config.py`, `control_center.py`, `app.py` e `tools/render_showcase.py`, validado visualmente (folha 5 poses, showcase 4 horários e GIF 20 FPS no Telegram) com **32/32 testes verdes**.
+- **Milestone 18** (2026-11-23): **Motor Oficial Wan 2.2 de Máximo Reaproveitamento (`render/character_pack.py` + `comfy/character_pipeline.py`) · Piloto: Arya**:
+  - **8 Direções Reais via 5 Ângulos Canônicos Espelhados (`COMPASS_8`, `vector_to_compass8`, `DIRECTION_TO_CANONICAL`)**: Apenas 5 ângulos únicos (`S, SE, L, NE, N`) cobrem todas as 8 direções com espelhamento horizontal em 0 ms para `NO`, `O` e `SO` + fallback progressivo por Tier (no Tier 0, apenas `SE` + `NE` já cobrem as 8 direções).
+  - **Grafo de Poses com Reversão Temporal (`POSE_TRANSITIONS`, `SpriteClip.frame_at(..., reverse=True, loop=False)`)**: Transições geradas uma única vez via `WanFirstLastFrameToVideo(start=A, end=B)` (`trans_sit_floor`, `trans_sit_chair`, `trans_lie`) são reproduzidas automaticamente ao contrário para `levantar` com 0s de geração extra; `run` reaproveita `walk` a `1.45×` até o Tier 2 assar.
+  - **Sincronia Matemática Passo-Chão (`synced_walk_speed_norm` + `stride_ratio`)**: Poses-âncora de passo puro via Qwen Image 2.1 Edit (eliminando mão na cintura estática) e velocidade acoplada ao comprimento real do ciclo de 2 passos (`25f @ 16 FPS`), modulando `clip_speed_mul` durante desaceleração para eliminar completamente a patinação dos pés.
+  - **Pipeline Reutilizável de Personagens & Outfits 1:1 (`comfy/character_pipeline.py`)**: Estrutura padronizada `assets/generated/characters/<char_id>/outfits/<outfit_id>/`, catálogo enxuto em 3 Tiers (18 clipes totais cobrindo 8 direções + ~20 ações/transições), retratos expressivos 2D desacoplados e troca de roupa 1:1 via Qwen Edit. Validado na **Arya** (`idle_SE` 41f + `walk_SE/L/NE/N` 25f @ 16 FPS), integrado como motor padrão (`world_sprite`) no `AvatarRig`, `WallpaperCanvas`, `ControlCenterWindow` e `tools/render_showcase.py`, validado visualmente (`m18_arya_8dir_strip.png` e `m18_arya_8dir_plaza_tg.gif` no Telegram) com **34/34 testes verdes**.

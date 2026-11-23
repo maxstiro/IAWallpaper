@@ -34,6 +34,7 @@ from ..core.persona import Persona
 from ..log import log
 from ..mathutil import clamp, lerp, smoothstep
 from .atmosphere import AtmospherePalette
+from .character_pack import CharacterPack, ResolvedClip, load_character_pack, vector_to_compass8
 from .rig_cutter import AutoRiggedCharacter, RigPart, build_rig_from_apose
 from .skeleton import BoneWorld, CharacterSkeleton
 from .sprite_clip import SpriteClip, load_clips_from_dirs
@@ -85,12 +86,24 @@ class AvatarRig:
         render_style: str = "world_sprite",
         vrm_path: Path | None = None,
         live2d_dir: Path | None = None,
+        character_dir: Path | None = None,
     ):
         self.persona = persona
         self.sprite_dirs = self._normalize_dirs(sprite_dirs)
-        self.render_style: str = render_style  # "live2d_25d" | "vrm_3d" | "world_sprite" | "portrait"
+        self.render_style: str = render_style  # "world_sprite" | "live2d_25d" | "vrm_3d" | "portrait"
         self.outfit: str = "base"
-        self.action: str = "idle"              # idle | walk | sit_work | stretch | wave | dance | admire_view | music_sway | sleep
+        self.action: str = "idle"              # idle | walk | run | sit_floor | sit_chair | sit_work | lie | sleep | wave | interact | spin | dance | stretch
+
+        # Motor Oficial Wan 2.2 · 8 Direções + Grafo de Poses + Sincronia Matemática de Passos (Milestone 18)
+        self.character_dir: Path | None = None
+        self._char_pack: CharacterPack | None = None
+        self.compass_dir: str = "SE"           # S | SE | L | NE | N | NO | O | SO
+        self._running: bool = False
+        self._trans_resolved: ResolvedClip | None = None
+        self._trans_time: float = 0.0
+        self._pending_action: str | None = None
+        self._prev_clip_flip: bool = False
+        self._current_pack_sig: tuple[str, bool, bool] | None = None
 
         # Motor 2.5D Live2D / Spine2D em GPU (Arte 2D pura deformada em malha elástica contínua!)
         self.live2d_dir: Path | None = None
@@ -170,12 +183,38 @@ class AvatarRig:
         self._prev_sprite: QPixmap | None = None
         self._sprite_fade_t: float = 1.0
         self.reload_sprites()
+        if character_dir is not None:
+            self.set_character_pack(character_dir, outfit_id=self.outfit)
         if live2d_dir is not None:
             self.set_live2d_rig(live2d_dir)
         if vrm_path is not None:
             self.set_vrm_model(vrm_path)
         elif self.render_style == "vrm_3d":
             self.set_vrm_model("dungeon_squad")
+
+    def has_character_pack(self) -> bool:
+        return self._char_pack is not None and self._char_pack.has_clips()
+
+    def set_character_pack(self, char_dir: Path | str | None, outfit_id: str | None = None) -> bool:
+        """Carrega um `CharacterPack` Wan 2.2 padronizado (8 direções, reversão temporal e stride sync)."""
+        self._char_pack = None
+        self.character_dir = None
+        self._trans_resolved = None
+        self._pending_action = None
+        self._current_pack_sig = None
+        if not char_dir:
+            return False
+        p = Path(char_dir)
+        pack = load_character_pack(p, outfit_id=outfit_id or self.outfit or "base")
+        if pack is None:
+            return False
+        self._char_pack = pack
+        self.character_dir = p
+        log(
+            f"[character_pack] Pack Wan 2.2 carregado: {pack.name} ({pack.outfit_id}) "
+            f"· {len(pack.clips)} clipes · {len(pack.portraits)} retratos"
+        )
+        return True
 
     def has_live2d(self) -> bool:
         return self._live2d_renderer is not None
@@ -342,32 +381,49 @@ class AvatarRig:
         return set(self._sprites.keys())
 
     def available_clip_keys(self) -> set[str]:
-        return set(self._clips.keys())
+        keys = set(self._clips.keys())
+        if self._char_pack is not None:
+            keys |= self._char_pack.available_keys()
+        return keys
 
     def has_animated_clips(self) -> bool:
-        return bool(self._clips)
+        return bool(self._clips) or self.has_character_pack()
 
     def has_world_sprites(self) -> bool:
-        return bool(self._clips) or self._rig is not None or any(k.startswith("sprite_") for k in self._sprites)
+        return self.has_animated_clips() or self._rig is not None or any(k.startswith("sprite_") for k in self._sprites)
 
     def has_skeletal_rig(self) -> bool:
         return self._rig is not None
 
-    def walk_to(self, tx: float, ty: float, arrive_action: str = "idle") -> None:
+    def walk_to(self, tx: float, ty: float, arrive_action: str = "idle", run: bool = False) -> None:
         cx, cy = WorldStage.clamp_walkable(tx, ty)
         self.target_x = cx
         self.target_y = cy
         self._arrive_action = arrive_action
+        self._running = bool(run)
         dist = math.hypot(cx - self.pos_x, cy - self.pos_y)
         if dist > 0.015:
-            self.action = "walk"
+            self._trans_resolved = None
+            self._pending_action = None
+            self.action = "run" if self._running else "walk"
+            self.compass_dir = vector_to_compass8(cx - self.pos_x, cy - self.pos_y)
             if abs(cx - self.pos_x) > 0.005:
                 self.facing = 1 if cx > self.pos_x else -1
         else:
-            self.action = arrive_action
-            self.action_timer = 0.0
+            self._running = False
+            self.trigger_action(arrive_action)
 
     def trigger_action(self, action: str) -> None:
+        if self._char_pack is not None and action != self.action:
+            trans = self._char_pack.resolve_transition(self.action, action, self.compass_dir)
+            if trans is not None:
+                self._trans_resolved = trans
+                self._trans_time = 0.0
+                self._pending_action = action
+                self.action_timer = 0.0
+                return
+        self._trans_resolved = None
+        self._pending_action = None
         self.action = action
         self.action_timer = 0.0
 
@@ -477,20 +533,62 @@ class AvatarRig:
         dy = self.target_y - self.pos_y
         dist = math.hypot(dx, dy)
         clip_speed_mul = 1.0
+
+        # Troca de outfit 1:1 no CharacterPack caso a pasta do traje exista
+        if (
+            self._char_pack is not None
+            and self.character_dir is not None
+            and self.outfit != self._char_pack.outfit_id
+            and (self.character_dir / "outfits" / self.outfit / "clips").is_dir()
+        ):
+            self.set_character_pack(self.character_dir, outfit_id=self.outfit)
+
+        # Avança transição do Grafo de Poses (normal ou reversa!) quando ativa
+        if self._trans_resolved is not None:
+            self._trans_time += dt * self._trans_resolved.speed_mul
+            if self._trans_time >= self._trans_resolved.clip.duration:
+                next_act = self._pending_action or self.action
+                self._trans_resolved = None
+                self._pending_action = None
+                self.action = next_act
+                self._clip_time = 0.0
+                self.action_timer = 0.0
+
         if dist > 0.008 and not caressing:
-            self.action = "walk"
-            # Desaceleração suave ao chegar no destino + escala de perspectiva (passos menores ao fundo!)
+            self._trans_resolved = None
+            self._pending_action = None
+            self.action = "run" if self._running else "walk"
+            self.compass_dir = vector_to_compass8(dx, dy)
             depth_mul = WorldStage.depth_scale(self.pos_y)
-            speed_mul = clamp(dist / 0.055, 0.38, 1.0)
-            clip_speed_mul = clamp(0.75 + 0.35 * speed_mul, 0.72, 1.12)
-            step_dist = min(dist, self.walk_speed * depth_mul * speed_mul * dt)
+
+            if self._char_pack is not None and self.render_style == "world_sprite":
+                # Sincronia matemática exata passo-chão (`stride_ratio` acoplado a `clip_fps` -> ZERO patinação!)
+                resolved_move = self._char_pack.resolve_action(self.action, self.compass_dir)
+                if resolved_move is not None:
+                    synced_speed = self._char_pack.synced_walk_speed_norm(resolved_move, depth_mul)
+                    decel = clamp(dist / 0.045, 0.48, 1.0)
+                    actual_speed = synced_speed * decel
+                    clip_speed_mul = resolved_move.speed_mul * clamp(actual_speed / max(synced_speed, 1e-4), 0.65, 1.35)
+                    step_dist = min(dist, actual_speed * dt)
+                    step_period = max(0.24, (resolved_move.clip.duration / max(clip_speed_mul, 0.25)) * 0.5)
+                else:
+                    speed_mul = clamp(dist / 0.055, 0.38, 1.0)
+                    clip_speed_mul = clamp(0.75 + 0.35 * speed_mul, 0.72, 1.12)
+                    step_dist = min(dist, self.walk_speed * depth_mul * speed_mul * dt)
+                    step_period = 0.34
+            else:
+                speed_mul = clamp(dist / 0.055, 0.38, 1.0)
+                run_mul = 1.45 if self._running else 1.0
+                clip_speed_mul = clamp(0.75 + 0.35 * speed_mul, 0.72, 1.12) * run_mul
+                step_dist = min(dist, self.walk_speed * run_mul * depth_mul * speed_mul * dt)
+                step_period = 0.34 / run_mul
+
             self.pos_x += (dx / dist) * step_dist
             self.pos_y += (dy / dist) * step_dist
             self._move_dx = dx / dist
             self._move_dy = dy / dist
 
-            # Orientação direcional real estilo Ragnarok Online / Tree of Savior (compensando proporção 16:9)
-            # Horizontal dentro de ±36° -> perfil ("side"); mais vertical para cima -> costas ("back"); para baixo -> frente ("front")
+            # Orientação direcional legada (mantida em sincronia com `compass_dir` para Live2D/VRM)
             vx_vis = dx * 1.77
             vy_vis = dy
             if abs(vx_vis) >= abs(vy_vis) * 1.35:
@@ -506,24 +604,24 @@ class AvatarRig:
                 if abs(dx) > 0.004:
                     self.facing = 1 if dx > 0 else -1
 
-            self.walk_phase += dt * (9.5 * speed_mul + 2.2)
+            self.walk_phase += dt * (9.5 * clamp(dist / 0.055, 0.38, 1.0) + 2.2)
             self._step_emit_accum += dt
-            if self._step_emit_accum >= 0.34:
+            if self._step_emit_accum >= step_period:
                 self._step_emit_accum = 0.0
                 self.pending_footstep = (self.pos_x, self.pos_y)
         else:
-            if self.action == "walk":
-                self.action = self._arrive_action
-                self.action_timer = 0.0
+            if self.action in ("walk", "run"):
+                self._running = False
+                self.trigger_action(self._arrive_action)
             self.move_dir = "front"
             self._move_dx = 0.0
             self._move_dy = 0.0
-            if asleep:
+            if asleep and self._trans_resolved is None:
                 self.action = "sleep"
-            elif self.action in ("stretch", "wave", "dance") and self.action_timer > 4.2:
+            elif self.action in ("stretch", "wave", "dance", "spin", "interact") and self.action_timer > 4.2:
                 self.action = "idle"
                 self.action_timer = 0.0
-            if not self._clips and abs(self.look_x) > 0.42 and self.action not in ("sleep", "sit_work"):
+            if not self.has_animated_clips() and abs(self.look_x) > 0.42 and self.action not in ("sleep", "sit_work"):
                 self.facing = 1 if self.look_x > 0 else -1
 
         vel_x = (self.pos_x - prev_x) / max(dt, 1e-4)
@@ -676,6 +774,33 @@ class AvatarRig:
             self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
             draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
             self._paint_vrm_3d(painter, foot_x, foot_y, draw_y, u, atmosphere, raining, sun_x_norm)
+        elif self.render_style == "world_sprite" and self._char_pack is not None:
+            # Prioridade Oficial (Milestone 18): CharacterPack Wan 2.2 · 8 Direções + Grafo de Poses + Step Sync!
+            resolved = self._trans_resolved or self._char_pack.resolve_action(
+                "sleep" if asleep else self.action, self.compass_dir
+            )
+            if resolved is not None:
+                sig = (resolved.key, resolved.flip_x, resolved.reverse)
+                play_t = self._trans_time if self._trans_resolved is not None else self._clip_time
+                if sig != self._current_pack_sig:
+                    if self._current_pack_sig is not None:
+                        prev_k, prev_flip, prev_rev = self._current_pack_sig
+                        prev_c = self._char_pack.clips.get(prev_k)
+                        if prev_c is not None:
+                            self._prev_clip_frame = prev_c.frame_at(self._clip_time, reverse=prev_rev)
+                            self._prev_clip_flip = prev_flip
+                            self._clip_fade_t = 0.0
+                    self._current_pack_sig = sig
+                    if self._trans_resolved is None:
+                        self._clip_time = 0.0
+                        play_t = 0.0
+                lift = max(0.0, -self.bounce_y)
+                self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+                self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
+                draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
+                self._paint_character_pack_clip(
+                    painter, resolved, play_t, foot_x, foot_y, draw_y, u, atmosphere, raining
+                )
         else:
             # Prioridade 1: Clipes RGBA animados quadro-a-quadro (Wan 2.2 FirstLastFrameToVideo)
             clip_key = self._resolve_clip_key("sleepy" if asleep else emotion.mood, asleep)
@@ -927,6 +1052,85 @@ class AvatarRig:
             py = math.sin(ang) * r1y
             painter.drawEllipse(QPointF(px, py), 2.8 * u, 2.2 * u)
         painter.restore()
+
+    def _paint_character_pack_clip(
+        self,
+        painter: QPainter,
+        resolved: ResolvedClip,
+        play_t: float,
+        foot_x: float,
+        foot_y: float,
+        draw_y: float,
+        u: float,
+        atmosphere: AtmospherePalette,
+        raining: bool,
+    ) -> None:
+        """Renderiza um `ResolvedClip` do `CharacterPack` Wan 2.2 com espelhamento 8->5, reversão temporal e crossfade limpo."""
+        frame = resolved.clip.frame_at(play_t, reverse=resolved.reverse, loop=resolved.loop)
+        if frame.isNull():
+            return
+
+        # Altura projetada calibrada 1:1 com `CharacterPack.synced_walk_speed_norm` (h_norm ≈ 0.36 * depth_scale!)
+        target_h = 385.0 * u
+        aspect = frame.width() / max(frame.height(), 1)
+        target_w = target_h * aspect
+        sx = -1.0 if resolved.flip_x else 1.0
+        run_tilt = (3.5 * (-1.0 if resolved.flip_x else 1.0)) if self.action == "run" else 0.0
+
+        # 1. Reflexo no piso molhado em dias de chuva
+        if raining:
+            painter.save()
+            painter.translate(foot_x, foot_y + 2 * u)
+            painter.scale(sx, -0.32)
+            painter.setOpacity(0.18)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            painter.drawPixmap(QRectF(-target_w * 0.5, -target_h, target_w, target_h), frame, QRectF(frame.rect()))
+            painter.restore()
+
+        # 2. Aura sutil de carinho
+        painter.save()
+        if self.caress_glow > 0.05:
+            rim_r, rim_g, rim_b = atmosphere.rim_light
+            aura = QRadialGradient(QPointF(foot_x, draw_y - target_h * 0.50), target_h * 0.52)
+            aura.setColorAt(0.0, QColor(rim_r, rim_g, rim_b, int(92 * self.caress_glow)))
+            aura.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(aura)
+            painter.drawEllipse(QPointF(foot_x, draw_y - target_h * 0.50), target_h * 0.40, target_h * 0.52)
+
+        painter.translate(foot_x, draw_y)
+        painter.rotate(self.tilt_deg + run_tilt)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        tinted_curr = self._get_tinted_sprite(frame, atmosphere)
+        dst = QRectF(-target_w * 0.5, -target_h, target_w, target_h)
+        if self._prev_clip_frame is not None and self._clip_fade_t < 1.0:
+            ease = smoothstep(0.0, 1.0, self._clip_fade_t)
+            prev_t = self._get_tinted_sprite(self._prev_clip_frame, atmosphere)
+            prev_w = target_h * (prev_t.width() / max(prev_t.height(), 1))
+            prev_sx = -1.0 if self._prev_clip_flip else 1.0
+            painter.save()
+            painter.scale(prev_sx, 1.0)
+            painter.setOpacity(1.0 - ease)
+            painter.drawPixmap(QRectF(-prev_w * 0.5, -target_h, prev_w, target_h), prev_t, QRectF(prev_t.rect()))
+            painter.restore()
+
+            painter.save()
+            painter.scale(sx, 1.0)
+            painter.setOpacity(ease)
+            painter.drawPixmap(dst, tinted_curr, QRectF(tinted_curr.rect()))
+            painter.restore()
+            painter.setOpacity(1.0)
+        else:
+            painter.scale(sx, 1.0)
+            painter.drawPixmap(dst, tinted_curr, QRectF(tinted_curr.rect()))
+        painter.restore()
+
+        if raining and self.action not in ("sleep", "lie", "sit_work"):
+            self._paint_umbrella(painter, foot_x + (18 * u * sx), draw_y - target_h * 1.02, u, atmosphere)
+
+        self.body_rect = QRectF(foot_x - target_w * 0.36, draw_y - target_h * 0.96, target_w * 0.72, target_h * 0.96)
+        self.head_rect = QRectF(foot_x - target_w * 0.28, draw_y - target_h * 0.98, target_w * 0.56, target_h * 0.28)
 
     def _paint_animated_clip(
         self,

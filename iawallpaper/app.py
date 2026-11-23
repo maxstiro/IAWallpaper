@@ -134,6 +134,7 @@ class IAWallpaperApp:
             render_style=self.settings.render_style,
             vrm_path=self.paths.resolve_vrm_model(self.settings.vrm_model),
             live2d_dir=self.paths.resolve_live2d_rig(self.settings.vrm_model),
+            character_dir=self.paths.resolve_character_dir(self.settings.character_id),
         )
         self.canvas.avatar.vrm_dynamic_recolor = self.settings.vrm_dynamic_recolor
         self.canvas.setWindowTitle(f"IAWallpaper — {self.persona.name}")
@@ -309,6 +310,8 @@ class IAWallpaperApp:
                 ]
             )
 
+        if s.character_id != old.character_id or (s.render_style == "world_sprite" and not self.canvas.avatar.has_character_pack()):
+            self.canvas.avatar.set_character_pack(self.paths.resolve_character_dir(s.character_id))
         if s.vrm_model != old.vrm_model or (s.render_style == "live2d_25d" and not self.canvas.avatar.has_live2d()):
             self.canvas.avatar.set_live2d_rig(self.paths.resolve_live2d_rig(s.vrm_model))
         if s.vrm_model != old.vrm_model or (s.render_style == "vrm_3d" and not self.canvas.avatar.has_vrm_3d()):
@@ -625,6 +628,7 @@ class IAWallpaperApp:
 
     def _reload_assets(self) -> None:
         self.canvas.avatar.reload_sprites()
+        self.canvas.avatar.set_character_pack(self.paths.resolve_character_dir(self.settings.character_id))
         self.canvas.scene.reload_scene_images()
         self._update_asset_coverage()
         self.canvas.update()

@@ -25,12 +25,19 @@ class WallpaperCanvas(QWidget):
     whisper_dismissed = Signal()
     cursor_approaching = Signal(bool)  # True quando cursor se aproxima suavemente da avatar
 
-    def __init__(self, persona: Persona, sprite_dirs=None, scene_dirs=None, render_style: str = "world_sprite", vrm_path=None, live2d_dir=None, parent=None):
+    def __init__(self, persona: Persona, sprite_dirs=None, scene_dirs=None, render_style: str = "world_sprite", vrm_path=None, live2d_dir=None, character_dir=None, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.setMouseTracking(True)
 
-        self.avatar = AvatarRig(persona, sprite_dirs=sprite_dirs, render_style=render_style, vrm_path=vrm_path, live2d_dir=live2d_dir)
+        self.avatar = AvatarRig(
+            persona,
+            sprite_dirs=sprite_dirs,
+            render_style=render_style,
+            vrm_path=vrm_path,
+            live2d_dir=live2d_dir,
+            character_dir=character_dir,
+        )
         self.scene = SceneCompositor(scene_dirs=scene_dirs, seed=persona.seed)
         self.particles = ParticleEngine(seed=persona.seed + 17)
 

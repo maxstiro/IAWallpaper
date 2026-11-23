@@ -177,6 +177,20 @@ class ComfyBridge:
                     return ck
         return checkpoints[0] if checkpoints else ""
 
+    def download_output(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
+        """Baixa bytes de uma imagem/clipe gerado no ComfyUI via GET /view."""
+        params = urllib.parse.urlencode(
+            {
+                "filename": filename,
+                "subfolder": subfolder,
+                "type": folder_type,
+            }
+        )
+        url = f"{self.base_url}/view?{params}"
+        req = urllib.request.Request(url, headers={"User-Agent": "IAWallpaper/0.1"})
+        with urllib.request.urlopen(req, timeout=30.0) as resp:
+            return resp.read()
+
     def run_workflow_and_save(self, graph: dict, output_path: Path, timeout: float = 180.0) -> Path:
         res = self._post_json("/prompt", {"prompt": graph, "client_id": self.client_id})
         if not isinstance(res, dict) or "prompt_id" not in res:
@@ -193,20 +207,14 @@ class ComfyBridge:
                     raise RuntimeError(f"Erro na execução do ComfyUI: {status}")
                 outputs = item.get("outputs") or {}
                 for node_out in outputs.values():
-                    images = node_out.get("images") or []
+                    images = node_out.get("images") or node_out.get("gifs") or []
                     if images:
                         img_meta = images[0]
-                        params = urllib.parse.urlencode(
-                            {
-                                "filename": img_meta["filename"],
-                                "subfolder": img_meta.get("subfolder", ""),
-                                "type": img_meta.get("type", "output"),
-                            }
+                        raw = self.download_output(
+                            img_meta["filename"],
+                            img_meta.get("subfolder", ""),
+                            img_meta.get("type", "output"),
                         )
-                        url = f"{self.base_url}/view?{params}"
-                        req = urllib.request.Request(url, headers={"User-Agent": "IAWallpaper/0.1"})
-                        with urllib.request.urlopen(req, timeout=15.0) as resp:
-                            raw = resp.read()
                         output_path = Path(output_path)
                         output_path.parent.mkdir(parents=True, exist_ok=True)
                         tmp = output_path.with_name(output_path.name + ".tmp")

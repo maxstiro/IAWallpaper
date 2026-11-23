@@ -233,9 +233,9 @@ class ControlCenterWindow(QWidget):
         persona_row.addWidget(btn_new_persona)
 
         self.cb_render_style = QComboBox()
-        self.cb_render_style.addItem("✨ Motor 2.5D Live2D / Spine2D (Arte 2D Pura · Malha Elástica GPU)", "live2d_25d")
+        self.cb_render_style.addItem("✨ Clipes 2D Wan 2.2 · 8 Direções (Arya · Máximo Reaproveitamento)", "world_sprite")
+        self.cb_render_style.addItem("Motor 2.5D Live2D / Spine2D (Malha Elástica GPU)", "live2d_25d")
         self.cb_render_style.addItem("Motor 3D Cel-Shaded (VRM · Giro 360° estilo Tree of Savior)", "vrm_3d")
-        self.cb_render_style.addItem("Clipes 2D Animados (Wan 2.2 · Arte ComfyUI)", "world_sprite")
         self.cb_render_style.addItem("Retrato Visual Novel (Busto 2.5D)", "portrait")
         self.cb_render_style.currentIndexChanged.connect(self._emit_settings)
 
@@ -499,9 +499,10 @@ class ControlCenterWindow(QWidget):
         time_override = None if self.chk_real_time.isChecked() else (self.sl_hour.value() / 2.0)
         s = Settings(
             persona_id=self.cb_persona.currentData() or "mira",
+            character_id=self._settings.character_id or "arya",
             scene_id=self.cb_scene.currentData() or "sky_sanctuary",
             mode=self.cb_mode.currentData() or "wallpaper",
-            render_style=self.cb_render_style.currentData() or "vrm_3d",
+            render_style=self.cb_render_style.currentData() or "world_sprite",
             vrm_model=self.cb_vrm.currentData() or "",
             vrm_dynamic_recolor=self.chk_vrm_recolor.isChecked(),
             fps_cap=int(self.cb_fps.currentData() or 60),
@@ -527,7 +528,7 @@ class ControlCenterWindow(QWidget):
     def _populate_vrm_models(self) -> None:
         self.cb_vrm.blockSignals(True)
         self.cb_vrm.clear()
-        self.cb_vrm.addItem("★ Lyra — Elfa Loira (Base 3D HD)", "elfa_loira")
+        self.cb_vrm.addItem("★ Arya — Elfa Loira (Base)", "elfa_loira")
         self.cb_vrm.addItem("★ Freya — Humana Ruiva (Base 3D HD)", "humana_ruiva")
         self.cb_vrm.addItem("★ Airi — Androide Rosa (Base 3D HD)", "androide_rosa")
         self.cb_vrm.addItem("★ Lilith — Vampira Cabelos Pretos (Base 3D HD)", "vampira_negra")
