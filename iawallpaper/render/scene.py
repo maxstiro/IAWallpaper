@@ -1,5 +1,6 @@
 """SCENE — Compositor multi-camada do wallpaper dinâmico (céu, astros, nuvens, montanhas, luzes urbanas, água, avatar e sussurros)."""
 
+import json
 import math
 from pathlib import Path
 import random
@@ -8,6 +9,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QImage,
     QLinearGradient,
     QPainter,
     QPainterPath,
@@ -57,6 +59,9 @@ class SceneCompositor:
 
         # Imagens de cenário opcionais (geradas pelo ComfyUI): day.png, sunset.png, night.png, rain.png
         self._bg_images: dict[str, QPixmap] = {}
+        self._window_mask: QImage | None = None
+        self._occluders: list[dict] = []
+        self._last_bg_target: QRectF = QRectF()
         self._current_bg_key: str | None = None
         self._prev_bg: QPixmap | None = None
         self._bg_fade_t: float = 1.0
@@ -82,6 +87,8 @@ class SceneCompositor:
             self._prev_bg = None
             self._bg_fade_t = 1.0
         self._bg_images.clear()
+        self._window_mask = None
+        self._occluders = []
         detected_scene = ""
         for folder in self.scene_dirs:
             if folder.name:
@@ -89,9 +96,37 @@ class SceneCompositor:
             if not folder.exists():
                 continue
             for png in folder.glob("*.png"):
+                if png.stem.lower() == "window_mask":
+                    wimg = QImage(str(png))
+                    if not wimg.isNull():
+                        # Converte máscara em escala de cinza para canal alpha (ARGB32_Premultiplied)
+                        gray = wimg.convertToFormat(QImage.Format_Grayscale8)
+                        alpha_img = QImage(gray.size(), QImage.Format_ARGB32_Premultiplied)
+                        alpha_img.fill(Qt.white)
+                        alpha_img.setAlphaChannel(gray)
+                        self._window_mask = alpha_img
+                    continue
                 pm = QPixmap(str(png))
                 if not pm.isNull():
                     self._bg_images[png.stem.lower()] = pm
+            occ_manifest = folder / "occluders" / "manifest.json"
+            if occ_manifest.exists():
+                try:
+                    data = json.loads(occ_manifest.read_text(encoding="utf-8"))
+                    for item in data.get("occluders", []):
+                        occ_pm = QPixmap(str(folder / "occluders" / item["file"]))
+                        if not occ_pm.isNull():
+                            self._occluders.append({
+                                "id": str(item.get("id", "")),
+                                "pixmap": occ_pm,
+                                "x0": float(item["x0"]),
+                                "y0": float(item["y0"]),
+                                "x1": float(item["x1"]),
+                                "y1": float(item["y1"]),
+                                "sort_y": float(item.get("sort_y", 0.5)),
+                            })
+                except Exception:
+                    pass
         if detected_scene:
             self.stage.set_scene_id(detected_scene)
 
@@ -128,6 +163,9 @@ class SceneCompositor:
     def _pick_bg_key(self, circadian: CircadianState, weather: WeatherState, prefer_diorama: bool = False) -> str | None:
         if not self._bg_images:
             return None
+        # Modo Single-Base com Janela Dinâmica & Iluminação por Fora (100% pixel-idêntico em qualquer hora/clima!)
+        if self._window_mask is not None and prefer_diorama and "diorama_day" in self._bg_images:
+            return "diorama_day"
         prefix = "diorama_" if prefer_diorama else ""
         keys: list[str] = []
         if weather.condition in ("rain", "storm"):
@@ -177,8 +215,9 @@ class SceneCompositor:
                     self._bg_fade_t = 0.0
                 self._current_bg_key = bg_key
             bg = self._bg_images[bg_key]
-            self._paint_ai_backdrop(painter, width, height, bg, atmo, circadian)
-            particles.paint_sky_fx(painter)
+            self._paint_ai_backdrop(painter, width, height, bg, atmo, circadian, weather=weather)
+            if self._window_mask is None:
+                particles.paint_sky_fx(painter)
         else:
             self._paint_sky(painter, width, height, atmo, circadian, weather)
             particles.paint_sky_fx(painter)
@@ -237,6 +276,10 @@ class SceneCompositor:
             sun_x_norm=circadian.sun_x_norm,
         )
 
+        # Fatias 2.5D (occluders) na frente da personagem quando ela está atrás dos móveis (ex.: sentada no sofá atrás da mesinha!)
+        if is_world and self._occluders:
+            self._paint_occluders(painter, avatar.pos_y, circadian, weather)
+
         if is_world and bg_key is None:
             self.stage.paint_props_layer(
                 painter, width, height, atmo, self.parallax_x, self.parallax_y,
@@ -267,12 +310,184 @@ class SceneCompositor:
         painter.restore()
         return atmo
 
-    def _paint_ai_backdrop(self, painter: QPainter, w: int, h: int, bg: QPixmap, atmo: AtmospherePalette, circadian: CircadianState) -> None:
+    @staticmethod
+    def _compute_interior_grade(circadian: CircadianState, weather: WeatherState) -> QColor:
+        """Cor de multiplicação contínua 24h para iluminar o quarto de fora para dentro mantendo 100% os mesmos pixels."""
+        nf = clamp(circadian.night_factor, 0.0, 1.0)
+        warmth = clamp(circadian.warmth, 0.0, 1.0)
+        is_rain = weather.condition in ("rain", "storm")
+
+        # Base diurna -> pôr do sol quente -> noite índigo aconchegante
+        r = lerp(255.0, 88.0, nf)
+        g = lerp(252.0, 96.0, nf)
+        b = lerp(246.0, 146.0, nf)
+
+        # Calor dourado-pêssego no pôr do sol / amanhecer
+        if warmth > 0.15 and nf < 0.75:
+            w_amt = warmth * (1.0 - nf * 0.75) * 0.65
+            r = lerp(r, 255.0, w_amt)
+            g = lerp(g, 186.0, w_amt)
+            b = lerp(b, 134.0, w_amt)
+
+        # Clima chuvoso/nublado lá fora: interior mais fresco e aconchegante
+        if is_rain:
+            r = lerp(r, 178.0, 0.42 if nf < 0.5 else 0.18)
+            g = lerp(g, 192.0, 0.42 if nf < 0.5 else 0.18)
+            b = lerp(b, 218.0, 0.42 if nf < 0.5 else 0.18)
+
+        return QColor(int(clamp(r, 40, 255)), int(clamp(g, 40, 255)), int(clamp(b, 50, 255)), 255)
+
+    def _paint_occluders(
+        self,
+        painter: QPainter,
+        avatar_y: float,
+        circadian: CircadianState,
+        weather: WeatherState,
+    ) -> None:
+        """Desenha fatias 2.5D (ex.: mesinha de centro) NA FRENTE da personagem quando `avatar_y < sort_y`."""
+        target = self._last_bg_target
+        if target.isEmpty():
+            return
+        grade = self._compute_interior_grade(circadian, weather) if self._window_mask is not None else None
+        for occ in self._occluders:
+            if avatar_y >= occ["sort_y"]:
+                continue
+            pm: QPixmap = occ["pixmap"]
+            rx = target.x() + occ["x0"] * target.width()
+            ry = target.y() + occ["y0"] * target.height()
+            rw = (occ["x1"] - occ["x0"]) * target.width()
+            rh = (occ["y1"] - occ["y0"]) * target.height()
+            dst = QRectF(rx, ry, rw, rh)
+            if grade is not None and (grade.red() < 252 or grade.green() < 250 or grade.blue() < 245):
+                # Multiplica a fatia com a MESMA gradação do quarto preservando textura de madeira + alpha 100%
+                buf = QImage(pm.size(), QImage.Format_ARGB32_Premultiplied)
+                buf.fill(Qt.transparent)
+                bp = QPainter(buf)
+                bp.drawPixmap(0, 0, pm)
+                bp.setCompositionMode(QPainter.CompositionMode_Multiply)
+                bp.fillRect(buf.rect(), grade)
+                bp.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+                bp.drawPixmap(0, 0, pm)
+                bp.end()
+                painter.save()
+                painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+                painter.drawImage(dst, buf, QRectF(buf.rect()))
+                painter.restore()
+            else:
+                painter.save()
+                painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+                painter.drawPixmap(dst, pm, QRectF(pm.rect()))
+                painter.restore()
+
+    def _paint_ai_backdrop(
+        self,
+        painter: QPainter,
+        w: int,
+        h: int,
+        bg: QPixmap,
+        atmo: AtmospherePalette,
+        circadian: CircadianState,
+        weather: WeatherState | None = None,
+    ) -> None:
         pad = 28.0
         ox = -self.parallax_x * 16.0 - pad
         oy = -self.parallax_y * 10.0 - pad
         target = QRectF(ox, oy, w + pad * 2.0, h + pad * 2.0)
+        self._last_bg_target = target
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        # Modo Single-Base com Janela Panorâmica Dinâmica + Iluminação Real por Fora!
+        if self._window_mask is not None and weather is not None:
+            # 1. Desenha a sala mestre 100% pixel-idêntica
+            painter.drawPixmap(target, bg, QRectF(bg.rect()))
+
+            # 2. Iluminação ambiente contínua 24h aplicada ao interior via Multiply
+            grade = self._compute_interior_grade(circadian, weather)
+            painter.save()
+            painter.setCompositionMode(QPainter.CompositionMode_Multiply)
+            painter.fillRect(0, 0, w, h, grade)
+            painter.restore()
+
+            # 3. Céu, sol/lua, estrelas e chuva AO VIVO estritamente através do vidro da janela panorâmica!
+            win_buf = QImage(w, h, QImage.Format_ARGB32_Premultiplied)
+            win_buf.fill(Qt.transparent)
+            wp = QPainter(win_buf)
+            wp.setRenderHint(QPainter.Antialiasing, True)
+            wp.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            # Base da paisagem vista pela janela (árvores/telhados originais!)
+            wp.drawPixmap(target, bg, QRectF(bg.rect()))
+
+            nf = clamp(circadian.night_factor, 0.0, 1.0)
+            warmth = clamp(circadian.warmth, 0.0, 1.0)
+            is_rain = weather.condition in ("rain", "storm")
+
+            if is_rain:
+                # Céu chuvoso nublado + gotas e riscos de chuva animados SÓ do lado de fora da janela!
+                rain_g = QLinearGradient(0, 0, 0, h * 0.34)
+                rain_g.setColorAt(0.0, QColor(42, 58, 86, 175 if nf < 0.5 else 215))
+                rain_g.setColorAt(1.0, QColor(78, 96, 122, 130 if nf < 0.5 else 185))
+                wp.fillRect(0, 0, w, int(h * 0.36), rain_g)
+                # Riscos de chuva caindo lá fora
+                wp.setPen(QPen(QColor(210, 232, 255, 135), max(1.0, h / 720.0)))
+                for i in range(68):
+                    rx = ((i * 0.097 + self.time * 0.04) % 0.72 + 0.16) * w
+                    ry = ((i * 0.173 + self.time * (1.25 + (i % 4) * 0.25)) % 0.34) * h
+                    rlen = (12.0 + (i % 4) * 5.0) * (h / 720.0)
+                    wp.drawLine(QPointF(rx, ry), QPointF(rx - rlen * 0.22, ry + rlen))
+            elif nf >= 0.45:
+                # Noite estrelada profunda + estrelas cintilantes + lua luminosa!
+                night_a = int(clamp((nf - 0.35) / 0.65, 0.0, 1.0) * 235)
+                ng = QLinearGradient(0, 0, 0, h * 0.34)
+                ng.setColorAt(0.0, QColor(8, 12, 36, night_a))
+                ng.setColorAt(0.68, QColor(18, 26, 68, int(night_a * 0.92)))
+                ng.setColorAt(1.0, QColor(24, 34, 72, int(night_a * 0.72)))
+                wp.fillRect(0, 0, w, int(h * 0.36), ng)
+                # Estrelas cintilantes vivas
+                wp.setPen(Qt.NoPen)
+                for sx, sy, sr, ph in self._stars[:90]:
+                    if sy > 0.28:
+                        continue
+                    tw = 0.45 + 0.55 * math.sin(self.time * 2.1 + ph)
+                    sa = int(night_a * tw)
+                    wp.setBrush(QColor(235, 245, 255, sa))
+                    wp.drawEllipse(QPointF(sx * w, sy * h), sr * 0.85, sr * 0.85)
+                # Lua cheia suave no céu da janela
+                mx, my = w * 0.62, h * 0.115
+                mrad = h * 0.032
+                mg = QRadialGradient(QPointF(mx, my), mrad * 3.2)
+                mg.setColorAt(0.0, QColor(240, 246, 255, int(night_a * 0.85)))
+                mg.setColorAt(0.35, QColor(185, 210, 255, int(night_a * 0.35)))
+                mg.setColorAt(1.0, QColor(140, 175, 255, 0))
+                wp.setBrush(mg)
+                wp.drawEllipse(QPointF(mx, my), mrad * 3.2, mrad * 3.2)
+                wp.setBrush(QColor(250, 252, 255, night_a))
+                wp.drawEllipse(QPointF(mx, my), mrad * 0.65, mrad * 0.65)
+            elif warmth > 0.25:
+                # Pôr do sol dourado-pêssego-violeta vibrante na janela!
+                wa = int(clamp(warmth * 0.88, 0.0, 0.88) * 210)
+                sg = QLinearGradient(0, 0, 0, h * 0.34)
+                sg.setColorAt(0.0, QColor(145, 68, 128, int(wa * 0.85)))
+                sg.setColorAt(0.45, QColor(246, 126, 68, int(wa * 0.92)))
+                sg.setColorAt(1.0, QColor(255, 198, 92, int(wa * 0.78)))
+                wp.fillRect(0, 0, w, int(h * 0.36), sg)
+                # Sol baixo dourado
+                sx, sy = w * 0.50, h * 0.22
+                srad = h * 0.10
+                sun_g = QRadialGradient(QPointF(sx, sy), srad)
+                sun_g.setColorAt(0.0, QColor(255, 248, 210, int(wa * 0.95)))
+                sun_g.setColorAt(0.45, QColor(255, 175, 85, int(wa * 0.55)))
+                sun_g.setColorAt(1.0, QColor(255, 120, 60, 0))
+                wp.setPen(Qt.NoPen)
+                wp.setBrush(sun_g)
+                wp.drawEllipse(QPointF(sx, sy), srad, srad)
+
+            # Recorta estritamente para a máscara da janela panorâmica (preservando molduras e folhas!)
+            wp.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+            wp.drawImage(target, self._window_mask, QRectF(self._window_mask.rect()))
+            wp.end()
+            painter.drawImage(0, 0, win_buf)
+            return
+
         if self._prev_bg is not None and self._bg_fade_t < 1.0:
             ease = smoothstep(0.0, 1.0, self._bg_fade_t)
             painter.drawPixmap(target, self._prev_bg, QRectF(self._prev_bg.rect()))
@@ -545,22 +760,25 @@ class SceneCompositor:
         painter.save()
         painter.setPen(Qt.NoPen)
 
-        # 1. Iluminação viva orgânica nos pontos de luz do cenário (abajures, velas, lareira, luzinhas!)
+        # 1. Iluminação viva orgânica ADITIVA nos pontos de luz do cenário (abajures, velas, lareira, luzinhas!)
         lights = SCENE_LIGHTS.get(self.stage.scene_id, ())
+        painter.save()
+        painter.setCompositionMode(QPainter.CompositionMode_Plus)
         for idx, ln in enumerate(lights):
             lx = ln.x * w - self.parallax_x * 16.0
             ly = ln.y * h - self.parallax_y * 10.0
             flicker = 0.86 + 0.14 * math.sin(self.time * ln.flicker_hz * math.tau + idx * 1.7)
             pulse = 1.0 + ln.audio_react * (0.28 * bass + 0.18 * beat)
-            rad = ln.radius * min(w, h) * pulse
-            alpha = int(clamp((34 + 54 * night_factor * ln.night_boost + 42 * bass * ln.audio_react) * flicker, 14, 150))
+            rad = ln.radius * min(w, h) * (1.0 + 0.35 * night_factor) * pulse
+            alpha = int(clamp((28 + 92 * night_factor * ln.night_boost + 48 * bass * ln.audio_react) * flicker, 14, 185))
             lr, lg, lb = ln.color
             grad = QRadialGradient(QPointF(lx, ly), rad)
             grad.setColorAt(0.0, QColor(lr, lg, lb, alpha))
-            grad.setColorAt(0.45, QColor(lr, lg, lb, int(alpha * 0.42)))
+            grad.setColorAt(0.45, QColor(lr, lg, lb, int(alpha * 0.45)))
             grad.setColorAt(1.0, QColor(lr, lg, lb, 0))
             painter.setBrush(grad)
             painter.drawEllipse(QPointF(lx, ly), rad, rad)
+        painter.restore()
 
         # 2. Feixes suaves de luz da janela panorâmica em contra-paralaxe (ilusão de profundidade 3D!)
         if self.stage.is_indoor and night_factor < 0.72:
@@ -582,30 +800,33 @@ class SceneCompositor:
                 painter.setBrush(bg_grad)
                 painter.drawPath(path)
 
-        # 3. Partículas vivas de luz/poeira/brasas reagindo organicamente ao som do PC (graves & agudos!)
+        # 3. Partículas vivas de luz/poeira/brasas em primeiro plano (ADITIVAS sobre toda a cena, reagindo ao som do PC!)
         rim_r, rim_g, rim_b = atmo.rim_light
-        n_motes = 26
+        n_motes = 30
+        painter.save()
+        painter.setCompositionMode(QPainter.CompositionMode_Plus)
         for i in range(n_motes):
-            speed = 0.018 + (i % 5) * 0.006 + 0.032 * energy
-            base_x = ((i * 0.1739 + 0.07) % 0.92) + 0.04
-            sway = math.sin(self.time * (0.55 + (i % 4) * 0.22) + i * 1.37) * (0.025 + 0.018 * bass)
+            speed = 0.022 + (i % 5) * 0.007 + 0.038 * energy
+            base_x = ((i * 0.1739 + 0.05) % 0.92) + 0.04
+            sway = math.sin(self.time * (0.62 + (i % 4) * 0.24) + i * 1.37) * (0.028 + 0.022 * bass)
             y_prog = (i * 0.231 + self.time * speed) % 1.0
-            px = (base_x + sway) * w - self.parallax_x * (18.0 + (i % 3) * 10.0)
-            py = (0.94 - y_prog * 0.84) * h - self.parallax_y * (10.0 + (i % 3) * 6.0)
-            twinkle = 0.45 + 0.55 * math.sin(self.time * (2.2 + (i % 5) * 0.7) + i * 2.1)
-            spark = 1.0 + 0.85 * treble + 0.65 * beat
-            rad = (2.4 + (i % 4) * 1.3) * sc * (1.0 + 0.45 * bass)
-            alpha = int(clamp((48 + 75 * night_factor + 90 * energy) * twinkle * min(1.5, spark * 0.75), 18, 225))
+            px = (base_x + sway) * w - self.parallax_x * (22.0 + (i % 3) * 12.0)
+            py = (0.94 - y_prog * 0.86) * h - self.parallax_y * (12.0 + (i % 3) * 7.0)
+            twinkle = 0.50 + 0.50 * math.sin(self.time * (2.4 + (i % 5) * 0.7) + i * 2.1)
+            spark = 1.0 + 0.90 * treble + 0.75 * beat
+            rad = (2.6 + (i % 4) * 1.4) * sc * (1.0 + 0.50 * bass)
+            alpha = int(clamp((55 + 85 * night_factor + 95 * energy) * twinkle * min(1.5, spark * 0.78), 24, 235))
 
-            # Halo suave
-            hr = rad * (3.2 + 1.4 * bass)
+            # Halo luminoso nítido em profundidade (flutuando claramente sobre o quarto!)
+            hr = rad * (3.4 + 1.5 * bass)
             mg = QRadialGradient(QPointF(px, py), hr)
-            mg.setColorAt(0.0, QColor(255, 244, 210, alpha))
-            mg.setColorAt(0.4, QColor(rim_r, rim_g, rim_b, int(alpha * 0.48)))
+            mg.setColorAt(0.0, QColor(255, 248, 224, alpha))
+            mg.setColorAt(0.38, QColor(rim_r, rim_g, rim_b, int(alpha * 0.52)))
             mg.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
             painter.setBrush(mg)
             painter.drawEllipse(QPointF(px, py), hr, hr)
-            # Núcleo brilhante
-            painter.setBrush(QColor(255, 250, 232, min(255, int(alpha * 1.2))))
-            painter.drawEllipse(QPointF(px, py), rad * 0.55, rad * 0.55)
+            # Núcleo especular brilhante
+            painter.setBrush(QColor(255, 252, 240, min(255, int(alpha * 1.25))))
+            painter.drawEllipse(QPointF(px, py), rad * 0.62, rad * 0.62)
+        painter.restore()
         painter.restore()

@@ -27,9 +27,10 @@ from .atmosphere import AtmospherePalette
 class WorldHotspot:
     id: str
     x: float           # coordenada normalizada 0..1
-    y: float           # coordenada normalizada no piso caminhável (0.81..0.95)
+    y: float           # coordenada normalizada no piso caminhável (0.46..0.92)
     arrive_action: str # idle | sit_work | sit_relax | sleep | music_sway | admire_view | stretch
     label_pt: str
+    facing_dir: str = ""  # direção opcional ao chegar ("S", "SE", "SO", etc.) para encaixe exato no móvel
 
 
 # Hotspots distribuídos pela praça de pedra aberta estilo Tree of Savior / Ragnarok Online (livres do HUD inferior esquerdo!)
@@ -49,25 +50,25 @@ INDOOR_SCENES: frozenset[str] = frozenset({"cozy_loft_arya", "cozy_loft_erin", "
 # Hotspots calibrados 1:1 com os móveis pintados à mão de cada cenário!
 SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
     "cozy_loft_arya": {
-        "desk":       WorldHotspot("desk",       0.195, 0.755, "sit_chair", "Escrivaninha Botânica"),
-        "chair":      WorldHotspot("chair",      0.505, 0.485, "sit_chair", "Sofá Aconchegante"),
-        "sofa":       WorldHotspot("sofa",       0.505, 0.485, "sit_chair", "Sofá Aconchegante"),
-        "cushion":    WorldHotspot("cushion",    0.840, 0.685, "lie",       "Cama do Loft"),
-        "bedroll":    WorldHotspot("bedroll",    0.840, 0.685, "lie",       "Cama do Loft"),
+        "desk":       WorldHotspot("desk",       0.195, 0.755, "sit_chair", "Escrivaninha Botânica", "SO"),
+        "chair":      WorldHotspot("chair",      0.510, 0.502, "sit_chair", "Sofá Aconchegante", "S"),
+        "sofa":       WorldHotspot("sofa",       0.510, 0.502, "sit_chair", "Sofá Aconchegante", "S"),
+        "cushion":    WorldHotspot("cushion",    0.862, 0.672, "lie",       "Cama do Loft", "SE"),
+        "bedroll":    WorldHotspot("bedroll",    0.862, 0.672, "lie",       "Cama do Loft", "SE"),
         "music_spot": WorldHotspot("music_spot", 0.48,  0.74,  "wave",      "Tapete Central"),
-        "overlook":   WorldHotspot("overlook",   0.46,  0.54,  "idle",      "Janela Panorâmica"),
+        "overlook":   WorldHotspot("overlook",   0.46,  0.56,  "idle",      "Janela Panorâmica"),
         "lantern":    WorldHotspot("lantern",    0.34,  0.64,  "wave",      "Perto da Lareira"),
         "garden_l":   WorldHotspot("garden_l",   0.38,  0.82,  "sit_floor", "Tapete Macio"),
         "garden_r":   WorldHotspot("garden_r",   0.64,  0.78,  "idle",      "Perto da Cama"),
     },
     "cozy_loft_erin": {
-        "desk":       WorldHotspot("desk",       0.195, 0.610, "sit_chair", "Mesa de Som & Desenho"),
-        "chair":      WorldHotspot("chair",      0.485, 0.475, "sit_chair", "Sofá do Estúdio"),
-        "sofa":       WorldHotspot("sofa",       0.485, 0.475, "sit_chair", "Sofá do Estúdio"),
-        "cushion":    WorldHotspot("cushion",    0.825, 0.560, "lie",       "Cama do Loft"),
-        "bedroll":    WorldHotspot("bedroll",    0.825, 0.560, "lie",       "Cama do Loft"),
+        "desk":       WorldHotspot("desk",       0.195, 0.610, "sit_chair", "Mesa de Som & Desenho", "SO"),
+        "chair":      WorldHotspot("chair",      0.488, 0.498, "sit_chair", "Sofá do Estúdio", "S"),
+        "sofa":       WorldHotspot("sofa",       0.488, 0.498, "sit_chair", "Sofá do Estúdio", "S"),
+        "cushion":    WorldHotspot("cushion",    0.835, 0.560, "lie",       "Cama do Loft", "SE"),
+        "bedroll":    WorldHotspot("bedroll",    0.835, 0.560, "lie",       "Cama do Loft", "SE"),
         "music_spot": WorldHotspot("music_spot", 0.50,  0.74,  "wave",      "Tapete Central"),
-        "overlook":   WorldHotspot("overlook",   0.48,  0.54,  "idle",      "Janela Panorâmica"),
+        "overlook":   WorldHotspot("overlook",   0.48,  0.56,  "idle",      "Janela Panorâmica"),
         "lantern":    WorldHotspot("lantern",    0.34,  0.66,  "wave",      "Centro do Estúdio"),
         "garden_l":   WorldHotspot("garden_l",   0.38,  0.82,  "sit_floor", "Tapete Estampado"),
         "garden_r":   WorldHotspot("garden_r",   0.64,  0.78,  "idle",      "Perto da Cama"),

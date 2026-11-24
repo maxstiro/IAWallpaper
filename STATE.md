@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-24 (Milestone 19.5 Concluído — **Lofts 3/4 Elevados estilo Tree of Savior em Escala Real 1:1 para Monitor 32" QHD (`cozy_loft_arya` & `cozy_loft_erin` · 4 horários/climas 1:1)**, **captura real de áudio do PC via Windows WASAPI Loopback (`soundcard` em `sense/audio.py`)** e **reatividade Wallpaper Engine 100% orgânica** com partículas luminosas + luzes quentes de abajur/velas/lareira pulsando com a música + paralaxe suave · **35/35 testes verdes**)
+> **Última atualização**: 2026-11-24 (Milestone 19.6 Concluído — **Motor Single-Base + Iluminação Dinâmica Real por Fora (`window_mask.png`) + Fatias 2.5D Y-Sort (`occluders/coffee_table.png`)** mantendo 100% os mesmos pixels em Manhã/Pôr do Sol/Noite/Chuva, cama orientada para os travesseiros, sofá rebaixado atrás da mesinha e partículas aditivas vivas sobre a cena · **35/35 testes verdes**)
 
 ---
 
