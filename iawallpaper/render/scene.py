@@ -159,6 +159,7 @@ class SceneCompositor:
         asleep: bool = False,
         affinity: float = 12.0,
         activity: str = "IDLE",
+        audio_frame=None,
     ) -> AtmospherePalette:
         """Renderiza todas as camadas do wallpaper em ordem de profundidade."""
         atmo = compute_atmosphere(circadian, weather, lightning=particles.lightning)
@@ -166,7 +167,8 @@ class SceneCompositor:
         painter.setRenderHint(QPainter.Antialiasing, True)
 
         is_world = avatar.render_style in ("live2d_25d", "vrm_3d", "world_sprite")
-        raining = weather.condition in ("rain", "storm")
+        is_indoor = self.stage.is_indoor
+        raining = (not is_indoor) and weather.condition in ("rain", "storm")
         bg_key = self._pick_bg_key(circadian, weather, prefer_diorama=is_world)
         if bg_key is not None:
             if bg_key != self._current_bg_key:
@@ -198,11 +200,12 @@ class SceneCompositor:
             painter.fillRect(0, 0, width, height, fog_g)
 
         if is_world:
-            # Dinâmica viva própria do cenário (raios solares, água/caustics, névoa, lanternas pulsando, pássaros/borboletas)
+            # Dinâmica viva própria do cenário (raios solares, luzes pulsando; em lofts internos, chuva fica lá fora!)
             self.stage.paint_location_dynamics(
                 painter, width, height, atmo,
                 daylight=circadian.daylight, warmth=circadian.warmth,
-                condition=weather.condition, parallax_x=self.parallax_x, parallax_y=self.parallax_y,
+                condition="clear" if is_indoor else weather.condition,
+                parallax_x=self.parallax_x, parallax_y=self.parallax_y,
             )
             # Efeitos no piso (poeira de passos, ondas de chuva & clique)
             self.stage.paint_ground_fx(painter, width, height, atmo, self.parallax_x, self.parallax_y)
@@ -242,9 +245,11 @@ class SceneCompositor:
                 music_active=activity == "MUSIC",
             )
 
-        # Partículas climáticas e reações afetivas em primeiro plano
+        # Partículas climáticas / poeira de luz + bokeh de profundidade em primeiro plano (ilusão 3D!)
         particles.paint_weather(painter)
         particles.paint_mood_fx(painter)
+        if audio_frame is not None:
+            self._paint_depth_bokeh_and_audio(painter, width, height, atmo, audio_frame, circadian.night_factor)
 
         # Bolha de sussurro contextual (se ativa)
         if self.whisper_text and self.whisper_alpha > 0.02:
@@ -518,3 +523,61 @@ class SceneCompositor:
         line2 = f"{persona_name} · {emotion.label} · Afinidade {affinity:.0f}% · {activity}"
         painter.setPen(QColor(168, 205, 255, 215))
         painter.drawText(rect.adjusted(14 * sc + tx, 40 * sc, -12 * sc, -6 * sc), Qt.AlignLeft | Qt.AlignVCenter, line2)
+
+    def _paint_depth_bokeh_and_audio(
+        self,
+        painter: QPainter,
+        w: int,
+        h: int,
+        atmo: AtmospherePalette,
+        audio_frame,
+        night_factor: float,
+    ) -> None:
+        """Camada de estilo Wallpaper Engine: bokeh em contra-paralaxe (ilusão 3D) + visualizador de áudio sutil."""
+        sc = clamp(h / 1080.0, 0.56, 1.0)
+        bass = float(getattr(audio_frame, "bass", 0.0))
+        bands = getattr(audio_frame, "bands", ())
+
+        # 1. Partículas bokeh flutuantes em primeiro plano (contra-paralaxe acentua profundidade 2.5D!)
+        painter.save()
+        painter.setPen(Qt.NoPen)
+        rim_r, rim_g, rim_b = atmo.rim_light
+        for i in range(6):
+            bx = ((0.12 + i * 0.165 + math.sin(self.time * (0.22 + i * 0.05) + i * 1.9) * 0.035) % 1.0) * w - self.parallax_x * 28.0
+            by = (0.18 + (i % 3) * 0.24 + math.cos(self.time * (0.28 + i * 0.04) + i * 2.3) * 0.04) * h - self.parallax_y * 18.0
+            rad = (16.0 + (i % 3) * 10.0) * sc * (1.0 + 0.25 * bass)
+            alpha = int((26 + 24 * night_factor + 26 * bass) * (0.7 + 0.3 * math.sin(self.time * 1.4 + i)))
+            g = QRadialGradient(QPointF(bx, by), rad)
+            g.setColorAt(0.0, QColor(rim_r, rim_g, rim_b, min(110, alpha)))
+            g.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
+            painter.setBrush(g)
+            painter.drawEllipse(QPointF(bx, by), rad, rad)
+
+        # 2. Equalizador glassmórfico discreto estilo Wallpaper Engine no canto inferior direito!
+        if bands:
+            n = len(bands)
+            bw = 5.0 * sc
+            gap = 3.0 * sc
+            total_w = n * (bw + gap)
+            max_bh = 44.0 * sc
+            base_x = w - total_w - 28.0 * sc
+            base_y = h - 54.0 * sc
+
+            # Placa translúcida bem discreta atrás das barras
+            pill = QRectF(base_x - 10 * sc, base_y - max_bh - 10 * sc, total_w + 20 * sc, max_bh + 18 * sc)
+            painter.setBrush(QColor(12, 16, 30, 118))
+            painter.setPen(QPen(QColor(255, 255, 255, 32), 1.0))
+            painter.drawRoundedRect(pill, 12.0 * sc, 12.0 * sc)
+            painter.setPen(Qt.NoPen)
+
+            for i, lvl in enumerate(bands):
+                bh = max(3.5 * sc, float(lvl) * max_bh)
+                x = base_x + i * (bw + gap)
+                y = base_y - bh
+                t_col = i / max(n - 1, 1)
+                cr = int(lerp(rim_r, 155, t_col))
+                cg = int(lerp(rim_g, 210, t_col))
+                cb = int(lerp(rim_b, 255, t_col))
+                painter.setBrush(QColor(cr, cg, cb, int(175 + 70 * float(lvl))))
+                painter.drawRoundedRect(QRectF(x, y, bw, bh), 2.5 * sc, 2.5 * sc)
+        painter.restore()

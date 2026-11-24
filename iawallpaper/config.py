@@ -16,7 +16,7 @@ VALID_OUTFITS = (None, "base", "cozy_shirt", "casual", "cozy", "rainy", "focus",
 class Settings:
     persona_id: str = "mira"
     character_id: str = "arya"
-    scene_id: str = "fairy_glade"
+    scene_id: str = "cozy_loft_arya"
     mode: str = "wallpaper"
     render_style: str = "world_sprite"
     vrm_model: str = "elfa_loira"

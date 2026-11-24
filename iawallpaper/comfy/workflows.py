@@ -6,6 +6,22 @@ from ..core.persona import Persona
 from .presets import LoraSpec
 
 SCENE_PRESETS: dict[str, dict[str, str]] = {
+    "cozy_loft_arya": {
+        "label": "Loft Botânico da Arya (Cozy Studio)",
+        "base": (
+            "anime_scenery, (tree_of_savior_style:1.30), hand_painted_watercolor_cozy_loft_interior, one_room_studio_apartment, "
+            "giant_panoramic_window_showing_sunlit_forest_sky, cozy_wooden_floor_and_woven_rug, plush_bed_with_sage_cream_throw, "
+            "comfy_sofa, wooden_desk_with_terrarium_books_and_warm_lamp, hanging_ivy_and_fairy_lights, no_humans, wide_angle, wallpaper"
+        ),
+    },
+    "cozy_loft_erin": {
+        "label": "Loft Estúdio da Erin (Cozy Artist Loft)",
+        "base": (
+            "anime_scenery, (tree_of_savior_style:1.30), hand_painted_watercolor_cozy_loft_interior, one_room_artist_studio_apartment, "
+            "giant_panoramic_window_showing_scenic_town_and_sky, warm_wood_and_brick_walls, plush_bed_with_terracotta_plaid_throw, "
+            "comfy_leather_fabric_sofa, wooden_desk_with_speakers_vinyls_sketchbook_and_warm_lamp, fairy_lights, no_humans, wide_angle, wallpaper"
+        ),
+    },
     "fairy_glade": {
         "label": "Clareira Mágica de Acampamento (Tree of Savior)",
         "base": (
@@ -513,6 +529,33 @@ QWEN_RELIGHT_GLADE: dict[str, str] = {
 }
 
 
+QWEN_RELIGHT_LOFT: dict[str, str] = {
+    "day": (
+        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
+        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Bright sunlit morning sky visible outside the giant panoramic window with warm crisp sunlight streaming through the glass onto the wooden floor."
+    ),
+    "sunset": (
+        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
+        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Transform ONLY the sky outside the panoramic window and the room lighting into a breathtaking golden-amber sunset with glowing peach-violet clouds outside, "
+        "warm orange sunbeams slanting across the wooden floorboards and bed, and the indoor desk lamp and fairy lights beginning to glow softly."
+    ),
+    "night": (
+        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
+        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Transform ONLY the outside sky and indoor lighting into a super cozy starry indigo night with glowing moonlight visible through the panoramic window, "
+        "while inside the loft warm golden amber light radiates from the desk lamp, string fairy lights, and soft cozy shadows across the bed and sofa."
+    ),
+    "rain": (
+        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
+        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Transform ONLY the weather outside the panoramic window and indoor ambiance into a cozy rainy afternoon: overcast slate-blue misty rain streaks and raindrops "
+        "on the OUTSIDE of the window glass, while the indoor room stays completely dry, warm, and snug illuminated by the glowing amber desk lamp and fairy lights."
+    ),
+}
+
+
 def build_qwen_relight_scene_workflow(
     base_uploaded_scene: str,
     variant: str = "sunset",
@@ -526,7 +569,12 @@ def build_qwen_relight_scene_workflow(
     scene_id: str = "",
 ) -> dict:
     """Reilumina a MESMA arquitetura/cenário base para sunset/night/rain via Qwen Image 2.1 Edit (consistência 1:1)."""
-    table = QWEN_RELIGHT_GLADE if scene_id == "fairy_glade" else QWEN_RELIGHT_INSTRUCTIONS
+    if scene_id.startswith("cozy_loft"):
+        table = QWEN_RELIGHT_LOFT
+    elif scene_id == "fairy_glade":
+        table = QWEN_RELIGHT_GLADE
+    else:
+        table = QWEN_RELIGHT_INSTRUCTIONS
     instruction = table.get(variant, table["sunset"])
     if anime_lora:
         instruction = f"anime-style Illustration, {instruction}"

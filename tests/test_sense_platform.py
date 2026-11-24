@@ -98,3 +98,20 @@ def test_platform_basic_queries():
     tel = system_telemetry()
     assert 0.0 <= tel["cpu"] <= 1.0
     assert 0.0 <= tel["ram"] <= 1.0
+
+
+def test_audio_reactive_engine_bands_and_energy():
+    from iawallpaper.sense.audio import AudioReactiveEngine
+
+    eng = AudioReactiveEngine(num_bands=24)
+    for _ in range(12):
+        f_music = eng.update(0.05, active_music=True)
+    assert len(f_music.bands) == 24
+    assert all(0.0 <= b <= 1.0 for b in f_music.bands)
+    assert f_music.energy > 0.15
+    assert f_music.bass > 0.1
+
+    eng.enabled = False
+    for _ in range(10):
+        f_off = eng.update(0.05, active_music=False)
+    assert f_off.energy == 0.0

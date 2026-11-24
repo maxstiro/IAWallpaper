@@ -43,8 +43,35 @@ DEFAULT_HOTSPOTS: dict[str, WorldHotspot] = {
     "garden_r":   WorldHotspot("garden_r",   0.78, 0.88, "idle",        "Terraço Leste"),
 }
 
-# Hotspots calibrados 1:1 com os móveis pintados à mão da Clareira Mágica (`fairy_glade`)!
+# Cenas internas (chuva fica do lado de fora da janela, sem molhar o tapete interno!)
+INDOOR_SCENES: frozenset[str] = frozenset({"cozy_loft_arya", "cozy_loft_erin", "cyber_loft"})
+
+# Hotspots calibrados 1:1 com os móveis pintados à mão de cada cenário!
 SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
+    "cozy_loft_arya": {
+        "desk":       WorldHotspot("desk",       0.195, 0.725, "sit_chair", "Escrivaninha Botânica"),
+        "chair":      WorldHotspot("chair",      0.340, 0.680, "sit_chair", "Sofá Aconchegante"),
+        "sofa":       WorldHotspot("sofa",       0.340, 0.680, "sit_chair", "Sofá Aconchegante"),
+        "cushion":    WorldHotspot("cushion",    0.825, 0.655, "lie",       "Cama do Loft"),
+        "bedroll":    WorldHotspot("bedroll",    0.825, 0.655, "lie",       "Cama do Loft"),
+        "music_spot": WorldHotspot("music_spot", 0.48,  0.85,  "wave",      "Tapete Central"),
+        "overlook":   WorldHotspot("overlook",   0.52,  0.74,  "idle",      "Janela Panorâmica"),
+        "lantern":    WorldHotspot("lantern",    0.58,  0.85,  "wave",      "Centro do Loft"),
+        "garden_l":   WorldHotspot("garden_l",   0.36,  0.89,  "sit_floor", "Tapete Macio"),
+        "garden_r":   WorldHotspot("garden_r",   0.64,  0.89,  "idle",      "Perto da Cama"),
+    },
+    "cozy_loft_erin": {
+        "desk":       WorldHotspot("desk",       0.210, 0.770, "interact",  "Mesa de Som & Desenho"),
+        "chair":      WorldHotspot("chair",      0.340, 0.690, "sit_chair", "Sofá do Estúdio"),
+        "sofa":       WorldHotspot("sofa",       0.340, 0.690, "sit_chair", "Sofá do Estúdio"),
+        "cushion":    WorldHotspot("cushion",    0.805, 0.690, "lie",       "Cama do Loft"),
+        "bedroll":    WorldHotspot("bedroll",    0.805, 0.690, "lie",       "Cama do Loft"),
+        "music_spot": WorldHotspot("music_spot", 0.50,  0.86,  "wave",      "Tapete Central"),
+        "overlook":   WorldHotspot("overlook",   0.52,  0.74,  "idle",      "Janela Panorâmica"),
+        "lantern":    WorldHotspot("lantern",    0.58,  0.86,  "wave",      "Centro do Estúdio"),
+        "garden_l":   WorldHotspot("garden_l",   0.36,  0.89,  "sit_floor", "Tapete Macio"),
+        "garden_r":   WorldHotspot("garden_r",   0.64,  0.89,  "idle",      "Perto da Cama"),
+    },
     "fairy_glade": {
         "desk":       WorldHotspot("desk",       0.338, 0.775, "sit_chair", "Cadeira & Mesa de Trabalho"),
         "chair":      WorldHotspot("chair",      0.338, 0.775, "sit_chair", "Cadeira de Acampamento"),
@@ -59,8 +86,8 @@ SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
     },
 }
 
-WALK_MIN_X, WALK_MAX_X = 0.24, 0.84
-WALK_MIN_Y, WALK_MAX_Y = 0.69, 0.94
+WALK_MIN_X, WALK_MAX_X = 0.18, 0.86
+WALK_MIN_Y, WALK_MAX_Y = 0.64, 0.94
 
 
 @dataclass
@@ -126,6 +153,10 @@ class WorldStage:
     def set_scene_id(self, scene_id: str) -> None:
         self.scene_id = scene_id
         self.hotspots = dict(SCENE_HOTSPOTS.get(scene_id, DEFAULT_HOTSPOTS))
+
+    @property
+    def is_indoor(self) -> bool:
+        return self.scene_id in INDOOR_SCENES
 
     @staticmethod
     def clamp_walkable(x: float, y: float) -> tuple[float, float]:

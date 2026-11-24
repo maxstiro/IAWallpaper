@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-24 (Milestone 18.7 Concluído — **2ª Personagem Oficial `Erin` [Humana Ruiva]**: 9 âncoras `base/` limpas + 6 retratos expressivos 2D + **14 clipes Wan 2.2 @ 16 FPS** no `casual` em algodão fininho [cropped oliva + hotpants mescla cinza-carvão] + 14 clipes extras `casual_denim`, cadeira da `fairy_glade` recalibrada `(0.338, 0.775)` sem sombra sob pés balançando e seletor **Arya / Erin** na Central de Controle · **34/34 testes verdes**)
+> **Última atualização**: 2026-11-24 (Milestone 19 Concluído — **Lofts Cômodo Único Cozy (`cozy_loft_arya` & `cozy_loft_erin`) nos 4 horários/climas 1:1 com janelão panorâmico**, **motor de áudio reativo 24-bandas (`sense/audio.py`) + bokeh de profundidade em contra-paralaxe**, remoção dos guarda-chuvas e escala mais equilibrada `295 * u` com passo sincronizado · **35/35 testes verdes**)
 
 ---
 
@@ -10,10 +10,10 @@
 | Módulo | Caminho | Status | Notas |
 |---|---|---|---|
 | Infra & Docs | `PROJETO.md`, `STATE.md`, `roadmap.md`, `AGENTS.md`, `venv/` | 🟢 Concluído | Venv Python 3.12 com PySide6, NumPy, Pillow, psutil, pywin32, moderngl, pytest |
-| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Padrão `scene_id="fairy_glade"`, `render_style="world_sprite"`, `character_id="arya"` (`default_outfit="cozy_shirt"`, `base` preservado) |
+| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Padrão `scene_id="cozy_loft_arya"`, `render_style="world_sprite"`, `character_id="arya"` (`erin` + `cozy_loft_erin` + `fairy_glade` selecionáveis) |
 | Núcleo Neural (`core/`) | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | 🟢 Validado | 438 neurônios LIF, aprendizado 3 fatores, Rescorla-Wagner, Bandit, Mira & Nyx |
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
-| Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
+| Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py`, `audio.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + **AudioReactiveEngine 24-bandas** estilo Wallpaper Engine |
 | Ponte ComfyUI (`comfy/`) | `presets.py`, `bridge.py`, `workflows.py`, `character_pipeline.py` | 🟢 Validado E2E | `CharacterPipeline`: inicialização padronizada `characters/<id>/outfits/<outfit>/`, geração de poses-âncora Qwen 2.1 Edit, outfits 1:1 e baking Wan 2.2 (`start == end` e transições `start != end`, 25f/41f @ 16 FPS) em 3 Tiers |
 | Render 2.5D & 3D (`render/`) | `character_pack.py`, `sprite_clip.py`, `avatar.py`, `live2d_mesh.py`, `vrm_sculptor.py`, `dungeon_avatar.py`, `vrm_loader.py`, `vrm_animator.py`, `vrm_renderer.py`, `world_stage.py`, `skeleton.py`, `rig_cutter.py`, `atmosphere.py`, `particles.py`, `scene.py`, `canvas.py` | 🟢 Validado Visual | **Motor Oficial Wan 2.2 (`character_pack.py` + `sprite_clip.py` + `avatar.py`)**: 8 direções reais (`S/SE/L/NE/N/NO/O/SO`) via 5 ângulos canônicos com espelhamento instantâneo em 0 ms (`NO/O/SO`), rotas multi-waypoint (`walk_path`) com preservação de fase da passada (zero flash de `idle` nas curvas), Grafo de Poses com reversão temporal (`play_reverse=True` em `sentar <-> levantar` e `deitar <-> levantar`), acoplamento matemático `stride_ratio ↔ velocidade` (zero patinação), aceleração automática `run` (`1.45×`) e expressões 2D desacopladas |
 | Mente (`mind/`) | `director.py` | 🟢 Validado | Navegação autônoma pela praça `sky_sanctuary`, poses fluidas (`idle`, `walk`, `run`, `sit_floor`, `sit_chair`, `lie`, `wave`, `interact`, `spin`, `sleep`), emotes RO, sono e sussurros |

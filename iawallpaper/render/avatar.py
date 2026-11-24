@@ -943,9 +943,6 @@ class AvatarRig:
         painter.restore()
 
         body_h = frame_h * 0.78
-        if raining and self.action not in ("sleep", "sit_work"):
-            self._paint_umbrella(painter, foot_x + 14 * u, draw_y - body_h * 1.04, u, atmosphere)
-
         self.body_rect = QRectF(foot_x - frame_w * 0.28, draw_y - body_h, frame_w * 0.56, body_h)
         self.head_rect = QRectF(foot_x - frame_w * 0.22, draw_y - body_h * 1.02, frame_w * 0.44, body_h * 0.26)
 
@@ -1011,9 +1008,6 @@ class AvatarRig:
         painter.restore()
 
         body_h = frame_h * 0.78
-        if raining and self.action not in ("sleep", "sit_work"):
-            self._paint_umbrella(painter, foot_x + 14 * u, draw_y - body_h * 1.04, u, atmosphere)
-
         self.body_rect = QRectF(foot_x - frame_w * 0.28, draw_y - body_h, frame_w * 0.56, body_h)
         self.head_rect = QRectF(foot_x - frame_w * 0.22, draw_y - body_h * 1.02, frame_w * 0.44, body_h * 0.26)
 
@@ -1115,8 +1109,8 @@ class AvatarRig:
         if frame.isNull():
             return
 
-        # Altura projetada calibrada 1:1 com `CharacterPack.synced_walk_speed_norm` e `height_scale` de postura!
-        target_h = 385.0 * u * resolved.height_scale
+        # Altura projetada calibrada 1:1 com `CharacterPack.synced_walk_speed_norm` (h_norm ≈ 0.275 — proporção equilibrada no loft/desktop!)
+        target_h = 295.0 * u * resolved.height_scale
         aspect = frame.width() / max(frame.height(), 1)
         target_w = target_h * aspect
         sx = -1.0 if resolved.flip_x else 1.0
@@ -1176,9 +1170,6 @@ class AvatarRig:
         self._last_drawn_frame = frame
         self._last_drawn_flip = resolved.flip_x
         self._last_drawn_h = target_h
-
-        if raining and self.action not in ("sleep", "lie", "sit_work"):
-            self._paint_umbrella(painter, foot_x + (18 * u * sx), draw_y - target_h * 1.02, u, atmosphere)
 
         self.body_rect = QRectF(foot_x - target_w * 0.36, draw_y - target_h * 0.96, target_w * 0.72, target_h * 0.96)
         self.head_rect = QRectF(foot_x - target_w * 0.28, draw_y - target_h * 0.98, target_w * 0.56, target_h * 0.28)
@@ -1250,9 +1241,6 @@ class AvatarRig:
         else:
             painter.drawPixmap(dst, tinted_curr, QRectF(tinted_curr.rect()))
         painter.restore()
-
-        if raining and self.action not in ("sleep", "sit_work"):
-            self._paint_umbrella(painter, foot_x + self.facing * 18 * u, draw_y - target_h * 1.02, u, atmosphere)
 
         self.body_rect = QRectF(foot_x - target_w * 0.36, draw_y - target_h * 0.96, target_w * 0.72, target_h * 0.96)
         self.head_rect = QRectF(foot_x - target_w * 0.28, draw_y - target_h * 0.98, target_w * 0.56, target_h * 0.28)

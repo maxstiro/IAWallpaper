@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QWidget
 
 from ..core.emotion import EmotionState
 from ..core.persona import Persona
+from ..sense.audio import AudioReactiveEngine
 from ..sense.circadian import CircadianState, compute_circadian
 from ..sense.weather import WeatherState
 from .avatar import AvatarRig
@@ -40,6 +41,7 @@ class WallpaperCanvas(QWidget):
         )
         self.scene = SceneCompositor(scene_dirs=scene_dirs, seed=persona.seed)
         self.particles = ParticleEngine(seed=persona.seed + 17)
+        self.audio = AudioReactiveEngine(num_bands=24)
 
         # Estado visual atual
         self.circadian: CircadianState = compute_circadian()
@@ -143,20 +145,23 @@ class WallpaperCanvas(QWidget):
 
     def step_animation(self, dt: float) -> None:
         """Avança um quadro da simulação visual."""
-        self.scene.update(dt, wind_speed=self.weather.wind_speed, condition=self.weather.condition)
+        is_indoor = self.scene.stage.is_indoor
+        weather_cond = "clear" if is_indoor and self.weather.condition in ("rain", "storm", "snow") else self.weather.condition
+        self.audio.update(dt, active_music=(self.activity == "MUSIC"))
+        self.scene.update(dt, wind_speed=self.weather.wind_speed, condition=weather_cond)
         self.particles.update(
             dt=dt,
             width=max(self.width(), 640),
             height=max(self.height(), 360),
-            condition=self.weather.condition,
+            condition=weather_cond,
             night_factor=self.circadian.night_factor,
-            density=self.particle_density,
-            wind_speed=self.weather.wind_speed,
+            density=self.particle_density * (0.65 if is_indoor else 1.0),
+            wind_speed=self.weather.wind_speed * (0.25 if is_indoor else 1.0),
         )
         self.avatar.update(dt=dt, emotion=self.emotion, caressing=self._caressing, asleep=self.asleep)
         if self.avatar.pending_footstep is not None:
             fx, fy = self.avatar.pending_footstep
-            self.scene.stage.spawn_footstep(fx, fy, raining=self.weather.condition in ("rain", "storm"))
+            self.scene.stage.spawn_footstep(fx, fy, raining=(not is_indoor and self.weather.condition in ("rain", "storm")))
             self.avatar.pending_footstep = None
         self.update()
 
@@ -176,6 +181,7 @@ class WallpaperCanvas(QWidget):
             asleep=self.asleep,
             affinity=self.affinity,
             activity=self.activity,
+            audio_frame=self.audio.frame,
         )
         painter.end()
 
@@ -199,6 +205,7 @@ class WallpaperCanvas(QWidget):
             asleep=self.asleep,
             affinity=self.affinity,
             activity=self.activity,
+            audio_frame=self.audio.frame,
         )
         painter.end()
         return img
