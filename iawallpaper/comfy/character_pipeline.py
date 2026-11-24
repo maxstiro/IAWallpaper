@@ -59,7 +59,7 @@ ANCHOR_SPECS: dict[str, AnchorSpec] = {
         key="walk_L",
         prompt=(
             "Turn this exact curvy shortstack character into a clean RIGHT SIDE PROFILE (facing right, 90 degrees) mid-stride WALKING pose: "
-            "preserving her exact face in profile, exact hair, exact elf ears, exact skin tone, exact underwear/outfit, exact ~4.1 head proportions "
+            "preserving her exact face in profile, exact hair, exact ears, exact skin tone, exact underwear/outfit, exact ~4.1 head proportions "
             "and crisp 2D painted art style. One leg extended forward and the other leg trailing behind in mid-step, arms swinging naturally, "
             "hair flowing backward, full body head to feet on pure solid flat white background, zero floor shadow."
         ),
@@ -70,7 +70,7 @@ ANCHOR_SPECS: dict[str, AnchorSpec] = {
         key="walk_NE",
         prompt=(
             "Turn this exact curvy shortstack character into a clean three-quarter BACK-RIGHT (facing away and to the right, 135 degrees) "
-            "mid-stride WALKING pose: preserving her exact long flowing hair down her back, exact pointed ears, exact skin tone, exact underwear/outfit, "
+            "mid-stride WALKING pose: preserving her exact long flowing hair down her back, exact ears, exact skin tone, exact underwear/outfit, "
             "exact ~4.1 head proportions and crisp 2D painted art style. Walking away diagonally toward the top-right with one leg forward and back heel lifted, "
             "arms swinging naturally, full body head to bare feet on pure solid flat white background, zero floor shadow."
         ),
@@ -81,7 +81,7 @@ ANCHOR_SPECS: dict[str, AnchorSpec] = {
         key="walk_N",
         prompt=(
             "Turn this exact curvy shortstack character 180 degrees to show a clean FULL BACK VIEW (facing directly away from viewer, walking forward away) "
-            "in a natural mid-stride WALKING pose: preserving her exact lush wavy hair flowing down her upper back, pointed ears visible on sides, "
+            "in a natural mid-stride WALKING pose: preserving her exact lush wavy hair flowing down her upper back, exact ears on sides, "
             "exact skin tone, curvy hips and glutes, exact underwear/outfit back straps, exact ~4.1 head proportions and crisp 2D painted art style. "
             "One heel lifted mid-step, arms swinging slightly at sides, full body head to bare feet on pure solid flat white background, zero floor shadow."
         ),
@@ -726,7 +726,7 @@ class CharacterPipeline:
                 base_uploaded_image=up,
                 prompt=(
                     f"Keep this exact curvy shortstack character, exact face, exact expression, exact pose, exact body framing, "
-                    f"exact hair, exact pointed ears, exact proportions and pure solid flat white background 100% identical pixel-for-pixel, "
+                    f"exact hair, exact ears, exact proportions and pure solid flat white background 100% identical pixel-for-pixel, "
                     f"replacing ONLY her clothing so she wears {outfit_prompt}, crisp 2D hand-painted Rapscallion Tree of Savior ink art style, zero floor shadow."
                 ),
                 neg="different pose, moved limbs, different angle, different face, underwear visible on top, shadow, scenery, 2girls, cropped feet, 3d render",

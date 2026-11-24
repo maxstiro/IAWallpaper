@@ -149,6 +149,7 @@ class IAWallpaperApp:
             self.settings,
             personas_dir=self.paths.personas_dir,
             vrm_models=self.paths.list_vrm_models(),
+            character_packs=self.paths.list_character_packs(),
         )
         self._connect_control_center()
         self._update_asset_coverage()

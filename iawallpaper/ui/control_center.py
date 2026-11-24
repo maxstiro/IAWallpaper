@@ -94,14 +94,15 @@ class ControlCenterWindow(QWidget):
     clear_generated_requested = Signal()
     clear_memory_requested = Signal()
 
-    def __init__(self, settings: Settings, personas_dir: Path | None = None, vrm_models: list[Path] | None = None, parent=None):
+    def __init__(self, settings: Settings, personas_dir: Path | None = None, vrm_models: list[Path] | None = None, character_packs: list[Path] | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("IAWallpaper — Central de Controle")
-        self.resize(720, 620)
+        self.resize(720, 640)
         self.setStyleSheet(DARK_STUDIO_QSS)
         self._settings = settings.sanitized()
         self._personas_dir = personas_dir
         self._vrm_models: list[Path] = list(vrm_models or [])
+        self._character_packs: list[Path] = list(character_packs or [])
         self._building = True
 
         root = QVBoxLayout(self)
@@ -232,8 +233,12 @@ class ControlCenterWindow(QWidget):
         persona_row.addWidget(self.cb_persona, 1)
         persona_row.addWidget(btn_new_persona)
 
+        self.cb_character = QComboBox()
+        self._populate_characters()
+        self.cb_character.currentIndexChanged.connect(self._emit_settings)
+
         self.cb_render_style = QComboBox()
-        self.cb_render_style.addItem("✨ Clipes 2D Wan 2.2 · 8 Direções (Arya · Máximo Reaproveitamento)", "world_sprite")
+        self.cb_render_style.addItem("✨ Clipes 2D Wan 2.2 · 8 Direções (Arya / Erin · Máximo Reaproveitamento)", "world_sprite")
         self.cb_render_style.addItem("Motor 2.5D Live2D / Spine2D (Malha Elástica GPU)", "live2d_25d")
         self.cb_render_style.addItem("Motor 3D Cel-Shaded (VRM · Giro 360° estilo Tree of Savior)", "vrm_3d")
         self.cb_render_style.addItem("Retrato Visual Novel (Busto 2.5D)", "portrait")
@@ -277,7 +282,8 @@ class ControlCenterWindow(QWidget):
         self.chk_whispers = QCheckBox("Permitir sussurros contextuais na área de trabalho")
         self.chk_whispers.stateChanged.connect(self._emit_settings)
 
-        f.addRow("Personagem:", persona_row)
+        f.addRow("Persona (Cérebro):", persona_row)
+        f.addRow("Personagem (Wan 2.2):", self.cb_character)
         f.addRow("Motor Visual:", self.cb_render_style)
         f.addRow("Modelo 3D (.vrm):", vrm_row)
         f.addRow("", self.chk_vrm_recolor)
@@ -460,6 +466,9 @@ class ControlCenterWindow(QWidget):
         self.sl_particles.setValue(int(round(s.particle_density * 10)))
 
         self._set_combo(self.cb_persona, s.persona_id)
+        if s.character_id and self.cb_character.findData(s.character_id) < 0:
+            self.cb_character.addItem(s.character_id.capitalize(), s.character_id)
+        self._set_combo(self.cb_character, s.character_id)
         self._set_combo(self.cb_render_style, s.render_style)
         if s.vrm_model and self.cb_vrm.findData(s.vrm_model) < 0:
             self.cb_vrm.addItem(Path(s.vrm_model).name, s.vrm_model)
@@ -501,8 +510,8 @@ class ControlCenterWindow(QWidget):
         time_override = None if self.chk_real_time.isChecked() else (self.sl_hour.value() / 2.0)
         s = Settings(
             persona_id=self.cb_persona.currentData() or "mira",
-            character_id=self._settings.character_id or "arya",
-            scene_id=self.cb_scene.currentData() or "sky_sanctuary",
+            character_id=self.cb_character.currentData() or self._settings.character_id or "arya",
+            scene_id=self.cb_scene.currentData() or "fairy_glade",
             mode=self.cb_mode.currentData() or "wallpaper",
             render_style=self.cb_render_style.currentData() or "world_sprite",
             vrm_model=self.cb_vrm.currentData() or "",
@@ -526,6 +535,23 @@ class ControlCenterWindow(QWidget):
         ).sanitized()
         self._settings = s
         self.settings_changed.emit(s)
+
+    def _populate_characters(self) -> None:
+        self.cb_character.blockSignals(True)
+        self.cb_character.clear()
+        seen: set[str] = set()
+        labels = {
+            "arya": "★ Arya — Elfa Loira (Wan 2.2)",
+            "erin": "★ Erin — Humana Ruiva (Wan 2.2)",
+        }
+        for cp in self._character_packs:
+            cid = cp.name.lower()
+            seen.add(cid)
+            self.cb_character.addItem(labels.get(cid, f"★ {cid.capitalize()} (Wan 2.2)"), cid)
+        for cid, lbl in labels.items():
+            if cid not in seen:
+                self.cb_character.addItem(lbl, cid)
+        self.cb_character.blockSignals(False)
 
     def _populate_vrm_models(self) -> None:
         self.cb_vrm.blockSignals(True)

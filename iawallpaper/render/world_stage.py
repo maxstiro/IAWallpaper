@@ -46,8 +46,8 @@ DEFAULT_HOTSPOTS: dict[str, WorldHotspot] = {
 # Hotspots calibrados 1:1 com os móveis pintados à mão da Clareira Mágica (`fairy_glade`)!
 SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
     "fairy_glade": {
-        "desk":       WorldHotspot("desk",       0.325, 0.745, "sit_chair", "Cadeira & Mesa de Trabalho"),
-        "chair":      WorldHotspot("chair",      0.325, 0.745, "sit_chair", "Cadeira de Acampamento"),
+        "desk":       WorldHotspot("desk",       0.338, 0.775, "sit_chair", "Cadeira & Mesa de Trabalho"),
+        "chair":      WorldHotspot("chair",      0.338, 0.775, "sit_chair", "Cadeira de Acampamento"),
         "worktable":  WorldHotspot("worktable",  0.34,  0.76,  "interact",  "Mesa de Poções & Grimório"),
         "cushion":    WorldHotspot("cushion",    0.720, 0.765, "lie",       "Cama Sob o Arco Florido"),
         "bedroll":    WorldHotspot("bedroll",    0.720, 0.765, "lie",       "Superfície de Dormir"),

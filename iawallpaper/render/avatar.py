@@ -838,7 +838,8 @@ class AvatarRig:
                         self._clip_time = 0.0
                         play_t = 0.0
                 lift = max(0.0, -self.bounce_y)
-                self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+                if self.action not in ("sit_chair", "lie", "sleep"):
+                    self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
                 self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
                 draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
                 self._paint_character_pack_clip(
@@ -855,7 +856,8 @@ class AvatarRig:
                     self._current_clip_key = clip_key
                     self._clip_time = 0.0
                 lift = max(0.0, -self.bounce_y)
-                self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
+                if self.action not in ("sit_chair", "lie", "sleep"):
+                    self._paint_grounded_shadow(painter, foot_x, foot_y, u, lift, sun_x_norm)
                 self._paint_rpg_ground_aura(painter, foot_x, foot_y, u, atmosphere)
                 draw_y = foot_y - lift + max(0.0, self.bounce_y) * 0.35
                 self._paint_animated_clip(

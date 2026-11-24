@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-23 (Milestone 18.6 Concluído — **Novo Cenário Oficial `fairy_glade` [Clareira Mágica de Acampamento estilo Tree of Savior nos 4 horários 1:1 com móveis reais]** + **1º Outfit Completo 1:1 da Arya `cozy_shirt` [Camisola Casual / Camisetão · 14 clipes Wan 2.2 @ 16 FPS]** calibrado pixel-a-pixel na cadeira/mesa e cama sob o arco florido · **34/34 testes verdes**)
+> **Última atualização**: 2026-11-24 (Milestone 18.7 Concluído — **2ª Personagem Oficial `Erin` [Humana Ruiva]**: 9 âncoras `base/` limpas + 6 retratos expressivos 2D + **14 clipes Wan 2.2 @ 16 FPS** no `casual` em algodão fininho [cropped oliva + hotpants mescla cinza-carvão] + 14 clipes extras `casual_denim`, cadeira da `fairy_glade` recalibrada `(0.338, 0.775)` sem sombra sob pés balançando e seletor **Arya / Erin** na Central de Controle · **34/34 testes verdes**)
 
 ---
 
@@ -28,7 +28,13 @@
   - `portraits/` (**6 retratos expressivos 2D desacoplados** no medalhão ao vivo do HUD): `happy.png`, `affectionate.png`, `shy.png`, `pouty.png`, `sleepy.png`, `focused.png`.
   - **Outfit 1:1 Oficial — `outfits/cozy_shirt/` (Camisola Casual / Camisetão)**: 9 âncoras Qwen 2.1 Edit + **14 clipes Wan 2.2 @ 16 FPS** (`idle_SE` 41f, `wave_SE` 41f, `walk_S/SE/L/NE/N` 25f, `sit_chair_SE`, `sit_floor_SE`, `lie_SE`, `interact_SE`, `trans_sit_chair`, `trans_sit_floor`, `trans_lie`).
   - **Outfit Base Estrutural — `outfits/base/`**: 9 poses-âncora Qwen 2.1 + **15 clipes Wan 2.2 @ 16 FPS** (inclui `spin_SE`).
-- **Cenário Padrão Oficial — Clareira Mágica de Acampamento (`assets/generated/scenes/fairy_glade/diorama_*.png`)**: Aquarela *Tree of Savior* gerada via Qwen Image 2.1 (`1344×768`) e reiluminada 1:1 para `day`, `sunset`, `night` (vaga-lumes, lanternas e cogumelos bioluminescentes) e `rain`, com móveis reais calibrados em `world_stage.py` (`chair/desk` `(0.325, 0.745)` e `bedroll/cushion` `(0.720, 0.765)`).
+- **2ª Personagem Oficial — Erin (`assets/generated/characters/erin/` · Humana Ruiva)**:
+  - `character.json` + `master_idle_SE.png` (~4.1 cabeças estilo *Rapscallion × Tree of Savior*, orelhas humanas, cabelo ruivo acobreado, sardas e base limpa minimalista).
+  - `portraits/` (**6 retratos expressivos 2D** com orelhas humanas): `happy`, `affectionate`, `shy`, `pouty`, `sleepy`, `focused`.
+  - `outfits/base/anchors/`: 9 âncoras limpas (sem móvel em `sit_chair_SE`, `sit_floor_SE`/`lie_SE` alinhadas ao chão).
+  - `outfits/casual_denim/`: 9 âncoras + **14 clipes Wan 2.2 @ 16 FPS** completos preservados como traje extra.
+  - `outfits/casual/` (**Outfit Padrão — Algodão Fininho**): 9 âncoras (hotpants cinza-carvão mescla liso + top cropped oliva-sálvia) + **14 clipes Wan 2.2 @ 16 FPS** completos (`idle_SE` 41f, `wave_SE` 41f, `walk_S/SE/L/NE/N`, `sit_chair_SE`, `sit_floor_SE`, `lie_SE`, `interact_SE`, `trans_sit_chair`, `trans_sit_floor`, `trans_lie`).
+- **Cenário Padrão Oficial — Clareira Mágica de Acampamento (`assets/generated/scenes/fairy_glade/diorama_*.png`)**: Aquarela *Tree of Savior* gerada via Qwen Image 2.1 (`1344×768`) e reiluminada 1:1 para `day`, `sunset`, `night` (vaga-lumes, lanternas e cogumelos bioluminescentes) e `rain`, com móveis reais calibrados em `world_stage.py` (`chair/desk` `(0.338, 0.775)` sem sombra sob pés balançando e `bedroll/cushion` `(0.720, 0.765)`).
 - **Cenários & Motores Opcionais Preservados**: `sky_sanctuary`, `dark_sanctuary`, Rig Live2D 2.5D e 4 Arquétipos 3D VRM.
 - **Prévias & GIFs Validados (Milestone 18.6)**: `m186_fairy_glade_4times.png`, `m186_arya_cozy_shirt_anchors.png`, `m186_glade_furniture_check.png` e `m186_arya_fairy_glade_tg.gif` (todos enviados e validados no Telegram).
 
