@@ -49,28 +49,28 @@ INDOOR_SCENES: frozenset[str] = frozenset({"cozy_loft_arya", "cozy_loft_erin", "
 # Hotspots calibrados 1:1 com os móveis pintados à mão de cada cenário!
 SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
     "cozy_loft_arya": {
-        "desk":       WorldHotspot("desk",       0.195, 0.725, "sit_chair", "Escrivaninha Botânica"),
-        "chair":      WorldHotspot("chair",      0.340, 0.680, "sit_chair", "Sofá Aconchegante"),
-        "sofa":       WorldHotspot("sofa",       0.340, 0.680, "sit_chair", "Sofá Aconchegante"),
-        "cushion":    WorldHotspot("cushion",    0.825, 0.655, "lie",       "Cama do Loft"),
-        "bedroll":    WorldHotspot("bedroll",    0.825, 0.655, "lie",       "Cama do Loft"),
-        "music_spot": WorldHotspot("music_spot", 0.48,  0.85,  "wave",      "Tapete Central"),
-        "overlook":   WorldHotspot("overlook",   0.52,  0.74,  "idle",      "Janela Panorâmica"),
-        "lantern":    WorldHotspot("lantern",    0.58,  0.85,  "wave",      "Centro do Loft"),
-        "garden_l":   WorldHotspot("garden_l",   0.36,  0.89,  "sit_floor", "Tapete Macio"),
-        "garden_r":   WorldHotspot("garden_r",   0.64,  0.89,  "idle",      "Perto da Cama"),
+        "desk":       WorldHotspot("desk",       0.195, 0.755, "sit_chair", "Escrivaninha Botânica"),
+        "chair":      WorldHotspot("chair",      0.505, 0.485, "sit_chair", "Sofá Aconchegante"),
+        "sofa":       WorldHotspot("sofa",       0.505, 0.485, "sit_chair", "Sofá Aconchegante"),
+        "cushion":    WorldHotspot("cushion",    0.840, 0.685, "lie",       "Cama do Loft"),
+        "bedroll":    WorldHotspot("bedroll",    0.840, 0.685, "lie",       "Cama do Loft"),
+        "music_spot": WorldHotspot("music_spot", 0.48,  0.74,  "wave",      "Tapete Central"),
+        "overlook":   WorldHotspot("overlook",   0.46,  0.54,  "idle",      "Janela Panorâmica"),
+        "lantern":    WorldHotspot("lantern",    0.34,  0.64,  "wave",      "Perto da Lareira"),
+        "garden_l":   WorldHotspot("garden_l",   0.38,  0.82,  "sit_floor", "Tapete Macio"),
+        "garden_r":   WorldHotspot("garden_r",   0.64,  0.78,  "idle",      "Perto da Cama"),
     },
     "cozy_loft_erin": {
-        "desk":       WorldHotspot("desk",       0.210, 0.770, "interact",  "Mesa de Som & Desenho"),
-        "chair":      WorldHotspot("chair",      0.340, 0.690, "sit_chair", "Sofá do Estúdio"),
-        "sofa":       WorldHotspot("sofa",       0.340, 0.690, "sit_chair", "Sofá do Estúdio"),
-        "cushion":    WorldHotspot("cushion",    0.805, 0.690, "lie",       "Cama do Loft"),
-        "bedroll":    WorldHotspot("bedroll",    0.805, 0.690, "lie",       "Cama do Loft"),
-        "music_spot": WorldHotspot("music_spot", 0.50,  0.86,  "wave",      "Tapete Central"),
-        "overlook":   WorldHotspot("overlook",   0.52,  0.74,  "idle",      "Janela Panorâmica"),
-        "lantern":    WorldHotspot("lantern",    0.58,  0.86,  "wave",      "Centro do Estúdio"),
-        "garden_l":   WorldHotspot("garden_l",   0.36,  0.89,  "sit_floor", "Tapete Macio"),
-        "garden_r":   WorldHotspot("garden_r",   0.64,  0.89,  "idle",      "Perto da Cama"),
+        "desk":       WorldHotspot("desk",       0.195, 0.610, "sit_chair", "Mesa de Som & Desenho"),
+        "chair":      WorldHotspot("chair",      0.485, 0.475, "sit_chair", "Sofá do Estúdio"),
+        "sofa":       WorldHotspot("sofa",       0.485, 0.475, "sit_chair", "Sofá do Estúdio"),
+        "cushion":    WorldHotspot("cushion",    0.825, 0.560, "lie",       "Cama do Loft"),
+        "bedroll":    WorldHotspot("bedroll",    0.825, 0.560, "lie",       "Cama do Loft"),
+        "music_spot": WorldHotspot("music_spot", 0.50,  0.74,  "wave",      "Tapete Central"),
+        "overlook":   WorldHotspot("overlook",   0.48,  0.54,  "idle",      "Janela Panorâmica"),
+        "lantern":    WorldHotspot("lantern",    0.34,  0.66,  "wave",      "Centro do Estúdio"),
+        "garden_l":   WorldHotspot("garden_l",   0.38,  0.82,  "sit_floor", "Tapete Estampado"),
+        "garden_r":   WorldHotspot("garden_r",   0.64,  0.78,  "idle",      "Perto da Cama"),
     },
     "fairy_glade": {
         "desk":       WorldHotspot("desk",       0.338, 0.775, "sit_chair", "Cadeira & Mesa de Trabalho"),
@@ -86,8 +86,39 @@ SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
     },
 }
 
-WALK_MIN_X, WALK_MAX_X = 0.18, 0.86
-WALK_MIN_Y, WALK_MAX_Y = 0.64, 0.94
+@dataclass(frozen=True)
+class SceneLightNode:
+    x: float
+    y: float
+    radius: float
+    color: tuple[int, int, int]
+    flicker_hz: float = 2.2
+    audio_react: float = 0.65
+    night_boost: float = 1.0
+
+
+# Pontos orgânicos de iluminação viva (abajures, velas, lareira, luzinhas de fada) que respiram e pulsam com o áudio do PC!
+SCENE_LIGHTS: dict[str, tuple[SceneLightNode, ...]] = {
+    "cozy_loft_arya": (
+        SceneLightNode(0.080, 0.510, 0.14, (255, 206, 128), flicker_hz=1.6, audio_react=0.70, night_boost=1.35),
+        SceneLightNode(0.160, 0.450, 0.11, (255, 192, 112), flicker_hz=3.4, audio_react=0.80, night_boost=1.40),
+        SceneLightNode(0.240, 0.415, 0.15, (255, 148, 76),  flicker_hz=4.2, audio_react=0.95, night_boost=1.50),
+        SceneLightNode(0.875, 0.470, 0.12, (255, 204, 126), flicker_hz=2.8, audio_react=0.65, night_boost=1.35),
+        SceneLightNode(0.280, 0.060, 0.16, (255, 224, 158), flicker_hz=1.2, audio_react=0.55, night_boost=1.15),
+        SceneLightNode(0.760, 0.060, 0.16, (255, 224, 158), flicker_hz=1.4, audio_react=0.55, night_boost=1.15),
+    ),
+    "cozy_loft_erin": (
+        SceneLightNode(0.155, 0.375, 0.15, (255, 196, 116), flicker_hz=1.7, audio_react=0.85, night_boost=1.40),
+        SceneLightNode(0.045, 0.615, 0.11, (255, 174, 96),  flicker_hz=3.6, audio_react=0.90, night_boost=1.45),
+        SceneLightNode(0.855, 0.345, 0.14, (255, 202, 124), flicker_hz=2.0, audio_react=0.70, night_boost=1.35),
+        SceneLightNode(0.160, 0.090, 0.15, (255, 218, 146), flicker_hz=1.3, audio_react=0.60, night_boost=1.20),
+        SceneLightNode(0.500, 0.060, 0.18, (255, 220, 152), flicker_hz=1.1, audio_react=0.65, night_boost=1.15),
+        SceneLightNode(0.860, 0.090, 0.15, (255, 218, 146), flicker_hz=1.5, audio_react=0.60, night_boost=1.20),
+    ),
+}
+
+WALK_MIN_X, WALK_MAX_X = 0.14, 0.88
+WALK_MIN_Y, WALK_MAX_Y = 0.46, 0.92
 
 
 @dataclass
@@ -164,9 +195,9 @@ class WorldStage:
 
     @staticmethod
     def depth_scale(y_norm: float) -> float:
-        """Perspectiva 2.5D estilo Tree of Savior / Ragnarok Online: menor ao fundo da praça (0.64), maior à frente (0.91)."""
+        """Perspectiva 3/4 elevada estilo Tree of Savior: escala suave e consistente em toda a sala (0.84 -> 1.04)."""
         t = clamp((y_norm - WALK_MIN_Y) / max(WALK_MAX_Y - WALK_MIN_Y, 0.01), 0.0, 1.0)
-        return lerp(0.78, 1.08, t)
+        return lerp(0.84, 1.04, t)
 
     def screen_pos(self, x_norm: float, y_norm: float, w: int, h: int, parallax_x: float = 0.0, parallax_y: float = 0.0) -> tuple[float, float]:
         depth = self.depth_scale(y_norm)

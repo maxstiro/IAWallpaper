@@ -1109,8 +1109,8 @@ class AvatarRig:
         if frame.isNull():
             return
 
-        # Altura projetada calibrada 1:1 com `CharacterPack.synced_walk_speed_norm` (h_norm ≈ 0.275 — proporção equilibrada no loft/desktop!)
-        target_h = 295.0 * u * resolved.height_scale
+        # Altura projetada calibrada para monitor 32" QHD (~23.2% da tela, proporção 1:1 estilo Tree of Savior!)
+        target_h = 250.0 * u * resolved.height_scale
         aspect = frame.width() / max(frame.height(), 1)
         target_w = target_h * aspect
         sx = -1.0 if resolved.flip_x else 1.0

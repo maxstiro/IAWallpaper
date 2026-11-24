@@ -533,51 +533,79 @@ class SceneCompositor:
         audio_frame,
         night_factor: float,
     ) -> None:
-        """Camada de estilo Wallpaper Engine: bokeh em contra-paralaxe (ilusão 3D) + visualizador de áudio sutil."""
+        """Reatividade orgânica estilo Wallpaper Engine: luzes vivas do cenário + partículas/brasas reagindo ao som do PC!"""
+        from .world_stage import SCENE_LIGHTS
+
         sc = clamp(h / 1080.0, 0.56, 1.0)
         bass = float(getattr(audio_frame, "bass", 0.0))
-        bands = getattr(audio_frame, "bands", ())
+        treble = float(getattr(audio_frame, "treble", 0.0))
+        beat = float(getattr(audio_frame, "beat", 0.0))
+        energy = float(getattr(audio_frame, "energy", 0.0))
 
-        # 1. Partículas bokeh flutuantes em primeiro plano (contra-paralaxe acentua profundidade 2.5D!)
         painter.save()
         painter.setPen(Qt.NoPen)
+
+        # 1. Iluminação viva orgânica nos pontos de luz do cenário (abajures, velas, lareira, luzinhas!)
+        lights = SCENE_LIGHTS.get(self.stage.scene_id, ())
+        for idx, ln in enumerate(lights):
+            lx = ln.x * w - self.parallax_x * 16.0
+            ly = ln.y * h - self.parallax_y * 10.0
+            flicker = 0.86 + 0.14 * math.sin(self.time * ln.flicker_hz * math.tau + idx * 1.7)
+            pulse = 1.0 + ln.audio_react * (0.28 * bass + 0.18 * beat)
+            rad = ln.radius * min(w, h) * pulse
+            alpha = int(clamp((34 + 54 * night_factor * ln.night_boost + 42 * bass * ln.audio_react) * flicker, 14, 150))
+            lr, lg, lb = ln.color
+            grad = QRadialGradient(QPointF(lx, ly), rad)
+            grad.setColorAt(0.0, QColor(lr, lg, lb, alpha))
+            grad.setColorAt(0.45, QColor(lr, lg, lb, int(alpha * 0.42)))
+            grad.setColorAt(1.0, QColor(lr, lg, lb, 0))
+            painter.setBrush(grad)
+            painter.drawEllipse(QPointF(lx, ly), rad, rad)
+
+        # 2. Feixes suaves de luz da janela panorâmica em contra-paralaxe (ilusão de profundidade 3D!)
+        if self.stage.is_indoor and night_factor < 0.72:
+            beam_alpha = int((26 + 22 * (1.0 - night_factor) + 18 * bass) * (0.85 + 0.15 * math.sin(self.time * 0.6)))
+            br, bg, bb = atmo.rim_light
+            for bi in range(3):
+                bx = (0.34 + bi * 0.15) * w - self.parallax_x * 22.0
+                bw = (0.09 + (bi % 2) * 0.04) * w
+                path = QPainterPath()
+                path.moveTo(bx, h * 0.08)
+                path.lineTo(bx + bw, h * 0.08)
+                path.lineTo(bx + bw * 1.45 - w * 0.08, h * 0.86)
+                path.lineTo(bx - w * 0.08, h * 0.86)
+                path.closeSubpath()
+                bg_grad = QLinearGradient(bx, h * 0.08, bx, h * 0.86)
+                bg_grad.setColorAt(0.0, QColor(br, bg, bb, beam_alpha))
+                bg_grad.setColorAt(0.65, QColor(br, bg, bb, int(beam_alpha * 0.35)))
+                bg_grad.setColorAt(1.0, QColor(br, bg, bb, 0))
+                painter.setBrush(bg_grad)
+                painter.drawPath(path)
+
+        # 3. Partículas vivas de luz/poeira/brasas reagindo organicamente ao som do PC (graves & agudos!)
         rim_r, rim_g, rim_b = atmo.rim_light
-        for i in range(6):
-            bx = ((0.12 + i * 0.165 + math.sin(self.time * (0.22 + i * 0.05) + i * 1.9) * 0.035) % 1.0) * w - self.parallax_x * 28.0
-            by = (0.18 + (i % 3) * 0.24 + math.cos(self.time * (0.28 + i * 0.04) + i * 2.3) * 0.04) * h - self.parallax_y * 18.0
-            rad = (16.0 + (i % 3) * 10.0) * sc * (1.0 + 0.25 * bass)
-            alpha = int((26 + 24 * night_factor + 26 * bass) * (0.7 + 0.3 * math.sin(self.time * 1.4 + i)))
-            g = QRadialGradient(QPointF(bx, by), rad)
-            g.setColorAt(0.0, QColor(rim_r, rim_g, rim_b, min(110, alpha)))
-            g.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
-            painter.setBrush(g)
-            painter.drawEllipse(QPointF(bx, by), rad, rad)
+        n_motes = 26
+        for i in range(n_motes):
+            speed = 0.018 + (i % 5) * 0.006 + 0.032 * energy
+            base_x = ((i * 0.1739 + 0.07) % 0.92) + 0.04
+            sway = math.sin(self.time * (0.55 + (i % 4) * 0.22) + i * 1.37) * (0.025 + 0.018 * bass)
+            y_prog = (i * 0.231 + self.time * speed) % 1.0
+            px = (base_x + sway) * w - self.parallax_x * (18.0 + (i % 3) * 10.0)
+            py = (0.94 - y_prog * 0.84) * h - self.parallax_y * (10.0 + (i % 3) * 6.0)
+            twinkle = 0.45 + 0.55 * math.sin(self.time * (2.2 + (i % 5) * 0.7) + i * 2.1)
+            spark = 1.0 + 0.85 * treble + 0.65 * beat
+            rad = (2.4 + (i % 4) * 1.3) * sc * (1.0 + 0.45 * bass)
+            alpha = int(clamp((48 + 75 * night_factor + 90 * energy) * twinkle * min(1.5, spark * 0.75), 18, 225))
 
-        # 2. Equalizador glassmórfico discreto estilo Wallpaper Engine no canto inferior direito!
-        if bands:
-            n = len(bands)
-            bw = 5.0 * sc
-            gap = 3.0 * sc
-            total_w = n * (bw + gap)
-            max_bh = 44.0 * sc
-            base_x = w - total_w - 28.0 * sc
-            base_y = h - 54.0 * sc
-
-            # Placa translúcida bem discreta atrás das barras
-            pill = QRectF(base_x - 10 * sc, base_y - max_bh - 10 * sc, total_w + 20 * sc, max_bh + 18 * sc)
-            painter.setBrush(QColor(12, 16, 30, 118))
-            painter.setPen(QPen(QColor(255, 255, 255, 32), 1.0))
-            painter.drawRoundedRect(pill, 12.0 * sc, 12.0 * sc)
-            painter.setPen(Qt.NoPen)
-
-            for i, lvl in enumerate(bands):
-                bh = max(3.5 * sc, float(lvl) * max_bh)
-                x = base_x + i * (bw + gap)
-                y = base_y - bh
-                t_col = i / max(n - 1, 1)
-                cr = int(lerp(rim_r, 155, t_col))
-                cg = int(lerp(rim_g, 210, t_col))
-                cb = int(lerp(rim_b, 255, t_col))
-                painter.setBrush(QColor(cr, cg, cb, int(175 + 70 * float(lvl))))
-                painter.drawRoundedRect(QRectF(x, y, bw, bh), 2.5 * sc, 2.5 * sc)
+            # Halo suave
+            hr = rad * (3.2 + 1.4 * bass)
+            mg = QRadialGradient(QPointF(px, py), hr)
+            mg.setColorAt(0.0, QColor(255, 244, 210, alpha))
+            mg.setColorAt(0.4, QColor(rim_r, rim_g, rim_b, int(alpha * 0.48)))
+            mg.setColorAt(1.0, QColor(rim_r, rim_g, rim_b, 0))
+            painter.setBrush(mg)
+            painter.drawEllipse(QPointF(px, py), hr, hr)
+            # Núcleo brilhante
+            painter.setBrush(QColor(255, 250, 232, min(255, int(alpha * 1.2))))
+            painter.drawEllipse(QPointF(px, py), rad * 0.55, rad * 0.55)
         painter.restore()

@@ -297,8 +297,8 @@ class CharacterPack:
         - Velocidade exata (tela/s): `dist_per_cycle / (clip.duration / speed_mul)` -> ZERO patinação!
         """
         if resolved.stride_ratio <= 0.0:
-            return 0.068 * depth_scale
-        h_norm = 0.275 * depth_scale
+            return 0.058 * depth_scale
+        h_norm = 0.232 * depth_scale
         cycle_s = max(resolved.clip.duration / max(resolved.speed_mul, 0.25), 0.35)
         dist_x_per_cycle = (h_norm * resolved.stride_ratio) / max(aspect_x, 1.0)
         return dist_x_per_cycle / cycle_s

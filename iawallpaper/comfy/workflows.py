@@ -531,27 +531,27 @@ QWEN_RELIGHT_GLADE: dict[str, str] = {
 
 QWEN_RELIGHT_LOFT: dict[str, str] = {
     "day": (
-        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
-        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
-        "Bright sunlit morning sky visible outside the giant panoramic window with warm crisp sunlight streaming through the glass onto the wooden floor."
+        "Keep the exact same cozy one-room loft interior, straight horizontal panoramic window, wooden plank floor, woven rug, compact bed, sofa, coffee table, desk, lamp, candles, plants, "
+        "and elevated 3/4 RPG diorama camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Bright sunlit morning sky visible outside the panoramic window with crisp warm morning sunlight streaming through the glass onto the wooden floor."
     ),
     "sunset": (
-        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
-        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Keep the exact same cozy one-room loft interior, straight horizontal panoramic window, wooden plank floor, woven rug, compact bed, sofa, coffee table, desk, lamp, candles, plants, "
+        "and elevated 3/4 RPG diorama camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
         "Transform ONLY the sky outside the panoramic window and the room lighting into a breathtaking golden-amber sunset with glowing peach-violet clouds outside, "
-        "warm orange sunbeams slanting across the wooden floorboards and bed, and the indoor desk lamp and fairy lights beginning to glow softly."
+        "warm orange sunbeams slanting across the wooden floorboards and rug, and the indoor desk lamp, candles, and fairy lights beginning to glow warmly."
     ),
     "night": (
-        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
-        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Keep the exact same cozy one-room loft interior, straight horizontal panoramic window, wooden plank floor, woven rug, compact bed, sofa, coffee table, desk, lamp, candles, plants, "
+        "and elevated 3/4 RPG diorama camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
         "Transform ONLY the outside sky and indoor lighting into a super cozy starry indigo night with glowing moonlight visible through the panoramic window, "
-        "while inside the loft warm golden amber light radiates from the desk lamp, string fairy lights, and soft cozy shadows across the bed and sofa."
+        "while inside the loft warm golden amber light radiates from the desk lamp, flickering candles, fireplace/hearth, and string fairy lights across the wooden floor, bed, and sofa."
     ),
     "rain": (
-        "Keep the exact same cozy one-room loft interior, panoramic window frame, wooden floor, woven rug, bed, sofa, desk, lamp, speakers, plants, "
-        "and eye-level camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
+        "Keep the exact same cozy one-room loft interior, straight horizontal panoramic window, wooden plank floor, woven rug, compact bed, sofa, coffee table, desk, lamp, candles, plants, "
+        "and elevated 3/4 RPG diorama camera angle from <image1> 100% pixel-identical, full-bleed edge to edge. "
         "Transform ONLY the weather outside the panoramic window and indoor ambiance into a cozy rainy afternoon: overcast slate-blue misty rain streaks and raindrops "
-        "on the OUTSIDE of the window glass, while the indoor room stays completely dry, warm, and snug illuminated by the glowing amber desk lamp and fairy lights."
+        "on the OUTSIDE of the window glass, while the indoor room stays completely dry, warm, and snug illuminated by the glowing amber desk lamp, candles, and fairy lights."
     ),
 }
 

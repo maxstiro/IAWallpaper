@@ -136,6 +136,8 @@ class IAWallpaperApp:
             live2d_dir=self.paths.resolve_live2d_rig(self.settings.vrm_model),
             character_dir=self.paths.resolve_character_dir(self.settings.character_id),
         )
+        if not test_mode:
+            self.canvas.audio.start_loopback()
         self.canvas.avatar.vrm_dynamic_recolor = self.settings.vrm_dynamic_recolor
         self.canvas.setWindowTitle(f"IAWallpaper — {self.persona.name}")
         self.canvas.caress_tick.connect(self._on_canvas_caress)
@@ -700,6 +702,7 @@ class IAWallpaperApp:
             self.tray.hide()
         self.control_center.close()
         self.neural_monitor.close()
+        self.canvas.audio.stop_loopback()
         self.canvas.close()
         app = QApplication.instance()
         if app is not None:
