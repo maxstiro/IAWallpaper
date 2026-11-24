@@ -1,7 +1,7 @@
 # STATE.md — Estado Operacional Vivo (`IAWallpaper`)
 
 > **Instrução Permanente ao Agente**: Leia e atualize `STATE.md`, `PROJETO.md` e `roadmap.md` a cada módulo implementado ou corrigido.
-> **Última atualização**: 2026-11-23 (Milestone 18.5 Concluído — **Biblioteca Completa da Arya na Roupa Base**: **15 clipes Wan 2.2 @ 16 FPS** cobrindo todos os 5/5 ângulos canônicos [8 direções], todas as posturas [`sit_floor`, `sit_chair`, `lie`], ações [`wave` 41f, `interact`, `spin` 360°], **3 transições reversíveis** [`trans_sit_floor`, `trans_sit_chair`, `trans_lie`] + **6 retratos expressivos 2D** no medalhão ao vivo do HUD · **34/34 testes verdes**)
+> **Última atualização**: 2026-11-23 (Milestone 18.6 Concluído — **Novo Cenário Oficial `fairy_glade` [Clareira Mágica de Acampamento estilo Tree of Savior nos 4 horários 1:1 com móveis reais]** + **1º Outfit Completo 1:1 da Arya `cozy_shirt` [Camisola Casual / Camisetão · 14 clipes Wan 2.2 @ 16 FPS]** calibrado pixel-a-pixel na cadeira/mesa e cama sob o arco florido · **34/34 testes verdes**)
 
 ---
 
@@ -10,7 +10,7 @@
 | Módulo | Caminho | Status | Notas |
 |---|---|---|---|
 | Infra & Docs | `PROJETO.md`, `STATE.md`, `roadmap.md`, `AGENTS.md`, `venv/` | 🟢 Concluído | Venv Python 3.12 com PySide6, NumPy, Pillow, psutil, pywin32, moderngl, pytest |
-| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Padrão `sky_sanctuary` + `render_style="world_sprite"` + `character_id="arya"` (`resolve_character_dir`, `list_character_packs`) com Live2D 2.5D e VRM 3D selecionáveis |
+| Shared Utils | `iawallpaper/store.py`, `paths.py`, `mathutil.py`, `config.py`, `log.py` | 🟢 Validado | Padrão `scene_id="fairy_glade"`, `render_style="world_sprite"`, `character_id="arya"` (`default_outfit="cozy_shirt"`, `base` preservado) |
 | Núcleo Neural (`core/`) | `nervous_system.py`, `homeostasis.py`, `conditioning.py`, `episodic.py`, `emotion.py`, `persona.py` | 🟢 Validado | 438 neurônios LIF, aprendizado 3 fatores, Rescorla-Wagner, Bandit, Mira & Nyx |
 | Plataforma (`plataforma/`) | `desktop_host.py`, `windows.py` | 🟢 Validado | Win11 24H2+ Raised Desktop + WorkerW clássico + auto-pausa tela cheia |
 | Sentidos (`sense/`) | `senses.py`, `circadian.py`, `weather.py`, `routine.py` | 🟢 Validado | Ciclo 24h contínuo, Open-Meteo sem API key, classificação de apps + ComfyUI |
@@ -24,26 +24,25 @@
 
 ## 2. Assets Locais (fora do Git)
 - **Personagem Piloto Oficial — Arya (`assets/generated/characters/arya/`)**:
-  - `character.json` + `master_idle_SE.png` (~4.1 cabeças estilo *Rapscallion × Dungeon Squad × Tree of Savior* em roupa base creme/marrom).
-  - `portraits/` (**6 retratos expressivos 2D desacoplados** exibidos no medalhão ao vivo do HUD): `happy.png`, `affectionate.png`, `shy.png`, `pouty.png`, `sleepy.png`, `focused.png`.
-  - `outfits/base/anchors/` (**9 poses-âncora Qwen 2.1 Edit**): `master.png`, `walk_SE.png`, `walk_L.png`, `walk_NE.png`, `walk_N.png`, `walk_S.png`, `sit_floor_SE.png`, `sit_chair_SE.png`, `lie_SE.png`.
-  - `outfits/base/clips/` (**15 clipes Wan 2.2 @ 16 FPS assados**): `idle_SE` (41f), `wave_SE` (41f), `walk_S/SE/L/NE/N` (25f — todos os 5/5 ângulos canônicos cobrindo 8 direções + corrida acelerada `1.45×`), `sit_floor_SE` (25f), `sit_chair_SE` (25f), `lie_SE` (25f), `interact_SE` (25f), `spin_SE` (25f), e **3 transições reversíveis** `trans_sit_floor`, `trans_sit_chair`, `trans_lie` (25f — ida e volta automática via `reverse=True`!).
-- **Cenário Padrão — Observatório Celeste (`assets/generated/scenes/sky_sanctuary/diorama_*.png`)**: Praça aberta ensolarada estilo Tree of Savior reiluminada 1:1 via Qwen 2.1 (`day`, `sunset`, `night`, `rain`).
-- **Motores Opcionais Preservados**: Rig Live2D 2.5D (`assets/generated/live2d/elfa_loira/`) e 4 Arquétipos 3D VRM (`assets/generated/vrm/`).
-- **Prévias & GIFs Validados (Milestones 18 & 18.5)**: `m18_arya_8dir_strip.png`, `m18_arya_8dir_plaza_v2_tg.gif`, `m185_arya_portraits_and_anchors.png`, `m185_arya_actions_strip.png` e `m185_arya_life_plaza_tg.gif` (todos enviados e validados no Telegram).
+  - `character.json` (`default_outfit="cozy_shirt"`) + `master_idle_SE.png`.
+  - `portraits/` (**6 retratos expressivos 2D desacoplados** no medalhão ao vivo do HUD): `happy.png`, `affectionate.png`, `shy.png`, `pouty.png`, `sleepy.png`, `focused.png`.
+  - **Outfit 1:1 Oficial — `outfits/cozy_shirt/` (Camisola Casual / Camisetão)**: 9 âncoras Qwen 2.1 Edit + **14 clipes Wan 2.2 @ 16 FPS** (`idle_SE` 41f, `wave_SE` 41f, `walk_S/SE/L/NE/N` 25f, `sit_chair_SE`, `sit_floor_SE`, `lie_SE`, `interact_SE`, `trans_sit_chair`, `trans_sit_floor`, `trans_lie`).
+  - **Outfit Base Estrutural — `outfits/base/`**: 9 poses-âncora Qwen 2.1 + **15 clipes Wan 2.2 @ 16 FPS** (inclui `spin_SE`).
+- **Cenário Padrão Oficial — Clareira Mágica de Acampamento (`assets/generated/scenes/fairy_glade/diorama_*.png`)**: Aquarela *Tree of Savior* gerada via Qwen Image 2.1 (`1344×768`) e reiluminada 1:1 para `day`, `sunset`, `night` (vaga-lumes, lanternas e cogumelos bioluminescentes) e `rain`, com móveis reais calibrados em `world_stage.py` (`chair/desk` `(0.325, 0.745)` e `bedroll/cushion` `(0.720, 0.765)`).
+- **Cenários & Motores Opcionais Preservados**: `sky_sanctuary`, `dark_sanctuary`, Rig Live2D 2.5D e 4 Arquétipos 3D VRM.
+- **Prévias & GIFs Validados (Milestone 18.6)**: `m186_fairy_glade_4times.png`, `m186_arya_cozy_shirt_anchors.png`, `m186_glade_furniture_check.png` e `m186_arya_fairy_glade_tg.gif` (todos enviados e validados no Telegram).
 
 ---
 
 ## 3. Como Executar
 - **Modo Wallpaper Dinâmico (atrás dos ícones)**: `.\start_iawallpaper.ps1` ou `.\venv\Scripts\python.exe main.py`
 - **Modo Preview + Central de Controle**: `.\start_iawallpaper.ps1 -Preview -Studio`
-- **Renderizar Showcase ou GIF da Arya (Wan 2.2 · 8 Direções)**: `.\venv\Scripts\python.exe tools\render_showcase.py --persona mira --character arya --scene sky_sanctuary --style world_sprite --mode gif --out demo_arya.gif`
+- **Renderizar Showcase ou GIF da Arya na Clareira Mágica**: `.\venv\Scripts\python.exe tools\render_showcase.py --persona mira --character arya --scene fairy_glade --style world_sprite --mode gif --out demo_arya_glade.gif`
 - **Suíte de Testes**: `$env:QT_QPA_PLATFORM="offscreen"; .\venv\Scripts\python.exe -m pytest -v`
 - **Git / GitHub**: Remote via SSH (`git@github.com:maxstiro/IAWallpaper.git`, branch `main`).
 
 ---
 
 ## 4. Próximas Etapas
-- **1º Outfit Completo 1:1 da Arya (`generate_outfit_anchors_sync`)**: Vestir as 9 âncoras da `base/` com o primeiro traje completo 1:1 via Qwen Image 2.1 Edit (zero retrabalho de pose!) e assar os clipes do novo traje.
-- **Replicação do Fluxo para Novas Personagens**: Usar `CharacterPipeline` para criar a próxima personagem (`Humana Ruiva`, `Androide Rosa` ou `Vampira`) na estrutura padronizada `assets/generated/characters/<id>/`.
-- **Milestone 19**: Ancoragem ao vivo Windows 11 Build 26300, multi-monitor independente e áudio reativo opcional.
+- **Replicação para Novas Personagens (`CharacterPipeline`)**: Criar a 2ª personagem oficial na estrutura padronizada `assets/generated/characters/<id>/` + seletor de personagem/outfit na Central de Controle.
+- **Milestone 19 — Desktop Vivo Win11 & Autonomia Completa**: Ligar o `BehaviorDirector` às novas ações/móveis da `fairy_glade` (`walk_path`, `chair`, `bedroll`, `worktable`), validar ancoragem ao vivo atrás dos ícones no Windows 11 Build 26300, multi-monitor e áudio reativo opcional.

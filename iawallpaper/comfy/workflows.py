@@ -6,6 +6,14 @@ from ..core.persona import Persona
 from .presets import LoraSpec
 
 SCENE_PRESETS: dict[str, dict[str, str]] = {
+    "fairy_glade": {
+        "label": "Clareira Mágica de Acampamento (Tree of Savior)",
+        "base": (
+            "anime_scenery, (tree_of_savior_style:1.35), hand_painted_watercolor_rpg_background, enchanted_woodland_glade_camp, "
+            "cozy_sleeping_blanket_and_pillows_on_mossy_grass, rustic_wooden_chair, wooden_camp_worktable_with_lantern_and_books, "
+            "ancient_glowing_trees, wildflowers, hanging_fairy_lanterns, floating_golden_pollen, masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
+        ),
+    },
     "dark_sanctuary": {
         "label": "Santuário Abissal (Dungeon Squad)",
         "base": "dark_fantasy_anime_scenery, gothic_obsidian_altar_courtyard, glowing_crimson_and_violet_runes_carved_in_stone_floor, ancient_gothic_arches_and_flaming_braziers, ominous_cathedral_ruins_horizon, high_contrast_moody_lighting, masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper",
@@ -53,6 +61,15 @@ WORLD_SPRITE_ACTIONS: dict[str, str] = {
 }
 
 DIORAMA_SCENE_PRESETS: dict[str, str] = {
+    "fairy_glade": (
+        "anime_scenery, (tree_of_savior_style:1.38), hand_painted_watercolor_matte_2.5d_rpg_background, full_bleed, borderless, "
+        "(slight_high_angle_3/4_view:1.28), (wide_open_lush_mossy_grass_and_stepping_stone_clearing_filling_bottom_55_percent:1.30), "
+        "on_the_left_side_a_cozy_wooden_camp_worktable_with_open_sketchbook_potion_vials_and_warm_lantern_beside_a_rustic_wooden_chair, "
+        "on_the_right_side_a_soft_woven_camping_bedroll_blanket_and_plush_cushions_under_a_glowing_flower_arch, "
+        "giant_ancient_enchanted_trees_with_hanging_fairy_lanterns_and_glowing_mushrooms_framing_background, "
+        "dappled_sunbeams_filtering_through_canopy, wildflowers_and_sparkling_magic_pollen, warm_cozy_living_fantasy_camp, "
+        "masterpiece, best_quality, ultra_detailed, no_humans, wide_angle, wallpaper"
+    ),
     "dark_sanctuary": (
         "dark_fantasy_anime_scenery, dungeon_squad_style, hand_painted_2.5d_rpg_background, full_bleed, borderless, "
         "(slight_high_angle_3/4_view:1.28), wide_open_cracked_obsidian_cobblestone_courtyard_filling_bottom_55_percent, "
@@ -469,6 +486,33 @@ def build_diorama_scene_workflow(
     return graph
 
 
+QWEN_RELIGHT_GLADE: dict[str, str] = {
+    "day": (
+        "Keep the exact same enchanted woodland clearing, grassy floor, stepping stones, wooden camp worktable, rustic wooden chair, "
+        "sleeping bedroll cushions, ancient trees, lanterns, flowers, and 3/4 camera angle from <image1> 100% unchanged, full-bleed edge to edge. "
+        "Bright lush sunlit morning with golden sunbeams filtering through the forest canopy, vibrant painterly Tree of Savior watercolor colors."
+    ),
+    "sunset": (
+        "Keep the exact same enchanted woodland clearing, grassy floor, stepping stones, wooden camp worktable, rustic wooden chair, "
+        "sleeping bedroll cushions, ancient trees, lanterns, flowers, and 3/4 camera angle from <image1> 100% unchanged, full-bleed edge to edge. "
+        "Transform only the sky, lighting, and atmosphere into a magical warm golden-amber sunset with glowing peach-violet clouds through the trees, "
+        "warm flickering fairy lanterns beginning to glow, and soft warm dusk shadows across the mossy clearing."
+    ),
+    "night": (
+        "Keep the exact same enchanted woodland clearing, grassy floor, stepping stones, wooden camp worktable, rustic wooden chair, "
+        "sleeping bedroll cushions, ancient trees, lanterns, flowers, and 3/4 camera angle from <image1> 100% unchanged, full-bleed edge to edge. "
+        "Transform only the sky, lighting, and atmosphere into an enchanting starry indigo woodland night bathed in soft silver moonlight, "
+        "with warm golden light radiating from the camp worktable lantern and hanging fairy lanterns, glowing cyan mushrooms and golden fireflies."
+    ),
+    "rain": (
+        "Keep the exact same enchanted woodland clearing, grassy floor, stepping stones, wooden camp worktable, rustic wooden chair, "
+        "sleeping bedroll cushions, ancient trees, lanterns, flowers, and 3/4 camera angle from <image1> 100% unchanged, full-bleed edge to edge. "
+        "Transform only the weather and lighting into a cozy misty forest rainfall with cool overcast blue-green light, glistening wet stepping stones "
+        "and leaves, soft shallow puddles reflecting the warm cozy glow of the camp lanterns, and gentle rain streaks."
+    ),
+}
+
+
 def build_qwen_relight_scene_workflow(
     base_uploaded_scene: str,
     variant: str = "sunset",
@@ -479,9 +523,11 @@ def build_qwen_relight_scene_workflow(
     clip_name: str = "qwen3vl_8b_int8_convrot.safetensors",
     vae_name: str = "qwen_image_2.1_vae_bf16.safetensors",
     anime_lora: str | None = r"qwen\qwen-anime-Illustration-1.safetensors",
+    scene_id: str = "",
 ) -> dict:
     """Reilumina a MESMA arquitetura/cenário base para sunset/night/rain via Qwen Image 2.1 Edit (consistência 1:1)."""
-    instruction = QWEN_RELIGHT_INSTRUCTIONS.get(variant, QWEN_RELIGHT_INSTRUCTIONS["sunset"])
+    table = QWEN_RELIGHT_GLADE if scene_id == "fairy_glade" else QWEN_RELIGHT_INSTRUCTIONS
+    instruction = table.get(variant, table["sunset"])
     if anime_lora:
         instruction = f"anime-style Illustration, {instruction}"
     neg = "photorealistic, real photo, different architecture, moved railing, people, 1girl, 1boy, text, watermark, blurry"

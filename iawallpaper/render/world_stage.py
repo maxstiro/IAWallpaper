@@ -43,6 +43,22 @@ DEFAULT_HOTSPOTS: dict[str, WorldHotspot] = {
     "garden_r":   WorldHotspot("garden_r",   0.78, 0.88, "idle",        "Terraço Leste"),
 }
 
+# Hotspots calibrados 1:1 com os móveis pintados à mão da Clareira Mágica (`fairy_glade`)!
+SCENE_HOTSPOTS: dict[str, dict[str, WorldHotspot]] = {
+    "fairy_glade": {
+        "desk":       WorldHotspot("desk",       0.325, 0.745, "sit_chair", "Cadeira & Mesa de Trabalho"),
+        "chair":      WorldHotspot("chair",      0.325, 0.745, "sit_chair", "Cadeira de Acampamento"),
+        "worktable":  WorldHotspot("worktable",  0.34,  0.76,  "interact",  "Mesa de Poções & Grimório"),
+        "cushion":    WorldHotspot("cushion",    0.720, 0.765, "lie",       "Cama Sob o Arco Florido"),
+        "bedroll":    WorldHotspot("bedroll",    0.720, 0.765, "lie",       "Superfície de Dormir"),
+        "music_spot": WorldHotspot("music_spot", 0.48,  0.86,  "spin",      "Pedras da Clareira"),
+        "overlook":   WorldHotspot("overlook",   0.45,  0.76,  "idle",      "Centro da Clareira"),
+        "lantern":    WorldHotspot("lantern",    0.55,  0.84,  "wave",      "Trilha Iluminada"),
+        "garden_l":   WorldHotspot("garden_l",   0.42,  0.90,  "sit_floor", "Grama com Cogumelos"),
+        "garden_r":   WorldHotspot("garden_r",   0.62,  0.88,  "idle",      "Borda das Flores"),
+    },
+}
+
 WALK_MIN_X, WALK_MAX_X = 0.24, 0.84
 WALK_MIN_Y, WALK_MAX_Y = 0.69, 0.94
 
@@ -78,9 +94,10 @@ class AmbientCritter:
 class WorldStage:
     """Gerencia o plano de chão 2.5D, props ordenados por Y e dinâmica ambiental viva do local."""
 
-    def __init__(self, seed: int = 2026):
+    def __init__(self, seed: int = 2026, scene_id: str = ""):
         self.rng = random.Random(seed + 88)
-        self.hotspots = dict(DEFAULT_HOTSPOTS)
+        self.scene_id: str = scene_id
+        self.hotspots = dict(SCENE_HOTSPOTS.get(scene_id, DEFAULT_HOTSPOTS))
         self.time: float = 0.0
         self.step_fx: list[GroundStepFx] = []
         self.ripples: list[RainPuddleRipple] = []
@@ -105,6 +122,10 @@ class WorldStage:
             (self.rng.uniform(0.06, 0.94), self.rng.uniform(0.70, 0.95), self.rng.uniform(0.7, 1.3), self.rng.uniform(0, math.tau))
             for _ in range(38)
         ]
+
+    def set_scene_id(self, scene_id: str) -> None:
+        self.scene_id = scene_id
+        self.hotspots = dict(SCENE_HOTSPOTS.get(scene_id, DEFAULT_HOTSPOTS))
 
     @staticmethod
     def clamp_walkable(x: float, y: float) -> tuple[float, float]:

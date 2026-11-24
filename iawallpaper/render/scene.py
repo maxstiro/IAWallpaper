@@ -82,13 +82,18 @@ class SceneCompositor:
             self._prev_bg = None
             self._bg_fade_t = 1.0
         self._bg_images.clear()
+        detected_scene = ""
         for folder in self.scene_dirs:
+            if folder.name:
+                detected_scene = folder.name.lower()
             if not folder.exists():
                 continue
             for png in folder.glob("*.png"):
                 pm = QPixmap(str(png))
                 if not pm.isNull():
                     self._bg_images[png.stem.lower()] = pm
+        if detected_scene:
+            self.stage.set_scene_id(detected_scene)
 
     def available_scene_keys(self) -> set[str]:
         return set(self._bg_images.keys())
@@ -203,16 +208,13 @@ class SceneCompositor:
             self.stage.paint_ground_fx(painter, width, height, atmo, self.parallax_x, self.parallax_y)
             working_now = activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING")
             music_now = activity == "MUSIC"
-            # Em cenas procedurais desenha todos os props; em dioramas AI pintados à mão
-            # desenha apenas o tapete/mesa quando a avatar está usando (sem poluir a arte do cenário!)
+            # Em cenas procedurais desenha os props; em dioramas AI (como a clareira mágica `fairy_glade`)
+            # os móveis reais (cama/tapete, cadeira e mesa) já estão pintados à mão no próprio cenário!
             if bg_key is None:
                 self.stage.paint_props_layer(
                     painter, width, height, atmo, self.parallax_x, self.parallax_y,
                     avatar_y=avatar.pos_y, behind_avatar=True, working_active=working_now, music_active=music_now,
                 )
-            elif avatar.action == "sleep":
-                sx, sy = self.stage.screen_pos(avatar.pos_x, avatar.pos_y, width, height, self.parallax_x, self.parallax_y)
-                self.stage._draw_cushion_rug(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0), atmo)
 
         # Avatar Waifu integrado com paralaxe, profundidade 2.5D, sombra aterrada e iluminação
         avatar.paint(
@@ -232,19 +234,13 @@ class SceneCompositor:
             sun_x_norm=circadian.sun_x_norm,
         )
 
-        if is_world:
-            if bg_key is None:
-                self.stage.paint_props_layer(
-                    painter, width, height, atmo, self.parallax_x, self.parallax_y,
-                    avatar_y=avatar.pos_y, behind_avatar=False,
-                    working_active=activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING"),
-                    music_active=activity == "MUSIC",
-                )
-            elif avatar.action == "sit_work":
-                sx, sy = self.stage.screen_pos(
-                    avatar.pos_x + avatar.facing * 0.055, avatar.pos_y + 0.012, width, height, self.parallax_x, self.parallax_y
-                )
-                self.stage._draw_study_desk(painter, sx, sy, self.stage.depth_scale(avatar.pos_y) * (height / 1080.0) * 0.95, atmo, True)
+        if is_world and bg_key is None:
+            self.stage.paint_props_layer(
+                painter, width, height, atmo, self.parallax_x, self.parallax_y,
+                avatar_y=avatar.pos_y, behind_avatar=False,
+                working_active=activity in ("PROGRAMMING", "AI_STUDIO", "DESIGNING"),
+                music_active=activity == "MUSIC",
+            )
 
         # Partículas climáticas e reações afetivas em primeiro plano
         particles.paint_weather(painter)

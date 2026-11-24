@@ -254,6 +254,8 @@ class ControlCenterWindow(QWidget):
         self.cb_outfit = QComboBox()
         for label, key in [
             ("Automático (Reage ao Clima, Hora e Atividade)", ""),
+            ("Camisola Casual (Camisetão)", "cozy_shirt"),
+            ("Roupa Base", "base"),
             ("Casual", "casual"),
             ("Estúdio / Óculos (Foco)", "focus"),
             ("Chuva / Moletom", "rainy"),

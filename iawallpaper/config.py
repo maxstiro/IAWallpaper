@@ -9,14 +9,14 @@ from .store import read_json, write_json
 VALID_MODES = ("wallpaper", "preview")
 VALID_RENDER_STYLES = ("world_sprite", "live2d_25d", "vrm_3d", "portrait")
 VALID_WEATHER_MODES = ("auto", "clear", "cloudy", "rain", "storm", "snow", "fog")
-VALID_OUTFITS = (None, "base", "casual", "cozy", "rainy", "focus", "nightwear", "starlight")
+VALID_OUTFITS = (None, "base", "cozy_shirt", "casual", "cozy", "rainy", "focus", "nightwear", "starlight")
 
 
 @dataclass
 class Settings:
     persona_id: str = "mira"
     character_id: str = "arya"
-    scene_id: str = "sky_sanctuary"
+    scene_id: str = "fairy_glade"
     mode: str = "wallpaper"
     render_style: str = "world_sprite"
     vrm_model: str = "elfa_loira"

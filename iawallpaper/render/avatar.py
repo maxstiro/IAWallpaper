@@ -190,7 +190,7 @@ class AvatarRig:
         self._sprite_fade_t: float = 1.0
         self.reload_sprites()
         if character_dir is not None:
-            self.set_character_pack(character_dir, outfit_id=self.outfit)
+            self.set_character_pack(character_dir, outfit_id=None)
         if live2d_dir is not None:
             self.set_live2d_rig(live2d_dir)
         if vrm_path is not None:
@@ -211,11 +211,12 @@ class AvatarRig:
         if not char_dir:
             return False
         p = Path(char_dir)
-        pack = load_character_pack(p, outfit_id=outfit_id or self.outfit or "base")
+        pack = load_character_pack(p, outfit_id=outfit_id)
         if pack is None:
             return False
         self._char_pack = pack
         self.character_dir = p
+        self.outfit = pack.outfit_id
         log(
             f"[character_pack] Pack Wan 2.2 carregado: {pack.name} ({pack.outfit_id}) "
             f"· {len(pack.clips)} clipes · {len(pack.portraits)} retratos"

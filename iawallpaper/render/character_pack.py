@@ -311,7 +311,7 @@ class CharacterPack:
         return next(iter(self.portraits.values()), None)
 
 
-def load_character_pack(char_dir: Path, outfit_id: str = "base") -> CharacterPack | None:
+def load_character_pack(char_dir: Path, outfit_id: str | None = None) -> CharacterPack | None:
     """Carrega um `CharacterPack` padronizado de `characters/<char_id>/outfits/<outfit_id>/`."""
     char_dir = Path(char_dir)
     if not char_dir.is_dir():
@@ -327,9 +327,14 @@ def load_character_pack(char_dir: Path, outfit_id: str = "base") -> CharacterPac
 
     char_id = str(char_meta.get("id") or char_dir.name).lower()
     char_name = str(char_meta.get("name") or char_id.capitalize())
+    default_outfit = str(char_meta.get("default_outfit") or "base").lower()
+    outfit_id = str(outfit_id or default_outfit).lower()
 
     outfits_root = char_dir / "outfits"
     outfit_dir = outfits_root / outfit_id
+    if not outfit_dir.is_dir():
+        outfit_dir = outfits_root / default_outfit
+        outfit_id = default_outfit
     if not outfit_dir.is_dir():
         outfit_dir = outfits_root / "base"
         outfit_id = "base"

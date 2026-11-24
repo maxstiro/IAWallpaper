@@ -676,30 +676,62 @@ class CharacterPipeline:
         outfit_id: str,
         outfit_prompt: str,
         source_outfit: str = "base",
+        anchor_keys: tuple[str, ...] | list[str] | None = None,
         base_seed: int = 88200,
         skip_existing: bool = True,
+        on_progress: Callable[[str], None] | None = None,
     ) -> Path:
         """Veste cada âncora existente da `base/` com um novo traje 1:1 via Qwen Image 2.1 Edit (zero retrabalho de pose!)."""
-        src_anchors = Path(char_dir) / "outfits" / source_outfit / "anchors"
-        dst_outfit = Path(char_dir) / "outfits" / outfit_id.lower()
+        char_dir = Path(char_dir)
+        src_anchors = char_dir / "outfits" / source_outfit / "anchors"
+        dst_outfit = char_dir / "outfits" / outfit_id.lower()
         dst_anchors = dst_outfit / "anchors"
         dst_anchors.mkdir(parents=True, exist_ok=True)
         (dst_outfit / "clips").mkdir(parents=True, exist_ok=True)
 
-        for idx, ap in enumerate(sorted(src_anchors.glob("*.png"))):
+        # Inicializa manifest.json do novo outfit se ainda não existir
+        mj = dst_outfit / "manifest.json"
+        if not mj.is_file():
+            manifest = {
+                "character_id": char_dir.name.lower(),
+                "outfit_id": outfit_id.lower(),
+                "default_stride_ratio": 0.80,
+                "clips": {
+                    spec.key: {
+                        "tier": spec.tier,
+                        "fps": spec.fps,
+                        "frames": spec.frames,
+                        "stride_ratio": spec.stride_ratio,
+                        "loop": spec.loop,
+                        "status": "pending",
+                    }
+                    for spec in TIER_CLIP_CATALOG
+                },
+            }
+            mj.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        files = sorted(src_anchors.glob("*.png"))
+        if anchor_keys is not None:
+            wanted = set(anchor_keys)
+            files = [fp for fp in files if fp.stem in wanted]
+
+        for idx, ap in enumerate(files):
             dst = dst_anchors / ap.name
             if skip_existing and dst.is_file():
                 continue
-            up = self.bridge.upload_image_on_white(ap, f"iaw_outfit_src_{ap.stem}.png")
+            if on_progress:
+                on_progress(f"Vestindo ancora {outfit_id}/{ap.stem}...")
+            up = self.bridge.upload_image_on_white(ap, f"iaw_outfit_{outfit_id}_src_{ap.stem}.png")
             g = build_qwen_anchor_workflow(
                 base_uploaded_image=up,
                 prompt=(
-                    f"Keep this exact character, exact face, exact pose, exact framing, exact hair and pure solid white background "
-                    f"100% identical pixel-for-pixel, changing ONLY her clothing to wear {outfit_prompt}, crisp 2D hand-painted style."
+                    f"Keep this exact curvy shortstack character, exact face, exact expression, exact pose, exact body framing, "
+                    f"exact hair, exact pointed ears, exact proportions and pure solid flat white background 100% identical pixel-for-pixel, "
+                    f"replacing ONLY her clothing so she wears {outfit_prompt}, crisp 2D hand-painted Rapscallion Tree of Savior ink art style, zero floor shadow."
                 ),
-                neg="different pose, moved limbs, different face, shadow, scenery, 2girls, cropped feet",
+                neg="different pose, moved limbs, different angle, different face, underwear visible on top, shadow, scenery, 2girls, cropped feet, 3d render",
                 prefix=f"IAW_outfit_{outfit_id}_{ap.stem}",
-                seed=base_seed + idx,
+                seed=base_seed + idx * 7,
             )
             self._run_and_save(g, dst, timeout_s=300.0)
         return dst_outfit
